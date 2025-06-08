@@ -8,7 +8,7 @@
 
 namespace RL {
 inline
-void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool mirror_vertical = false, bool rooms_the_same = true)
+void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool mirror_vertical = false)
 {
     const int room_min_size = 3;
     const int room_max_size = 15;
