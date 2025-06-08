@@ -1,0 +1,7 @@
+BIN= rl-test
+OBJ= main.o RoguelikeLib.o
+
+all: rllib
+
+rllib: $(OBJ)
+	g++ $(CFLAGS) $? -o $(BIN) $(LDFLAGS)
