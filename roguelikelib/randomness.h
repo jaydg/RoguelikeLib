@@ -6,14 +6,17 @@
 #ifndef RL_RANDOMNESS_H
 #define RL_RANDOMNESS_H
 
-#include "extern/mt19937int.h"
-#include <time.h>
+#include <ctime>
+#include <random>
 
 namespace RL {
+
+static std::mt19937 mt;
+
 inline
 void InitRandomness(void)
 {
-    init_genrand((unsigned int) time(0));
+    mt.seed((unsigned int) time(nullptr));
 };
 
 inline
@@ -25,7 +28,7 @@ int Random(int value)
         return 0;
     }
 
-    random_value = (int)(((float)genrand_int32() / (float)0xFFFFFFFF) * (value));
+    random_value = (int)(((float)mt() / (float)0xFFFFFFFF) * (value));
     return random_value;
 };
 
