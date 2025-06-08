@@ -11,6 +11,6 @@ public:
 	virtual void GainExperience();
 	virtual void DoAction();
 	virtual void Death();
-	virtual void Print();
+	virtual void Print() const;
 	virtual void LookAround();
 };

@@ -1,5 +1,6 @@
 #include "simple-game.h"
 #include "io.h"
+#include "../roguelikelib/randomness.h"
 
 extern CSimpleGame game;
 
@@ -39,30 +40,30 @@ void CPlayer::DoAction()
 	switch(key)
 	{
 	case '1':
-		MoveTo(RL::SPosition(position.x-1,position.y+1));
+		MoveTo(RL::Position(position.x-1,position.y+1));
 		break;
 	case '2':
-		MoveTo(RL::SPosition(position.x,position.y+1));
+		MoveTo(RL::Position(position.x,position.y+1));
 		break;
 	case '3':
-		MoveTo(RL::SPosition(position.x+1,position.y+1));
+		MoveTo(RL::Position(position.x+1,position.y+1));
 		break;
 	case '4':
-		MoveTo(RL::SPosition(position.x-1,position.y));
+		MoveTo(RL::Position(position.x-1,position.y));
 		break;
 	case '5':
 		break;
 	case '6':
-		MoveTo(RL::SPosition(position.x+1,position.y));
+		MoveTo(RL::Position(position.x+1,position.y));
 		break;
 	case '7':
-		MoveTo(RL::SPosition(position.x-1,position.y-1));
+		MoveTo(RL::Position(position.x-1,position.y-1));
 		break;
 	case '8':
-		MoveTo(RL::SPosition(position.x,position.y-1));
+		MoveTo(RL::Position(position.x,position.y-1));
 		break;
 	case '9':
-		MoveTo(RL::SPosition(position.x+1,position.y-1));
+		MoveTo(RL::Position(position.x+1,position.y-1));
 		break;
 	}
 }
@@ -72,7 +73,7 @@ void CPlayer::Death()
 	IOPrintString(30,24,"You are dead!");
 }
 
-void CPlayer::Print()
+void CPlayer::Print() const
 {
 	CMonster::Print();
 	IOPrintString(0,24,"HP:   ");
@@ -80,4 +81,42 @@ void CPlayer::Print()
 
 	IOPrintString(10,24,"EXP:");
 	IOPrintValue(15,24,experience);
+}
+
+void CPlayer::LookAround()
+{
+	CMonster::LookAround();
+
+	// Print map
+	RL::Position pos;
+	for (pos.x=0;pos.x<LEVEL_SIZE_X;++pos.x)
+	{
+		for (pos.y=0;pos.y<LEVEL_SIZE_Y;++pos.y)
+		{
+			if (fov.GetCell(pos)) // if visible
+			{
+				int cell = game.level.GetCell(pos);
+				seen_map.SetCell(pos,cell);
+				if (cell!='#')
+					cell='.';
+				IOPrintChar(pos.x,pos.y,cell);
+				CMonster *monster = game.GetMonsterFromCell(pos);
+				if (monster!=NULL)
+					monster->Print();
+			}
+			else if (seen_map.GetCell(pos))
+			{
+				int seen_cell = seen_map.GetCell(pos);
+				if (seen_cell=='#')
+					IOPrintChar(pos.x,pos.y,'%');				
+				else
+					IOPrintChar(pos.x,pos.y,' ');				
+			}
+			else
+			{
+				IOPrintChar(pos.x,pos.y,' ');				
+			}
+		}
+	}
+	IORefresh();
 }

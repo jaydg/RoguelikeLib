@@ -1,5 +1,7 @@
 #include "simple-game.h"
 #include "io.h"
+#include "../roguelikelib/randomness.h"
+#include "../roguelikelib/fov.h"
 
 extern CSimpleGame game;
 
@@ -19,7 +21,7 @@ bool CMonster::Attack(CMonster *monster)
 	return monster->Damage(RL::Random(strength));
 }
 
-void CMonster::Print()
+void CMonster::Print() const
 {
 	IOPrintChar(position.x,position.y,tile);
 }
@@ -30,7 +32,7 @@ void CMonster::LookAround()
 	for (int x=0;x<LEVEL_SIZE_X;++x)
 		for (int y=0;y<LEVEL_SIZE_Y;++y)
 			fov.SetCell(x,y,fov.GetCell(x,y)==RL::LevelElementWall); // blocked only if Wall
-	CalculateFOV(fov,position,5);
+	RL::CalculateFOV(fov,position,5);
 }
 
 void CMonster::Death()
@@ -40,3 +42,27 @@ void CMonster::Death()
 	position.x=-1;
 	position.y=-1;
 };
+
+RL::Position CMonster::GetPosition() const
+{
+	return position;
+}
+
+bool CMonster::MoveTo(const RL::Position &new_pos)
+{
+	int cell = game.level.GetCell(new_pos);
+	if (cell!=-1 && cell!='#')
+	{
+		// if monster there
+		CMonster *monster = game.GetMonsterFromCell(new_pos);
+		if (monster==NULL)
+		{
+			position=new_pos;
+			return true;
+		}
+		if (monster!=this)
+			Attack(monster);
+		return false;
+	}
+	return false;
+}

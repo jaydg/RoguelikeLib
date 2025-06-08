@@ -15,20 +15,23 @@
 
 #include <list>
 #include <set>
+#include "../roguelikelib/randomness.h"
+#include "../roguelikelib/mapgenerators.h"
+
 #include "simple-game.h"
 #include "io.h"
 #include "rodent.h"
 
-// game is global
+// game is a global singleton
 CSimpleGame game;
 
 void CSimpleGame::PlacePlayer()
 {
-	RL::SPosition pos(0,0);
-	if (RL::FindOnMapRandomRectangleOfType(level,RL::LevelElementRoom,pos,1,1))
-		player.position=pos;
-	else if (RL::FindOnMapRandomRectangleOfType(level,RL::LevelElementCorridor,pos,1,1))
-		player.position=pos;
+	RL::Position pos(0,0);
+	if (RL::FindOnMapRandomRectangleOfType(level,RL::LevelElementRoom,pos,RL::Size(1,1)))
+		player.MoveTo(pos);
+	else if (RL::FindOnMapRandomRectangleOfType(level,RL::LevelElementCorridor,pos,RL::Size(1,1)))
+		player.MoveTo(pos);
 
 	monsters.push_back(&player);
 }
@@ -36,11 +39,11 @@ void CSimpleGame::PlacePlayer()
 void CSimpleGame::AddMonster()
 {
 	CRodent *new_one = new CRodent;
-	RL::SPosition pos(0,0);
-	if (RL::FindOnMapRandomRectangleOfType(level,RL::LevelElementRoom,pos,1,1))
-		new_one->position=pos;
-	else if (RL::FindOnMapRandomRectangleOfType(level,RL::LevelElementCorridor,pos,1,1))
-		new_one->position=pos;
+	RL::Position pos(0,0);
+	if (RL::FindOnMapRandomRectangleOfType(level,RL::LevelElementRoom,pos,RL::Size(1,1)))
+		new_one->MoveTo(pos);
+	else if (RL::FindOnMapRandomRectangleOfType(level,RL::LevelElementCorridor,pos,RL::Size(1,1)))
+		new_one->MoveTo(pos);
 
 	monsters.push_back(new_one);
 }
@@ -71,7 +74,7 @@ void CSimpleGame::MoveAllMonsters()
 	monsters_to_remove.clear();
 }
 
-void CSimpleGame::Start()
+void CSimpleGame::CreateLevel()
 {
 	level.Resize(LEVEL_SIZE_X,LEVEL_SIZE_Y);
 
@@ -104,11 +107,13 @@ void CSimpleGame::Start()
 		break;
 	}
 
-	//////////////////////////////////////////////////////////////////////////
-
 	PlacePlayer();
 	for (int index=0;index<15;++index)
 		AddMonster();
+}
+
+void CSimpleGame::MainLoop()
+{
 	for (;;) // next turn
 	{
 		if (RL::Random(100)==0)
@@ -119,71 +124,13 @@ void CSimpleGame::Start()
 	}
 }
 
-bool CMonster::MoveTo(const RL::SPosition &new_pos)
-{
-	int cell = game.level.GetCell(new_pos);
-	if (cell!=-1 && cell!='#')
-	{
-		// if monster there
-		CMonster *monster = game.GetMonsterFromCell(new_pos);
-		if (monster==NULL)
-		{
-			position=new_pos;
-			return true;
-		}
-		if (monster!=this)
-			Attack(monster);
-		return false;
-	}
-	return false;
-}
-
-void CPlayer::LookAround()
-{
-	CMonster::LookAround();
-
-	// Print map
-	RL::SPosition pos;
-	for (pos.x=0;pos.x<LEVEL_SIZE_X;++pos.x)
-	{
-		for (pos.y=0;pos.y<LEVEL_SIZE_Y;++pos.y)
-		{
-			if (fov.GetCell(pos)) // if visible
-			{
-				int cell = game.level.GetCell(pos);
-				seen_map.SetCell(pos,cell);
-				if (cell!='#')
-					cell='.';
-				IOPrintChar(pos.x,pos.y,cell);
-				CMonster *monster = game.GetMonsterFromCell(pos);
-				if (monster!=NULL)
-					monster->Print();
-			}
-			else if (seen_map.GetCell(pos))
-			{
-				int seen_cell = seen_map.GetCell(pos);
-				if (seen_cell=='#')
-					IOPrintChar(pos.x,pos.y,'%');				
-				else
-					IOPrintChar(pos.x,pos.y,' ');				
-			}
-			else
-			{
-				IOPrintChar(pos.x,pos.y,' ');				
-			}
-		}
-	}
-	IORefresh();
-}
-
-
-CMonster *CSimpleGame::GetMonsterFromCell(const RL::SPosition &cell)
+CMonster *CSimpleGame::GetMonsterFromCell(const RL::Position &cell)
 {
 	std::list < CMonster * >::iterator it, _it;
 	for (it=game.monsters.begin(),_it=game.monsters.end();it!=_it;++it)
 	{
 		CMonster *monster = *it;		
-		if (monster->position==cell)
+		if (monster->GetPosition()==cell)
 			return monster;
 	}
 	return NULL;
@@ -193,6 +140,7 @@ int main(void)
 {	
 	IOInit();
 	RL::InitRandomness();
-	game.Start();
+	game.CreateLevel();
+	game.MainLoop();
 	return 0;
 }

@@ -1,4 +1,5 @@
 #include <set>
+#include <list>
 #include "player.h"
 
 const int LEVEL_SIZE_X=80; 
@@ -9,14 +10,16 @@ private:
 
 	void PlacePlayer();
 	void AddMonster();
-	void MoveAllMonsters();
+	void MoveAllMonsters();	
 
 public:
 	RL::CMap level;
 	CPlayer player;
 	std::list < CMonster * > monsters;
 	std::set < CMonster * > monsters_to_remove;
-	void Start();
-	CMonster *GetMonsterFromCell(const RL::SPosition &cell);
+	CMonster *GetMonsterFromCell(const RL::Position &cell);
+
+	void CreateLevel();
+	void MainLoop();
 };
 

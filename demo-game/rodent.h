@@ -1,8 +1,8 @@
-#include "../include/roguelikelib.h"
+#include "../roguelikelib/map.h"
 
 class CRodent : public CMonster {
 private:
-	RL::SPosition enemy_pos;
+	RL::Position enemy_pos;
 public:
 	CRodent();
 	virtual void LookAround();

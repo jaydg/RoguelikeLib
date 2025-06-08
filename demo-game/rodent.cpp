@@ -1,5 +1,6 @@
 #include "simple-game.h"
 #include "rodent.h"
+#include "../roguelikelib/pathfinding.h"
 
 extern CSimpleGame game;
 
@@ -13,8 +14,8 @@ CRodent::CRodent()
 void CRodent::LookAround()
 {
 	CMonster::LookAround();
-	if (fov.GetCell(game.player.position.x,game.player.position.y))
-		enemy_pos = game.player.position;
+	if (fov.GetCell(game.player.GetPosition()))
+		enemy_pos = game.player.GetPosition();
 }
 
 void CRodent::DoAction()
@@ -22,11 +23,11 @@ void CRodent::DoAction()
 	LookAround();
 	if (position!=enemy_pos && game.level.OnMap(enemy_pos))
 	{		
-		std::vector<RL::SPosition> path;
+		std::vector<RL::Position> path;
 
 		// Convert map to values for pathfinding
 		RL::CMap temp_map = game.level;
-		RL::SPosition pos;
+		RL::Position pos;
 		for (pos.x=0;pos.x<LEVEL_SIZE_X;++pos.x)
 			for (pos.y=0;pos.y<LEVEL_SIZE_Y;++pos.y)
 			{

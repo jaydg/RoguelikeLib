@@ -197,38 +197,6 @@
 				>
 			</Filter>
 		</Filter>
-		<Filter
-			Name="RoguelikeLib"
-			>
-			<File
-				RelativePath="..\include\mt19937int.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\include\mt19937int.h"
-				>
-			</File>
-			<File
-				RelativePath="..\include\permissive-fov-cpp.h"
-				>
-			</File>
-			<File
-				RelativePath="..\include\permissive-fov.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\include\permissive-fov.h"
-				>
-			</File>
-			<File
-				RelativePath="..\include\RoguelikeLib.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\include\RoguelikeLib.h"
-				>
-			</File>
-		</Filter>
 	</Files>
 	<Globals>
 	</Globals>
