@@ -1,4 +1,5 @@
 // Simple IO using Curses
+
 #include <curses.h>
 
 void IOInit()
@@ -21,7 +22,7 @@ void IOPrintChar(int x, int y, char to_print)
     mvprintw(y, x, "%c", to_print);
 }
 
-void IOPrintString(int x, int y, char *to_print)
+void IOPrintString(int x, int y, const char* to_print)
 {
     mvprintw(y, x, "%s", to_print);
 }
