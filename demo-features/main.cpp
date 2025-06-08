@@ -7,160 +7,162 @@ using namespace std;
 
 int main(void)
 {
-	//////////////////////////////////////////////////////////////////////////
-	// Initialization of randomness
-	//////////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////
+    // Initialization of randomness
+    //////////////////////////////////////////////////////////////////////////
 
-	RL::InitRandomness();
+    RL::InitRandomness();
 
-	//////////////////////////////////////////////////////////////////////////
-	// Define the map
-	//////////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////
+    // Define the map
+    //////////////////////////////////////////////////////////////////////////
 
-	RL::CMap level;
-	const RL::Size level_size(79,50);
-	level.Resize(level_size);
+    RL::CMap level;
+    const RL::Size level_size(79, 50);
+    level.Resize(level_size);
 
-	//////////////////////////////////////////////////////////////////////////
-	// Generate some levels
-	//////////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////
+    // Generate some levels
+    //////////////////////////////////////////////////////////////////////////
 
-	cout << endl << "Standard Dungeon" << endl << endl;
-	RL::CreateStandardDunegon(level,20);
-	level.PrintMap();
+    cout << endl << "Standard Dungeon" << endl << endl;
+    RL::CreateStandardDunegon(level, 20);
+    level.PrintMap();
 
-	cout << endl << "Ant's Nest" << endl << endl;
-	RL::CreateAntNest(level,true);
-	level.PrintMap();
+    cout << endl << "Ant's Nest" << endl << endl;
+    RL::CreateAntNest(level, true);
+    level.PrintMap();
 
-	cout << endl << "Mines" << endl << endl;
-	RL::CreateMines(level,25);
-	level.PrintMap();
+    cout << endl << "Mines" << endl << endl;
+    RL::CreateMines(level, 25);
+    level.PrintMap();
 
-	cout << endl << "Caves Sharp" << endl << endl;
-	RL::CreateCaves(level,1,0.75);
-	level.PrintMap();
+    cout << endl << "Caves Sharp" << endl << endl;
+    RL::CreateCaves(level, 1, 0.75);
+    level.PrintMap();
 
-	cout << endl << "Caves Soft" << endl << endl;
-	RL::CreateCaves(level,3);
-	level.PrintMap();
+    cout << endl << "Caves Soft" << endl << endl;
+    RL::CreateCaves(level, 3);
+    level.PrintMap();
 
-	cout << endl << "Space shuttle" << endl << endl;
-	RL::CreateSpaceShuttle(level,25);
-	level.PrintMap();
+    cout << endl << "Space shuttle" << endl << endl;
+    RL::CreateSpaceShuttle(level, 25);
+    level.PrintMap();
 
-	cout << endl << "Castle" << endl << endl;
-	RL::CreateSpaceShuttle(level,25,true);
-	level.PrintMap();
+    cout << endl << "Castle" << endl << endl;
+    RL::CreateSpaceShuttle(level, 25, true);
+    level.PrintMap();
 
-	cout << endl << "Simple City with 15 buildings" << endl << endl;
-	RL::CreateSimpleCity(level,15);
-	level.PrintMap();
+    cout << endl << "Simple City with 15 buildings" << endl << endl;
+    RL::CreateSimpleCity(level, 15);
+    level.PrintMap();
 
-	//////////////////////////////////////////////////////////////////////////
-	// Field of view testing
-	//////////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////
+    // Field of view testing
+    //////////////////////////////////////////////////////////////////////////
 
-	cout << endl << "Field of View in Simple City from the road" << endl << endl;
+    cout << endl << "Field of View in Simple City from the road" << endl << endl;
 
 
-	// Place observer somewhere on a horizontal road
+    // Place observer somewhere on a horizontal road
 
-	RL::Position observer;
-	RL::FindOnMapRandomRectangleOfType(level,RL::LevelElementCorridor,observer,RL::Size(2,1));	
+    RL::Position observer;
+    RL::FindOnMapRandomRectangleOfType(level, RL::LevelElementCorridor, observer, RL::Size(2, 1));
 
-	// Define the FOV
+    // Define the FOV
 
-	RL::CMap fov;
-	fov.Resize(level_size);
+    RL::CMap fov;
+    fov.Resize(level_size);
 
-	// Only walls block the FOV
+    // Only walls block the FOV
 
-	RL::Position pos;
-	for (pos.x=0;pos.x<level_size.x;++pos.x)
-	{
-		for (pos.y=0;pos.y<level_size.y;++pos.y)
-		{
-			if (level.GetCell(pos)==RL::LevelElementWall || level.GetCell(pos)==RL::LevelElementDoorClose)
-				fov.SetCell(pos,1); // blocks
-			else
-				fov.SetCell(pos,0); // doesn't block
-		}
-	}
+    RL::Position pos;
 
-	// FOV prepared, calculate it
+    for(pos.x = 0; pos.x < level_size.x; ++pos.x) {
+        for(pos.y = 0; pos.y < level_size.y; ++pos.y) {
+            if(level.GetCell(pos) == RL::LevelElementWall || level.GetCell(pos) == RL::LevelElementDoorClose) {
+                fov.SetCell(pos, 1); // blocks
+            } else {
+                fov.SetCell(pos, 0); // doesn't block
+            }
+        }
+    }
 
-	RL::CalculateFOV(fov,observer,9);
+    // FOV prepared, calculate it
 
-	// Print calculated FOV
+    RL::CalculateFOV(fov, observer, 9);
 
-	for (pos.y=0;pos.y<level_size.y;++pos.y)
-	{
-		for (pos.x=0;pos.x<level_size.x;++pos.x)
-		{
-			if (pos==observer)
-				cout << '@';
-			else if (fov.GetCell(pos)==1) // visible cells take from the map
-				cout << (char) level.GetCell(pos);
-			else if (level.GetCell(pos)=='#') // not visible walls as '%'
-				cout << '%';
-			else // others are empty
-				cout << ' ';
-		}
-		cout << endl;
-	}
+    // Print calculated FOV
 
-	//////////////////////////////////////////////////////////////////////////
-	// Find path in the maze
-	//////////////////////////////////////////////////////////////////////////
+    for(pos.y = 0; pos.y < level_size.y; ++pos.y) {
+        for(pos.x = 0; pos.x < level_size.x; ++pos.x) {
+            if(pos == observer) {
+                cout << '@';
+            } else if(fov.GetCell(pos) == 1) { // visible cells take from the map
+                cout << (char) level.GetCell(pos);
+            } else if(level.GetCell(pos) == '#') { // not visible walls as '%'
+                cout << '%';
+            } else { // others are empty
+                cout << ' ';
+            }
+        }
 
-	// Create maze
+        cout << endl;
+    }
 
-	cout << endl << "Maze" << endl << endl;
-	RL::CreateMaze(level);
-	level.PrintMap();
+    //////////////////////////////////////////////////////////////////////////
+    // Find path in the maze
+    //////////////////////////////////////////////////////////////////////////
 
-	cout << endl << "Path in this maze '+' (from top-left to bottom-right corner)" << endl << endl;
+    // Create maze
 
-	// convert tiles to values and find corners at the same time
-	// conversion is needed for pathfinding because it uses flood fill algorithm
-	// and you have to define what is blocking.
+    cout << endl << "Maze" << endl << endl;
+    RL::CreateMaze(level);
+    level.PrintMap();
 
-	RL::CMap temp_level=level; // copy the level to a temporary
-	RL::Position start, end;
+    cout << endl << "Path in this maze '+' (from top-left to bottom-right corner)" << endl << endl;
 
-	for (pos.x=0;pos.x<level_size.x;++pos.x)
-	{
-		for (pos.y=0;pos.y<level_size.y;++pos.y)
-		{
-			if (temp_level.GetCell(pos)==RL::LevelElementCorridor)
-			{
-				temp_level.SetCell(pos,RL::LevelElementCorridor_value); // conversion
-				// set top-left corner
-				if (start.x==-1)
-					start = pos;
-				// set bottom-right corner
-				end = pos;
-			}
-			else
-				temp_level.SetCell(pos,RL::LevelElementWall_value);  // conversion
-		}
-	}
+    // convert tiles to values and find corners at the same time
+    // conversion is needed for pathfinding because it uses flood fill algorithm
+    // and you have to define what is blocking.
 
-	// find path in maze
+    RL::CMap temp_level = level; // copy the level to a temporary
+    RL::Position start, end;
 
-	vector < RL::Position > path;
-	RL::FindPath(temp_level,start,end,path);
+    for(pos.x = 0; pos.x < level_size.x; ++pos.x) {
+        for(pos.y = 0; pos.y < level_size.y; ++pos.y) {
+            if(temp_level.GetCell(pos) == RL::LevelElementCorridor) {
+                temp_level.SetCell(pos, RL::LevelElementCorridor_value); // conversion
 
-	// print maze with path
+                // set top-left corner
+                if(start.x == -1) {
+                    start = pos;
+                }
 
-	for (size_t index=0;index<path.size();index++)
-		level.SetCell(path[index].x,path[index].y,'+');
-	level.PrintMap();
+                // set bottom-right corner
+                end = pos;
+            } else {
+                temp_level.SetCell(pos, RL::LevelElementWall_value); // conversion
+            }
+        }
+    }
 
-	//////////////////////////////////////////////////////////////////////////
-	// That's all folks!
-	//////////////////////////////////////////////////////////////////////////
-	return 0;
+    // find path in maze
+
+    vector < RL::Position > path;
+    RL::FindPath(temp_level, start, end, path);
+
+    // print maze with path
+
+    for(size_t index = 0; index < path.size(); index++) {
+        level.SetCell(path[index].x, path[index].y, '+');
+    }
+
+    level.PrintMap();
+
+    //////////////////////////////////////////////////////////////////////////
+    // That's all folks!
+    //////////////////////////////////////////////////////////////////////////
+    return 0;
 }
 

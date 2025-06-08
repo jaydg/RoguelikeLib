@@ -27,120 +27,137 @@ CSimpleGame game;
 
 void CSimpleGame::PlacePlayer()
 {
-	RL::Position pos(0,0);
-	if (RL::FindOnMapRandomRectangleOfType(level,RL::LevelElementRoom,pos,RL::Size(1,1)))
-		player.MoveTo(pos);
-	else if (RL::FindOnMapRandomRectangleOfType(level,RL::LevelElementCorridor,pos,RL::Size(1,1)))
-		player.MoveTo(pos);
+    RL::Position pos(0, 0);
 
-	monsters.push_back(&player);
+    if(RL::FindOnMapRandomRectangleOfType(level, RL::LevelElementRoom, pos, RL::Size(1, 1))) {
+        player.MoveTo(pos);
+    } else if(RL::FindOnMapRandomRectangleOfType(level, RL::LevelElementCorridor, pos, RL::Size(1, 1))) {
+        player.MoveTo(pos);
+    }
+
+    monsters.push_back(&player);
 }
 
 void CSimpleGame::AddMonster()
 {
-	CRodent *new_one = new CRodent;
-	RL::Position pos(0,0);
-	if (RL::FindOnMapRandomRectangleOfType(level,RL::LevelElementRoom,pos,RL::Size(1,1)))
-		new_one->MoveTo(pos);
-	else if (RL::FindOnMapRandomRectangleOfType(level,RL::LevelElementCorridor,pos,RL::Size(1,1)))
-		new_one->MoveTo(pos);
+    CRodent *new_one = new CRodent;
+    RL::Position pos(0, 0);
 
-	monsters.push_back(new_one);
+    if(RL::FindOnMapRandomRectangleOfType(level, RL::LevelElementRoom, pos, RL::Size(1, 1))) {
+        new_one->MoveTo(pos);
+    } else if(RL::FindOnMapRandomRectangleOfType(level, RL::LevelElementCorridor, pos, RL::Size(1, 1))) {
+        new_one->MoveTo(pos);
+    }
+
+    monsters.push_back(new_one);
 }
 
 void CSimpleGame::MoveAllMonsters()
 {
-	std::list < CMonster * >::iterator it, _it;
-	for (it=monsters.begin(),_it=monsters.end();it!=_it;++it)
-	{
-		CMonster *monster = *it;
-		if (monsters_to_remove.find(monster)==monsters_to_remove.end())
-			monster->DoAction();
-	}
-	// remove all dead monsters
-	std::list < CMonster * >::iterator to_remove;
+    std::list < CMonster * >::iterator it, _it;
 
-	for (it=monsters.begin(),_it=monsters.end();it!=_it;)
-	{
-		to_remove=it;
-		it++;
-		CMonster *monster = *to_remove;
-		if (monsters_to_remove.find(monster)!=monsters_to_remove.end())
-		{
-			delete monster;
-			monsters.erase(to_remove);
-		}
-	}
-	monsters_to_remove.clear();
+    for(it = monsters.begin(), _it = monsters.end(); it != _it; ++it) {
+        CMonster *monster = *it;
+
+        if(monsters_to_remove.find(monster) == monsters_to_remove.end()) {
+            monster->DoAction();
+        }
+    }
+
+    // remove all dead monsters
+    std::list < CMonster * >::iterator to_remove;
+
+    for(it = monsters.begin(), _it = monsters.end(); it != _it;) {
+        to_remove = it;
+        it++;
+        CMonster *monster = *to_remove;
+
+        if(monsters_to_remove.find(monster) != monsters_to_remove.end()) {
+            delete monster;
+            monsters.erase(to_remove);
+        }
+    }
+
+    monsters_to_remove.clear();
 }
 
 void CSimpleGame::CreateLevel()
 {
-	level.Resize(LEVEL_SIZE_X,LEVEL_SIZE_Y);
+    level.Resize(LEVEL_SIZE_X, LEVEL_SIZE_Y);
 
-	int level_type=RL::Random(6);
-	switch(level_type)
-	{
-	case 0:
-		RL::CreateStandardDunegon(level,20,false);
-		IOPrintString(60,24,"Standard Dungeon");
-		break;
-	case 1:
-		RL::CreateAntNest(level,true);
-		IOPrintString(60,24,"Ant Nest");
-		break;
-	case 2:
-		RL::CreateMines(level,12);
-		IOPrintString(60,24,"Mines");
-		break;
-	case 3:
-		RL::CreateCaves(level,2);
-		IOPrintString(60,24,"Caves");
-		break;
-	case 4:
-		RL::CreateMaze(level,false);
-		IOPrintString(60,24,"Maze");
-		break;
-	case 5:
-		RL::CreateSpaceShuttle(level);
-		IOPrintString(60,24,"Space Shuttle");
-		break;
-	}
+    int level_type = RL::Random(6);
 
-	PlacePlayer();
-	for (int index=0;index<15;++index)
-		AddMonster();
+    switch(level_type) {
+    case 0:
+        RL::CreateStandardDunegon(level, 20, false);
+        IOPrintString(60, 24, "Standard Dungeon");
+        break;
+
+    case 1:
+        RL::CreateAntNest(level, true);
+        IOPrintString(60, 24, "Ant Nest");
+        break;
+
+    case 2:
+        RL::CreateMines(level, 12);
+        IOPrintString(60, 24, "Mines");
+        break;
+
+    case 3:
+        RL::CreateCaves(level, 2);
+        IOPrintString(60, 24, "Caves");
+        break;
+
+    case 4:
+        RL::CreateMaze(level, false);
+        IOPrintString(60, 24, "Maze");
+        break;
+
+    case 5:
+        RL::CreateSpaceShuttle(level);
+        IOPrintString(60, 24, "Space Shuttle");
+        break;
+    }
+
+    PlacePlayer();
+
+    for(int index = 0; index < 15; ++index) {
+        AddMonster();
+    }
 }
 
 void CSimpleGame::MainLoop()
 {
-	for (;;) // next turn
-	{
-		if (RL::Random(100)==0)
-			AddMonster();
+    for(;;) { // next turn
+        if(RL::Random(100) == 0) {
+            AddMonster();
+        }
 
-		player.Regenerate();
-		MoveAllMonsters();
-	}
+        player.Regenerate();
+        MoveAllMonsters();
+    }
 }
 
 CMonster *CSimpleGame::GetMonsterFromCell(const RL::Position &cell)
 {
-	std::list < CMonster * >::iterator it, _it;
-	for (it=game.monsters.begin(),_it=game.monsters.end();it!=_it;++it)
-	{
-		CMonster *monster = *it;		
-		if (monster->GetPosition()==cell)
-			return monster;
-	}
-	return NULL;
+    std::list < CMonster * >::iterator it, _it;
+
+    for(it = game.monsters.begin(), _it = game.monsters.end(); it != _it; ++it) {
+        CMonster *monster = *it;
+
+        if(monster->GetPosition() == cell) {
+            return monster;
+        }
+    }
+
+    return NULL;
 }
 
 int main(void)
-{	
-	IOInit();
-	RL::InitRandomness();
-	game.CreateLevel();
-	game.MainLoop();
-	return 0;
+{
+    IOInit();
+    RL::InitRandomness();
+    game.CreateLevel();
+    game.MainLoop();
+    return 0;
 }

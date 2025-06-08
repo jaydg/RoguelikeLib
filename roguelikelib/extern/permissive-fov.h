@@ -27,17 +27,16 @@ extern "C"
 #endif
 
 /* See below for a description of how to use this struct */
-typedef struct
-{
-  /* Do not interact with the members directly.
-     Use the provided functions. */
-  int north;
-  int south;
-  int east;
-  int west;
-  int width;
-  int height;
-  unsigned int * mask;
+typedef struct {
+    /* Do not interact with the members directly.
+       Use the provided functions. */
+    int north;
+    int south;
+    int east;
+    int west;
+    int width;
+    int height;
+    unsigned int * mask;
 } permissiveMaskT;
 
 /* Function specifications for the two user functions called by
@@ -87,14 +86,13 @@ void permissiveFov(short sourceX, short sourceY,
                    isBlockedFunction isBlocked,
                    visitFunction visit, void * context);
 
-typedef enum
-{
-  PERMISSIVE_NO_FAILURE,
-  PERMISSIVE_OUT_OF_MEMORY,
-  PERMISSIVE_FAILED_TO_OPEN_FILE,
-  PERMISSIVE_LOAD_NO_ORIGIN,
-  PERMISSIVE_LOAD_INVALID_CHARACTER,
-  PERMISSIVE_SAVE_WRITE_FAILED,
+typedef enum {
+    PERMISSIVE_NO_FAILURE,
+    PERMISSIVE_OUT_OF_MEMORY,
+    PERMISSIVE_FAILED_TO_OPEN_FILE,
+    PERMISSIVE_LOAD_NO_ORIGIN,
+    PERMISSIVE_LOAD_INVALID_CHARACTER,
+    PERMISSIVE_SAVE_WRITE_FAILED,
 } permissiveErrorT;
 
 /*
@@ -183,6 +181,7 @@ int doesPermissiveVisit(permissiveMaskT * mask, int x, int y);
 
 #ifdef __cplusplus
 }
+
 #endif
 
 #endif

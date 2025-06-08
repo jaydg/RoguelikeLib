@@ -2,9 +2,9 @@
 
 class CRodent : public CMonster {
 private:
-	RL::Position enemy_pos;
+    RL::Position enemy_pos;
 public:
-	CRodent();
-	virtual void LookAround();
-	virtual void DoAction();
+    CRodent();
+    virtual void LookAround();
+    virtual void DoAction();
 };
