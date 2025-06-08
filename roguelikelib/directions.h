@@ -34,16 +34,16 @@ public:
     inline EDirection Get()
     {
         return direction;
-    };
+    }
 
     inline void Set(EDirection to_set)
     {
         direction = to_set;
-    };
+    }
 
     inline EDirection Incrase();
     inline EDirection Decrase();
-};
+}
 
 inline
 EDirection operator++(EDirection & e, int)
@@ -63,19 +63,19 @@ inline EDirection Direction::Incrase()
 {
     direction++;
     return direction;
-};
+}
 
 inline EDirection Direction::Decrase()
 {
     direction--;
     return direction;
-};
+}
 
 inline
 EDirection RandomDirection()
 {
     return (EDirection) Random(RL::EDirectionMax);
-};
+}
 
 } // end of namespace RL
 

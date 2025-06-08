@@ -86,7 +86,7 @@ void CreateMaze(CMap &level, bool allow_loops = false)
             }
         }
     }
-};
+}
 
 } // end of namespace RL
 

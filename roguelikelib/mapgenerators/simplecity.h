@@ -107,7 +107,7 @@ void CreateSimpleCity(CMap &level, const int& a_number_of_buildings)
             return;
         }
     }
-};
+}
 
 } // end of namespace RL
 

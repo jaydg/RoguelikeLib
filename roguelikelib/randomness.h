@@ -17,7 +17,7 @@ inline
 void InitRandomness(void)
 {
     mt.seed((unsigned int) time(nullptr));
-};
+}
 
 inline
 int Random(int value)
@@ -30,7 +30,7 @@ int Random(int value)
 
     random_value = (int)(((float)mt() / (float)0xFFFFFFFF) * (value));
     return random_value;
-};
+}
 
 inline
 bool RandomLowerThatLimit(int limit, int value)
@@ -50,7 +50,7 @@ inline
 bool CoinToss()
 {
     return Random(2) != 0;
-};
+}
 
 template <class RandomAccessIterator>
 void Shuffle(RandomAccessIterator first, RandomAccessIterator last)

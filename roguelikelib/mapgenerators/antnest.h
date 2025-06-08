@@ -110,7 +110,7 @@ void CreateAntNest(CMap &level, bool with_rooms = false)
             }
         }
     } // end of if (with_rooms)
-};
+}
 
 } // end of namespace RL
 

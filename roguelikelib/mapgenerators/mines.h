@@ -148,7 +148,7 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
             }
         } // end of room addition
     }
-};
+}
 
 } // end of namespace RL
 

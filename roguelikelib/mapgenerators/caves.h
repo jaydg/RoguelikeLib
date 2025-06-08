@@ -48,7 +48,7 @@ void CreateCaves(CMap &level, int iterations = 1, float density = 0.65)
 
     ConnectClosestRooms(level, true);
     ConvertValuesToTiles(level);
-};
+}
 
 } // end of namespace RL
 

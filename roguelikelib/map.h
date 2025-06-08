@@ -19,7 +19,7 @@ struct Position {
     {
         x = -1;
         y = -1;
-    };
+    }
 
     Position(int a_x, int a_y): x(a_x), y(a_y) {};
 
@@ -86,22 +86,22 @@ public:
         size.y = height;
 
         m_map.resize(size.x * size.y);
-    };
+    }
 
     void Resize(Size size)
     {
         return Resize(size.x, size.y);
-    };
+    }
 
     size_t GetWidth()
     {
         return size.x;
-    };
+    }
 
     size_t GetHeight()
     {
         return size.y;
-    };
+    }
 
     void Clear(int filler)
     {
@@ -130,31 +130,31 @@ public:
     bool OnMap(const int& x, const int& y)
     {
         return (x >= 0 && x < (int) size.x && y >= 0 && y < (int) size.y);
-    };
+    }
 
     bool OnMap(const Position &pos)
     {
         return OnMap(pos.x, pos.y);
-    };
+    }
 
     void SetCell(const int& x, const int& y, ELevelElement element)
     {
         if(OnMap(x, y)) {
             m_map[x * size.y + y] = element;
         }
-    };
+    }
 
     void SetCell(const int& x, const int& y, int element)
     {
         if(OnMap(x, y)) {
             m_map[x * size.y + y] = element;
         }
-    };
+    }
 
     void SetCell(const Position &pos, int element)
     {
         return SetCell(pos.x, pos.y, element);
-    };
+    }
 
     int GetCell(const int& x, const int& y)
     {
@@ -163,12 +163,12 @@ public:
         } else {
             return -1;
         }
-    };
+    }
 
     int GetCell(const Position &pos)
     {
         return GetCell(pos.x, pos.y);
-    };
+    }
 
     void PrintMap()
     {
@@ -185,15 +185,16 @@ public:
 struct SRoom {
     Position corner1, corner2;
     int type;
+
     inline bool IsInRoom(const Position &pos)
     {
         return (pos.x >= corner1.x && pos.x <= corner2.x && pos.y >= corner1.y && pos.y <= corner2.y);
-    };
+    }
 
     inline bool IsInRoom(const int x, const int y)
     {
         return (x >= corner1.x && x <= corner2.x && y >= corner1.y && y <= corner2.y);
-    };
+    }
 };
 
 } // end of namespace RL

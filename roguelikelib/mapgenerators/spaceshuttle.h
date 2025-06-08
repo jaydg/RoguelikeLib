@@ -169,7 +169,7 @@ void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool m
 
     ConvertValuesToTiles(level);
     AddDoors(level, 1, 0);
-};
+}
 
 } // end of namespace RL
 
