@@ -1,15 +1,15 @@
-// Simple IO using PDCurses
-#include "pdcurses/curses.h"
+// Simple IO using Curses
+#include <curses.h>
 
 void IOInit()
 {
 	initscr();
-	keypad( stdscr, TRUE ); 
-	nodelay( stdscr, FALSE ); 
+	keypad( stdscr, TRUE );
+	nodelay( stdscr, FALSE );
 	cbreak();
 	noecho();
 	curs_set(0);
-	leaveok(stdscr, true);	
+	leaveok(stdscr, true);
 
 	if (has_colors())
 		start_color();
