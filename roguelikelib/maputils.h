@@ -414,7 +414,7 @@ void ConnectClosestRooms(CMap &level, bool with_doors, bool straight_connections
         }
     }
 
-    random_shuffle(rooms.begin(), rooms.end());
+    Shuffle(rooms.begin(), rooms.end());
 
     if(rooms.size() < 2) {
         return;
