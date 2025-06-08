@@ -34,7 +34,7 @@ void CRodent::DoAction()
         for(pos.x = 0; pos.x < LEVEL_SIZE_X; ++pos.x)
             for(pos.y = 0; pos.y < LEVEL_SIZE_Y; ++pos.y) {
                 if(temp_map.GetCell(pos) != '#') {
-                    CMonster *monster = game.GetMonsterFromCell(pos);
+                    const CMonster *monster = game.GetMonsterFromCell(pos);
 
                     // go around other monsters, don't go around player
                     if(monster != NULL && monster != &game.player && monster != this) {

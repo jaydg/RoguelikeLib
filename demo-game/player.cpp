@@ -113,7 +113,7 @@ void CPlayer::LookAround()
                 }
 
                 IOPrintChar(pos.x, pos.y, cell);
-                CMonster *monster = game.GetMonsterFromCell(pos);
+                const CMonster* monster = game.GetMonsterFromCell(pos);
 
                 if(monster != NULL) {
                     monster->Print();
