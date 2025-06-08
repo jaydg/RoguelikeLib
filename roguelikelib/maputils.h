@@ -572,7 +572,7 @@ void ConnectClosestRooms(CMap &level, bool with_doors, bool straight_connections
 //////////////////////////////////////////////////////////////////////////
 
 inline
-void AddRecursiveRooms(CMap &level, const RL::ELevelElement& type, int min_size_x, int min_size_y, RL::SRoom room, bool with_doors = true)
+void AddRecursiveRooms(CMap &level, const RL::ELevelElement& type, int min_size_x, int min_size_y, const RL::SRoom& room, bool with_doors = true)
 {
     int size_x = room.corner2.x - room.corner1.x;
 
