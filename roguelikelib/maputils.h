@@ -167,7 +167,6 @@ bool FindOnMapRandomRectangleOfType(CMap &level, const RL::ELevelElement& type, 
     }
 
     // get position of Random rectangle
-
     pos = positions[Random((int) positions.size())];
     return true;
 }
@@ -230,7 +229,7 @@ int CountNeighboursOfType(CMap &level, ELevelElement type, const Position& pos, 
 inline
 void AddDoors(CMap &level, float door_probability, float open_probability)
 {
-    for(size_t x = 0; x < level.GetWidth(); ++x)
+    for(size_t x = 0; x < level.GetWidth(); ++x) {
         for(size_t y = 0; y < level.GetHeight(); ++y) {
             Position pos(x, y);
             int room_cells = CountNeighboursOfType(level, LevelElementRoom, pos);
@@ -254,8 +253,9 @@ void AddDoors(CMap &level, float door_probability, float open_probability)
                         }
                     }
                 }
-            }
-        }
+            } // if corridor at position
+        } // for y < level height
+    } // for x < level width
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -289,7 +289,6 @@ bool AddCorridor(CMap &level, const int& start_x1, const int& start_y1, const in
     } else {
         dir_y = -1;
     }
-
 
     // move into direction of the other end
     bool first_horizontal = CoinToss();
@@ -368,7 +367,7 @@ bool AddCorridor(CMap &level, const int& start_x1, const int& start_y1, const in
 inline
 int FillDisconnectedRoomsWithDifferentValues(CMap &level)
 {
-    for(unsigned int y = 0; y < level.GetHeight(); ++y)
+    for(unsigned int y = 0; y < level.GetHeight(); ++y) {
         for(unsigned int x = 0; x < level.GetWidth(); ++x) {
             if(level.GetCell(x, y) == LevelElementRoom) {
                 level.SetCell(x, y, LevelElementRoom_value);
@@ -376,6 +375,7 @@ int FillDisconnectedRoomsWithDifferentValues(CMap &level)
                 level.SetCell(x, y, LevelElementWall_value);
             }
         }
+    }
 
     int room_number = 0;
 
@@ -410,9 +410,9 @@ void ConnectClosestRooms(CMap &level, bool with_doors, bool straight_connections
                 if(CountNeighboursOfType(level, LevelElementWall_value, Position(x, y), false) > 0) {
                     rooms[level.GetCell(x, y)].push_back(Position(x, y));
                 }
-            }
-        }
-    }
+            } // if no wall at position
+        } // for x
+    } // for y
 
     Shuffle(rooms.begin(), rooms.end());
 
@@ -512,15 +512,15 @@ void ConnectClosestRooms(CMap &level, bool with_doors, bool straight_connections
     }
 
     // The closest rooms connected. Connect the rest until all areas are connected
-
     for(int to_connect_a = 0; to_connect_a != -1;) {
         size_t a, b, c;
         int to_connect_b;
 
-        for(a = 0; a < rooms.size(); a++)
+        for(a = 0; a < rooms.size(); a++) {
             for(b = 0; b < rooms.size(); b++) {
                 transitive_closure[a][b] = room_connections[a][b];
             }
+        }
 
         for(a = 0; a < rooms.size(); a++) {
             for(b = 0; b < rooms.size(); b++) {
