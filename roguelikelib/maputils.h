@@ -9,8 +9,10 @@
 #include "map.h"
 #include "randomness.h"
 #include "distance.h"
-#include <list>
+
 #include <algorithm>
+#include <climits>
+#include <list>
 
 namespace RL {
 	inline
@@ -43,10 +45,10 @@ namespace RL {
 
 		// count verticals
 
-		for (unsigned int  x=0;x<level.GetWidth();++x)
+		for (int x=0; x<level.GetWidth(); ++x)
 		{
 			int vertical_count=0;
-			for (unsigned int  y=0;y<level.GetHeight();++y)
+			for (int y=0; y<level.GetHeight(); ++y)
 			{
 				if (good_points.GetCell(x,y)==1)
 					vertical_count++;
@@ -223,8 +225,8 @@ namespace RL {
 	inline
 	void AddDoors(CMap &level, float door_probability, float open_probability)
 	{
-		for (unsigned int  x=0;x<level.GetWidth();++x)
-			for (unsigned int  y=0;y<level.GetHeight();++y)
+		for (size_t x = 0; x < level.GetWidth(); ++x)
+			for (size_t y = 0; y < level.GetHeight(); ++y)
 			{
 				Position pos(x,y);
 				int room_cells = CountNeighboursOfType(level,LevelElementRoom,pos);
@@ -359,9 +361,9 @@ namespace RL {
 
 			int room_number=0;
 
-			for (unsigned int  y=0;y<level.GetHeight();++y)
+			for (size_t y = 0; y < level.GetHeight(); ++y)
 			{
-				for (unsigned int  x=0;x<level.GetWidth();++x)
+				for (size_t x = 0; x < level.GetWidth(); ++x)
 				{
 					if (level.GetCell(x,y)==LevelElementRoom_value)
 					{
@@ -382,9 +384,9 @@ namespace RL {
 
 		std::vector < std::list < Position > > rooms;
 
-		for (unsigned int  y=0;y<level.GetHeight();++y)
+		for (size_t y = 0; y < level.GetHeight(); ++y)
 		{
-			for (unsigned int  x=0;x<level.GetWidth();++x)
+			for (size_t x = 0; x < level.GetWidth(); ++x)
 			{
 				if (level.GetCell(x,y)!=LevelElementWall_value)
 				{

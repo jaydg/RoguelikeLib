@@ -7,6 +7,7 @@
 #define RL_DISTANCE_H
 
 #include "map.h"
+#include <cmath>
 
 namespace RL {
 	//////////////////////////////////////////////////////////////////////////
@@ -29,7 +30,7 @@ namespace RL {
 
 		// count square root
 		for (size_t a=old_size;a<static_cast <size_t>(size);++a)
-			square_root[a]=(int )ceil(sqrt((double) a));				
+			square_root[a]=(int )ceil(std::sqrt((double) a));
 	}
 
 	static inline

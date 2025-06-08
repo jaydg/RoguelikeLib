@@ -6,6 +6,7 @@
 #ifndef RL_MAP_H
 #define RL_MAP_H
 
+#include <climits>
 #include <limits>
 #include <vector>
 #include <iostream>
@@ -61,22 +62,22 @@ namespace RL {
 		std::vector <int> m_map;
 		Size size;
 	public:
-		void Resize(int width,int height)
+		void Resize(size_t width, size_t height)
 		{
 			if (width<=0 || height<=0)
 				return;
 			size.x  = width;
 			size.y = height;
 
-			m_map.resize(size.x*size.y);			
+			m_map.resize(size.x*size.y);
 		};
 		void Resize(Size size)
 		{
 			return Resize(size.x,size.y);
 		};
 
-		unsigned int GetWidth()  { return size.x; };
-		unsigned int GetHeight() { return size.y; };
+		size_t GetWidth()  { return size.x; };
+		size_t GetHeight() { return size.y; };
 
 		void Clear(int filler)
 		{
