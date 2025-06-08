@@ -27,8 +27,6 @@ void InitSquareRoot(int size)
     size++;
     square_root.resize(size);
 
-    size_t size2 = square_root.size();
-
     // count square root
     for(size_t a = old_size; a < static_cast <size_t>(size); ++a) {
         square_root[a] = (int)ceil(std::sqrt((double) a));

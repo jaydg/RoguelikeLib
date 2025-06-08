@@ -74,7 +74,7 @@ bool FloodFill(CMap &level, Position position, int value, bool diagonal = true, 
     std::list < Position > positions;
     positions.push_back(position);
 
-    std::list < Position > ::iterator m, _m;
+    std::list < Position > ::iterator m;
     m = positions.begin();
 
     while(m != positions.end()) {
