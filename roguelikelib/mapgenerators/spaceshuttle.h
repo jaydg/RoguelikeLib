@@ -17,7 +17,7 @@ void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool m
     int free_cells;
 
     std::list < SRoom > list_of_rooms;
-    std::list < SRoom >::iterator m, _m;
+    std::list < SRoom >::iterator m;
     int x, y;
 
     int x1, y1, x2, y2, rx, ry;
@@ -59,7 +59,7 @@ void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool m
             // is in existing room?
             bool rand_again = false;
 
-            for(m = list_of_rooms.begin(), _m = list_of_rooms.end(); m != _m; m++) {
+            for(m = list_of_rooms.begin(); m != list_of_rooms.end(); ++m) {
                 SRoom &room = *m;
                 rand_again = true;
 
@@ -105,7 +105,7 @@ void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool m
         m = list_of_rooms.begin();
         int index;
 
-        for(index = 0; index < number_of_rooms; index++, m++) {
+        for(index = 0; index < number_of_rooms; index++, ++m) {
             SRoom room = *m;
 
             if(mirror_vertical) {
@@ -125,8 +125,8 @@ void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool m
             list_of_rooms.insert(m, room);
         };
 
-        for(m = list_of_rooms.begin(), _m = list_of_rooms.end(); m != _m; m++) {
-            SRoom &room = *m;
+        for(m = list_of_rooms.begin(); m != list_of_rooms.end(); ++m) {
+            const SRoom &room = *m;
 
             for(x = room.corner1.x; x <= room.corner2.x; x++)
                 for(y = room.corner1.y; y <= room.corner2.y; y++) {
