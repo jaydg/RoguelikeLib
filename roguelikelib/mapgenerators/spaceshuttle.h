@@ -153,7 +153,8 @@ void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool m
                     free_cells += 2; // +2 for mirror
                 }
 
-                level.SetCell(x, level.GetHeight() - y - 1, level.GetCell(x, y)); // i odbicie lustrzane
+                // and mirror image
+                level.SetCell(x, level.GetHeight() - y - 1, level.GetCell(x, y));
             }
         }
 
