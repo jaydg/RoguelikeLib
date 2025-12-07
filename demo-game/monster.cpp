@@ -60,7 +60,7 @@ bool CMonster::MoveTo(const RL::Position &new_pos)
         // if monster there
         CMonster *monster = game.GetMonsterFromCell(new_pos);
 
-        if(monster == NULL) {
+        if(monster == nullptr) {
             position = new_pos;
             return true;
         }

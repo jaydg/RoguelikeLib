@@ -150,7 +150,7 @@ CMonster *CSimpleGame::GetMonsterFromCell(const RL::Position &cell)
         }
     }
 
-    return NULL;
+    return nullptr;
 }
 
 int main(void)

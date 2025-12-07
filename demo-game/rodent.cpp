@@ -37,7 +37,7 @@ void CRodent::DoAction()
                     const CMonster *monster = game.GetMonsterFromCell(pos);
 
                     // go around other monsters, don't go around player
-                    if(monster != NULL && monster != &game.player && monster != this) {
+                    if(monster && monster != &game.player && monster != this) {
                         temp_map.SetCell(pos, RL::LevelElementWall_value);
                     } else {
                         temp_map.SetCell(pos, RL::LevelElementCorridor_value);
