@@ -96,8 +96,8 @@ void CreateSimpleCity(CMap &level, const int& a_number_of_buildings)
         if(tries < 100) {
             // plant some trees
             for(size_t index = 0; index < level.GetWidth() * static_cast<size_t>(static_cast<float>(level.GetHeight()) * 0.3); index++) {
-                int x = Random(static_cast <int> (level.GetWidth()));
-                int y = Random(static_cast <int> (level.GetHeight()));
+                size_t x = Random(level.GetWidth());
+                size_t y = Random(level.GetHeight());
 
                 if(level.GetCell(x, y) == LevelElementGrass && CountNeighboursOfType(level, LevelElementWall, Position(x, y), true) == 0) {
                     level.SetCell(x, y, LevelElementPlant);

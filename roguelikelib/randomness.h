@@ -20,30 +20,24 @@ void InitRandomness()
 }
 
 inline
-int Random(int value)
+unsigned Random(const size_t limit)
 {
-    int random_value;
-
-    if(value == 0) {
+    if(limit == 0) {
         return 0;
     }
 
-    random_value = (int)(((float)mt() / (float)0xFFFFFFFF) * (value));
-    return random_value;
+    std::uniform_int_distribution<size_t> dist(0,limit - 1);
+    return dist(mt);
 }
 
 inline
-bool RandomLowerThatLimit(int limit, int value)
+bool RandomLowerThatLimit(const size_t limit, const size_t value)
 {
     if(value == 0) {
         return false;
     }
 
-    if(Random(value) < limit) {
-        return true;
-    }
-
-    return false;
+    return Random(value) < limit;
 }
 
 inline

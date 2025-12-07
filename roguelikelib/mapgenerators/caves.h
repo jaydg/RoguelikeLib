@@ -19,7 +19,7 @@ void CreateCaves(CMap &level, int iterations = 1, float density = 0.65)
     level.Clear(LevelElementRoom);
 
     for(int fill = 0; fill < static_cast<int>(static_cast<float>(level.GetWidth() * level.GetHeight()) * density); fill++) {
-        level.SetCell(Random((int) level.GetWidth()), Random((int) level.GetHeight()), LevelElementWall);
+        level.SetCell(Random(level.GetWidth()), Random(level.GetHeight()), LevelElementWall);
     }
 
     for(int iteration = 0; iteration < iterations; iteration++) {

@@ -37,8 +37,7 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
 
             // Connect the room to existing one
             if(!rooms.empty()) {
-
-                int random_number = Random(static_cast<int>(rooms.size()));
+                size_t random_number = Random(rooms.size());
 
                 for(m = rooms.begin(); --random_number > 0; ++m);
 
@@ -98,7 +97,7 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
             rooms.push_back(room);
 
             // draw_room
-            int room_type = Random(4);
+            int room_type = static_cast<int>(Random(4));
 
             if(sx == sy) {
                 room_type = 3;
