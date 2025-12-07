@@ -31,7 +31,7 @@ void CreateAntNest(CMap &level, bool with_rooms = false)
         x1 = (double) level.GetWidth() / 2 + ((double)level.GetWidth() / 2) * sin(k);
         y1 = (double) level.GetHeight() / 2 + ((double)level.GetHeight() / 2) * cos(k);
 
-        // object will move not too horizontal and not too vertival
+        // object will move not too horizontal and not too vertical
         do {
             dx = Random(100);
             dy = Random(100);

@@ -445,7 +445,7 @@ void ConnectClosestRooms(CMap &level, bool with_doors, bool straight_connections
         }
     }
 
-    // find the closest cells for each room - Random closest cell
+    // find the closest cells for each room - random closest cell
     std::list < Position >::iterator m, _m, k, _k;
 
     for(int room_a = 0; room_a < (int) rooms.size(); ++room_a) {
@@ -457,7 +457,7 @@ void ConnectClosestRooms(CMap &level, bool with_doors, bool straight_connections
             std::pair < Position, Position > closest_cells;
 
             for(m = rooms[room_a].begin(), _m = rooms[room_a].end(); m != _m; ++m) {
-                // for each boder cell in room_a try each border cell of room_b
+                // for each border cell in room_a try each border cell of room_b
                 int x1 = (*m).x;
                 int y1 = (*m).y;
 
