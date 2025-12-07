@@ -7,7 +7,6 @@
 #define RL_MAP_H
 
 #include <limits>
-#include <climits>
 #include <vector>
 #include <iostream>
 
@@ -57,6 +56,8 @@ struct Position {
 
 typedef Position Size; // alias name
 
+constexpr int LevelElementMax = std::numeric_limits<int>::max();
+
 enum ELevelElement {
     LevelElementWall = '#',
     LevelElementCorridor = '.',
@@ -66,9 +67,9 @@ enum ELevelElement {
     LevelElementDoorClose = '+',
     LevelElementDoorOpen = '/',
     LevelElementWater = '~',
-    LevelElementCorridor_value = INT_MAX - 2, // Some algorithms (like pathfinding) needs values instead of tiles
-    LevelElementRoom_value = INT_MAX - 1,
-    LevelElementWall_value = INT_MAX
+    LevelElementCorridor_value = LevelElementMax - 2, // Some algorithms (like pathfinding) needs values instead of tiles
+    LevelElementRoom_value = LevelElementMax - 1,
+    LevelElementWall_value = LevelElementMax
 };
 
 class CMap {
