@@ -8,8 +8,6 @@
 
 #include <cmath>
 
-#include "map.h"
-
 namespace RL {
 
 template<typename T>
@@ -53,12 +51,6 @@ size_t Distance(const size_t& x1, const size_t& y1, const size_t& x2, const size
     }
 
     return square_root[dist];
-}
-
-static
-size_t Distance(const Position &p1, const Position &p2)
-{
-    return Distance(p1.x, p1.y, p2.x, p2.y);
 }
 
 } // end of namespace RL

@@ -7,7 +7,7 @@
 #define RL_FOV_H
 
 #include "map.h"
-#include "distance.h"
+#include "position.h"
 #include "extern/permissive-fov-cpp.h"
 
 namespace RL {
@@ -48,7 +48,7 @@ public:
 
     bool isBlocked(short destX, short destY)
     {
-        if(Distance(start, Position(destX, destY)) >= radius) {
+        if(start.Distance(Position(destX, destY)) >= radius) {
             return true;
         }
 

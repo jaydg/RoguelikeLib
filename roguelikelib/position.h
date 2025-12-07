@@ -3,6 +3,8 @@
 
 #include <limits>
 
+#include "distance.h"
+
 namespace RL {
 struct Position {
     static constexpr size_t invalid = std::numeric_limits<size_t>::max();
@@ -44,6 +46,11 @@ struct Position {
     bool operator!=(const Position& r) const
     {
         return !operator==(r);
+    }
+
+    [[nodiscard]] size_t Distance(const Position &other) const
+    {
+        return RL::Distance(x, y, other.x, other.y);
     }
 };
 
