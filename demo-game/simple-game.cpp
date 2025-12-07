@@ -40,7 +40,7 @@ void CSimpleGame::PlacePlayer()
 
 void CSimpleGame::AddMonster()
 {
-    CRodent *new_one = new CRodent;
+    auto *new_one = new CRodent;
     RL::Position pos(0, 0);
 
     if(RL::FindOnMapRandomRectangleOfType(level, RL::LevelElementRoom, pos, RL::Size(1, 1))) {
@@ -65,10 +65,8 @@ void CSimpleGame::MoveAllMonsters()
     }
 
     // remove all dead monsters
-    std::list < CMonster * >::iterator to_remove;
-
     for(it = monsters.begin(), _it = monsters.end(); it != _it;) {
-        to_remove = it;
+        auto to_remove = it;
         it++;
         CMonster *monster = *to_remove;
 
