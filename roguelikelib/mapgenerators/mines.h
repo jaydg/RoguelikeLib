@@ -36,7 +36,7 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
         sx = Random(5) +6;
         sy = Random(5) +6;
 
-        if(FindOnMapRandomRectangleOfType(level, LevelElementWall, p, RL::Size(sx + 4, sy + 4))) {
+        if(FindOnMapRandomRectangleOfType(level, LevelElementWall, p, Size(sx + 4, sy + 4))) {
             p.x += 2;
             p.y += 2;
 

@@ -16,7 +16,7 @@
 
 namespace RL {
 inline
-void FindOnMapAllRectanglesOfType(CMap &level, const RL::ELevelElement& type, const Size &size, std::vector < RL::Position >& positions)
+void FindOnMapAllRectanglesOfType(CMap &level, const ELevelElement& type, const Size &size, std::vector < Position >& positions)
 {
     CMap good_points;
     good_points = level;
@@ -65,7 +65,7 @@ void FindOnMapAllRectanglesOfType(CMap &level, const RL::ELevelElement& type, co
 //////////////////////////////////////////////////////////////////////////
 
 inline
-bool FloodFill(CMap &level, Position position, int value, bool diagonal = true, int gradient = 0, RL::Position end = RL::Position(-1, -1))
+bool FloodFill(CMap &level, Position position, int value, bool diagonal = true, int gradient = 0, Position end = Position(-1, -1))
 {
     // flood fill room
     int area_value = level.GetCell(position.x, position.y);
@@ -157,7 +157,7 @@ bool FloodFill(CMap &level, Position position, int value, bool diagonal = true, 
 //////////////////////////////////////////////////////////////////////////
 
 inline
-bool FindOnMapRandomRectangleOfType(CMap &level, const RL::ELevelElement& type, RL::Position& pos, const RL::Size &size)
+bool FindOnMapRandomRectangleOfType(CMap &level, const ELevelElement& type, Position& pos, const Size &size)
 {
     std::vector < Position > positions;
     FindOnMapAllRectanglesOfType(level, type, size, positions);
@@ -572,7 +572,7 @@ void ConnectClosestRooms(CMap &level, bool with_doors, bool straight_connections
 //////////////////////////////////////////////////////////////////////////
 
 inline
-void AddRecursiveRooms(CMap &level, const RL::ELevelElement& type, int min_size_x, int min_size_y, const RL::SRoom& room, bool with_doors = true)
+void AddRecursiveRooms(CMap &level, const ELevelElement& type, int min_size_x, int min_size_y, const SRoom& room, bool with_doors = true)
 {
     int size_x = room.corner2.x - room.corner1.x;
 

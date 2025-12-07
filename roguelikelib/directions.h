@@ -74,7 +74,7 @@ inline EDirection Direction::Decrase()
 inline
 EDirection RandomDirection()
 {
-    return (EDirection) Random(RL::EDirectionMax);
+    return (EDirection) Random(EDirectionMax);
 }
 
 } // end of namespace RL

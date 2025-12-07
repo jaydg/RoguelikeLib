@@ -41,7 +41,7 @@ void CreateSimpleCity(CMap &level, const int& a_number_of_buildings)
             while(1) {
                 Position pos;
 
-                if(FindOnMapRandomRectangleOfType(level, LevelElementGrass, pos, RL::Size(size_x + 2, size_y + 2))) {
+                if(FindOnMapRandomRectangleOfType(level, LevelElementGrass, pos, Size(size_x + 2, size_y + 2))) {
                     SRoom building, smaller;
                     pos.x++;
                     pos.y++;
