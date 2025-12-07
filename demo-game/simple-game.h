@@ -23,7 +23,7 @@ public:
     static CMonster *GetMonsterFromCell(const RL::Position &cell);
 
     void CreateLevel();
-    void MainLoop();
+    [[noreturn]] void MainLoop();
 };
 
 #endif

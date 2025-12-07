@@ -126,7 +126,7 @@ void CSimpleGame::CreateLevel()
     }
 }
 
-void CSimpleGame::MainLoop()
+[[noreturn]] void CSimpleGame::MainLoop()
 {
     for(;;) { // next turn
         if(RL::Random(100) == 0) {
@@ -153,11 +153,10 @@ CMonster *CSimpleGame::GetMonsterFromCell(const RL::Position &cell)
     return nullptr;
 }
 
-int main(void)
+int main()
 {
     IOInit();
     RL::InitRandomness();
     game.CreateLevel();
     game.MainLoop();
-    return 0;
 }
