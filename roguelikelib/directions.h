@@ -6,7 +6,6 @@
 #ifndef RL_DIRECTIONS_H
 #define RL_DIRECTIONS_H
 
-#include "roguelikelib.h"
 #include "randomness.h"
 
 namespace RL {
@@ -24,19 +23,18 @@ enum EDirection {
 };
 
 class Direction {
-private:
     EDirection direction;
 public:
     Direction(): direction(North) {};
 
-    Direction(EDirection start): direction(start) {};
+    explicit Direction(const EDirection start): direction(start) {};
 
-    EDirection Get()
+    EDirection Get() const
     {
         return direction;
     }
 
-    void Set(EDirection to_set)
+    void Set(const EDirection to_set)
     {
         direction = to_set;
     }
@@ -45,21 +43,21 @@ public:
 inline
 EDirection operator++(EDirection & e, int)
 {
-    e = ((e < EDirectionMax) ? (EDirection)(e + 1) : EDirectionMin) ;
+    e = (e < EDirectionMax) ? static_cast<EDirection>(e + 1) : EDirectionMin;
     return e;
 }
 
 inline
 EDirection operator--(EDirection & e, int)
 {
-    e = ((e > EDirectionMin) ? (EDirection)(e - 1) : EDirectionMax) ;
+    e = (e > EDirectionMin) ? static_cast<EDirection>(e - 1) : EDirectionMax;
     return e;
 }
 
 inline
 EDirection RandomDirection()
 {
-    return (EDirection) Random(EDirectionMax);
+    return static_cast<EDirection>(Random(EDirectionMax));
 }
 
 } // end of namespace RL
