@@ -17,8 +17,6 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
 
     level.Clear();
 
-    int x, y;
-
     typedef std::list < SRoom > list_of_rooms;
 
     list_of_rooms :: iterator m;
@@ -30,8 +28,8 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
     // Place rooms
     for(int room_number = 0; room_number < max_number_of_rooms; ++room_number) {
         // size of room
-        const int sx = Random(5) + 6;
-        const int sy = Random(5) + 6;
+        const size_t sx = Random(5) + 6;
+        const size_t sy = Random(5) + 6;
 
         if(FindOnMapRandomRectangleOfType(level, LevelElementWall, p, Size(sx + 4, sy + 4))) {
             p.x += 2;
@@ -53,19 +51,11 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
                 p2.y = m->corner1.y + (m->corner2.y - m->corner1.y) / 2;
 
                 // found the way to connect rooms
-                int diff_x = p2.x - p1.x;
-                int diff_y = p2.y - p1.y;
+                size_t diff_x = diff(p1.x, p2.x);
+                size_t diff_y = diff(p1.y, p2.y);
 
-                if(diff_x < 0) {
-                    diff_x = -diff_x;
-                }
-
-                if(diff_y < 0) {
-                    diff_y = -diff_y;
-                }
-
-                x = p1.x;
-                y = p1.y;
+                size_t x = p1.x;
+                size_t y = p1.y;
 
                 while(!(diff_x == 0 && diff_y == 0)) {
                     // move horizontally
@@ -115,8 +105,8 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
             }
 
             if(room_type != 2) {
-                for(y = 0; y < sy; y++)
-                    for(x = 0; x < sx; x++) {
+                for(size_t y = 0; y < sy; y++)
+                    for(size_t x = 0; x < sx; x++) {
                         switch(room_type) {
                         case 0: // rectangle room
                         case 1:
@@ -134,8 +124,8 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
                     }
             } // end if
             else { // typ==2 - Diamond
-                for(y = 0; y <= sy / 2; y++)
-                    for(x = 0; x <= sx / 2; x++) {
+                for(size_t y = 0; y <= sy / 2; y++)
+                    for(size_t x = 0; x <= sx / 2; x++) {
                         if(y >= x) {
                             level.SetCell(p.x + x + sx / 2, p.y + y, LevelElementRoom);
                             level.SetCell(p.x + x + sx / 2, p.y + sy - y, LevelElementRoom);

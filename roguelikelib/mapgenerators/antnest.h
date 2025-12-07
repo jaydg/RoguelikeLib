@@ -24,14 +24,14 @@ void CreateAntNest(CMap &level, bool with_rooms = false)
         // degree
         double k = Random(360) * 3.1419532 / 180;
         // position on ellipse by degree
-        double x1 = (double) level.GetWidth() / 2 + ((double) level.GetWidth() / 2) * sin(k);
-        double y1 = (double) level.GetHeight() / 2 + ((double) level.GetHeight() / 2) * cos(k);
+        double x1 = static_cast<double>(level.GetWidth()) / 2 + (static_cast<double>(level.GetWidth()) / 2) * sin(k);
+        double y1 = static_cast<double>(level.GetHeight()) / 2 + (static_cast<double>(level.GetHeight()) / 2) * cos(k);
 
         // object will move not too horizontal and not too vertical
         do {
             dx = Random(100);
             dy = Random(100);
-        } while((abs((int) dx) < 10 && abs((int) dy) < 10));
+        } while(dx < 10 && dy < 10);
 
         dx -= 50;
         dy -= 50;
@@ -52,26 +52,26 @@ void CreateAntNest(CMap &level, bool with_rooms = false)
             y1 += dy;
 
             // change float to int
-            px = (int) x1;
-            py = (int) y1;
+            px = static_cast<int>(x1);
+            py = static_cast<int>(y1);
 
             // go through the border to the other side
             if(px < 0) {
-                px = (int) level.GetWidth() - 1;
+                px = static_cast<int>(level.GetWidth()) - 1;
                 x1 = px;
             }
 
-            if(px > (int) level.GetWidth() - 1) {
+            if(px > static_cast<int>(level.GetWidth()) - 1) {
                 px = 0;
                 x1 = px;
             }
 
             if(py < 0) {
-                py = (int) level.GetHeight() - 1;
+                py = static_cast<int>(level.GetHeight()) - 1;
                 y1 = py;
             }
 
-            if(py > (int) level.GetHeight() - 1) {
+            if(py > static_cast<int>(level.GetHeight()) - 1) {
                 py = 0;
                 y1 = py;
             }
