@@ -2,13 +2,13 @@
 
 class CMonster {
 protected:
-    char tile;
+    char tile{};
     RL::CMap fov;
-    int hit_points;
-    int strength;
+    int hit_points{};
+    int strength{};
     RL::Position position;
 public:
-    ~CMonster() {};
+    virtual ~CMonster() = default;
 
     virtual void DoAction() = 0;
     virtual bool Attack(CMonster *monster);

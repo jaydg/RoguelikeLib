@@ -5,6 +5,6 @@ private:
     RL::Position enemy_pos;
 public:
     CRodent();
-    virtual void LookAround();
-    virtual void DoAction();
+    void LookAround() override;
+    void DoAction() override;
 };

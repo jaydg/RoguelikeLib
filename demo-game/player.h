@@ -1,16 +1,16 @@
 #include "monster.h"
 
-class CPlayer : public CMonster {
+class CPlayer final : public CMonster {
 private:
     int experience;
     RL::CMap seen_map;
 public:
     CPlayer();
-    virtual bool Attack(CMonster *monster) override;
-    virtual void Regenerate();
-    virtual void GainExperience();
-    virtual void DoAction() override;
-    virtual void Death() override;
-    virtual void Print() const override;
-    virtual void LookAround() override;
+    bool Attack(CMonster *monster) override;
+    void Regenerate();
+    void GainExperience();
+    void DoAction() override;
+    void Death() override;
+    void Print() const override;
+    void LookAround() override;
 };

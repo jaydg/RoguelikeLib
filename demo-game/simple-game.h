@@ -2,8 +2,8 @@
 #include <list>
 #include "player.h"
 
-const int LEVEL_SIZE_X = 80;
-const int LEVEL_SIZE_Y = 24;
+constexpr int LEVEL_SIZE_X = 80;
+constexpr int LEVEL_SIZE_Y = 24;
 
 class CSimpleGame {
 private:
@@ -17,9 +17,8 @@ public:
     CPlayer player;
     std::list < CMonster * > monsters;
     std::set < CMonster * > monsters_to_remove;
-    CMonster *GetMonsterFromCell(const RL::Position &cell);
+    static CMonster *GetMonsterFromCell(const RL::Position &cell);
 
     void CreateLevel();
     void MainLoop();
 };
-
