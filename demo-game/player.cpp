@@ -40,9 +40,8 @@ void CPlayer::GainExperience()
 void CPlayer::DoAction()
 {
     LookAround();
-    int key = IOGetKey();
 
-    switch(key) {
+    switch(IOGetKey()) {
     case '1':
         MoveTo(RL::Position(position.x - 1, position.y + 1));
         break;
