@@ -17,7 +17,7 @@ void CreateMaze(CMap &level, bool allow_loops = false)
     level.Clear();
 
     std::list < Position > drillers;
-    drillers.push_back(Position(level.GetWidth() / 2, level.GetHeight() / 2));
+    drillers.emplace_back(level.GetWidth() / 2, level.GetHeight() / 2);
 
     while(!drillers.empty()) {
         std::list < Position >::iterator m, _m;
@@ -79,8 +79,8 @@ void CreateMaze(CMap &level, bool allow_loops = false)
             if(remove_driller) {
                 m = drillers.erase(m);
             } else {
-                drillers.push_back(Position(m->x, m->y));
-                drillers.push_back(Position(m->x, m->y));
+                drillers.emplace_back(m->x, m->y);
+                drillers.emplace_back(m->x, m->y);
 
                 level.SetCell(m->x, m->y, LevelElementCorridor);
                 ++m;

@@ -54,7 +54,7 @@ void FindOnMapAllRectanglesOfType(CMap &level, const ELevelElement& type, const 
             }
 
             if(vertical_count == size.y) {
-                positions.push_back(Position(x, y - size.y + 1));
+                positions.emplace_back(x, y - size.y + 1);
                 vertical_count--;
             }
         }
@@ -71,7 +71,7 @@ bool FloodFill(CMap &level, Position position, int value, bool diagonal = true, 
     level.SetCell(position.x, position.y, value);
 
     std::list < Position > positions;
-    positions.push_back(position);
+    positions.emplace_back(position);
 
     std::list < Position > ::iterator m;
     m = positions.begin();
@@ -91,50 +91,50 @@ bool FloodFill(CMap &level, Position position, int value, bool diagonal = true, 
         if(pos_x > 0)
             if(level.GetCell(pos_x - 1, pos_y) == area_value) {
                 level.SetCell(pos_x - 1, pos_y, this_value + gradient);
-                positions.push_back(Position(pos_x - 1, pos_y));
+                positions.emplace_back(pos_x - 1, pos_y);
             }
 
         if(pos_x < (int) level.GetWidth() - 1)
             if(level.GetCell(pos_x + 1, pos_y) == area_value) {
                 level.SetCell(pos_x + 1, pos_y, this_value + gradient);
-                positions.push_back(Position(pos_x + 1, pos_y));
+                positions.emplace_back(pos_x + 1, pos_y);
             }
 
         if(pos_y > 0)
             if(level.GetCell(pos_x, pos_y - 1) == area_value) {
                 level.SetCell(pos_x, pos_y - 1, this_value + gradient);
-                positions.push_back(Position(pos_x, pos_y - 1));
+                positions.emplace_back(pos_x, pos_y - 1);
             }
 
         if(pos_y < (int) level.GetHeight() - 1)
             if(level.GetCell(pos_x, pos_y + 1) == area_value) {
                 level.SetCell(pos_x, pos_y + 1, this_value + gradient);
-                positions.push_back(Position(pos_x, pos_y + 1));
+                positions.emplace_back(pos_x, pos_y + 1);
             }
 
         if(diagonal) {
             if(pos_x > 0 && pos_y > 0)
                 if(level.GetCell(pos_x - 1, pos_y - 1) == area_value) {
                     level.SetCell(pos_x - 1, pos_y - 1, this_value + gradient);
-                    positions.push_back(Position(pos_x - 1, pos_y - 1));
+                    positions.emplace_back(pos_x - 1, pos_y - 1);
                 }
 
             if(pos_x < (int) level.GetWidth() - 1 && pos_y < (int) level.GetHeight() - 1)
                 if(level.GetCell(pos_x + 1, pos_y + 1) == area_value) {
                     level.SetCell(pos_x + 1, pos_y + 1, this_value + gradient);
-                    positions.push_back(Position(pos_x + 1, pos_y + 1));
+                    positions.emplace_back(pos_x + 1, pos_y + 1);
                 }
 
             if(pos_x < (int) level.GetWidth() - 1 && pos_y > 0)
                 if(level.GetCell(pos_x + 1, pos_y - 1) == area_value) {
                     level.SetCell(pos_x + 1, pos_y - 1, this_value + gradient);
-                    positions.push_back(Position(pos_x + 1, pos_y - 1));
+                    positions.emplace_back(pos_x + 1, pos_y - 1);
                 }
 
             if(pos_x > 0 && pos_y < (int) level.GetHeight() - 1)
                 if(level.GetCell(pos_x - 1, pos_y + 1) == area_value) {
                     level.SetCell(pos_x - 1, pos_y + 1, this_value + gradient);
-                    positions.push_back(Position(pos_x - 1, pos_y + 1));
+                    positions.emplace_back(pos_x - 1, pos_y + 1);
                 }
         }
 
@@ -403,7 +403,7 @@ void ConnectClosestRooms(CMap &level, bool with_doors, bool straight_connections
 
                 // only border cells without diagonals
                 if(CountNeighboursOfType(level, LevelElementWall_value, Position(x, y), false) > 0) {
-                    rooms[level.GetCell(x, y)].push_back(Position(x, y));
+                    rooms[level.GetCell(x, y)].emplace_back(x, y);
                 }
             } // if no wall at position
         } // for x
