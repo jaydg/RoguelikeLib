@@ -15,7 +15,7 @@ namespace RL {
 static std::vector <int> square_root;
 //////////////////////////////////////////////////////////////////////////
 
-static inline
+static
 void InitSquareRoot(int size)
 {
     size_t old_size = square_root.size();
@@ -33,7 +33,7 @@ void InitSquareRoot(int size)
     }
 }
 
-static inline
+static
 int Distance(const int& x1, const int& y1, const int& x2, const int& y2)
 {
     const int diff_x = x2 - x1;
@@ -47,7 +47,7 @@ int Distance(const int& x1, const int& y1, const int& x2, const int& y2)
     return square_root[dist];
 }
 
-static inline
+static
 int Distance(const Position &p1, const Position &p2)
 {
     return Distance(p1.x, p1.y, p2.x, p2.y);

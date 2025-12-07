@@ -14,7 +14,7 @@ namespace RL {
 static std::mt19937 mt;
 
 inline
-void InitRandomness(void)
+void InitRandomness()
 {
     mt.seed((unsigned int) time(nullptr));
 }

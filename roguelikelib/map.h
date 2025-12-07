@@ -40,7 +40,7 @@ struct Position {
         return *this;
     }
 
-    bool operator==(const Position& r)
+    bool operator==(const Position& r) const
     {
         if(x == r.x && y == r.y) {
             return true;
@@ -49,7 +49,7 @@ struct Position {
         }
     }
 
-    bool operator!=(const Position& r)
+    bool operator!=(const Position& r) const
     {
         return !operator==(r);
     }
@@ -93,12 +93,12 @@ public:
         return Resize(size.x, size.y);
     }
 
-    size_t GetWidth()
+    [[nodiscard]] size_t GetWidth() const
     {
         return size.x;
     }
 
-    size_t GetHeight()
+    [[nodiscard]] size_t GetHeight() const
     {
         return size.y;
     }
@@ -127,12 +127,12 @@ public:
             }
     }
 
-    bool OnMap(const int& x, const int& y)
+    [[nodiscard]] bool OnMap(const int& x, const int& y) const
     {
         return (x >= 0 && x < (int) size.x && y >= 0 && y < (int) size.y);
     }
 
-    bool OnMap(const Position &pos)
+    [[nodiscard]] bool OnMap(const Position &pos) const
     {
         return OnMap(pos.x, pos.y);
     }
@@ -156,8 +156,7 @@ public:
         return SetCell(pos.x, pos.y, element);
     }
 
-    int GetCell(const int& x, const int& y)
-    {
+    [[nodiscard]] int GetCell(const int& x, const int& y) const {
         if(OnMap(x, y)) {
             return m_map[x * size.y + y];
         } else {
@@ -165,12 +164,12 @@ public:
         }
     }
 
-    int GetCell(const Position &pos)
+    [[nodiscard]] int GetCell(const Position &pos) const
     {
         return GetCell(pos.x, pos.y);
     }
 
-    void PrintMap()
+    void PrintMap() const
     {
         for(int y = 0; y < size.y; ++y) {
             for(int x = 0; x < size.x; ++x) {
@@ -184,14 +183,14 @@ public:
 
 struct SRoom {
     Position corner1, corner2;
-    int type;
+    int type{};
 
-    inline bool IsInRoom(const Position &pos)
+    [[nodiscard]] bool IsInRoom(const Position &pos) const
     {
         return (pos.x >= corner1.x && pos.x <= corner2.x && pos.y >= corner1.y && pos.y <= corner2.y);
     }
 
-    inline bool IsInRoom(const int x, const int y)
+    [[nodiscard]] bool IsInRoom(const int x, const int y) const
     {
         return (x >= corner1.x && x <= corner2.x && y >= corner1.y && y <= corner2.y);
     }

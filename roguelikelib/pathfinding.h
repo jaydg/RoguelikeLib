@@ -15,7 +15,7 @@ namespace RL {
 // - LevelElementCorridor_value
 // - LevelElementWall_value
 // as output you get a flood filled level
-bool FindPath(CMap &level, const Position& start, const Position& end, std::vector < Position >& path, const bool& diagonals = true)
+inline bool FindPath(CMap &level, const Position& start, const Position& end, std::vector < Position >& path, const bool& diagonals = true)
 {
     // fill from end to start
     if(!FloodFill(level, end, 0, false, 1, start)) {

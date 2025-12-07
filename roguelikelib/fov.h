@@ -15,7 +15,7 @@ class FOVContext {
     CMap &level;
     CMap blocked;
 public:
-    FOVContext(CMap &input_level)
+    explicit FOVContext(CMap &input_level)
         : level(input_level)
     {
         blocked = input_level;
@@ -27,7 +27,7 @@ public:
         return blocked.GetCell(destX, destY) != false;
     }
 
-    void visit(short destX, short destY)
+    void visit(short destX, short destY) const
     {
         level.SetCell(destX, destY, true);
     }
@@ -55,7 +55,7 @@ public:
         return blocked.GetCell(destX, destY) != false;
     }
 
-    void visit(short destX, short destY)
+    void visit(short destX, short destY) const
     {
         level.SetCell(destX, destY, true);
     }
