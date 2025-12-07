@@ -40,9 +40,6 @@ public:
     {
         direction = to_set;
     }
-
-    inline EDirection Incrase();
-    inline EDirection Decrase();
 };
 
 inline
@@ -57,18 +54,6 @@ EDirection operator--(EDirection & e, int)
 {
     e = ((e > EDirectionMin) ? (EDirection)(e - 1) : EDirectionMax) ;
     return e;
-}
-
-inline EDirection Direction::Incrase()
-{
-    direction++;
-    return direction;
-}
-
-inline EDirection Direction::Decrase()
-{
-    direction--;
-    return direction;
 }
 
 inline
