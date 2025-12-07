@@ -43,7 +43,7 @@ public:
 
     inline EDirection Incrase();
     inline EDirection Decrase();
-}
+};
 
 inline
 EDirection operator++(EDirection & e, int)
