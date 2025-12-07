@@ -6,7 +6,6 @@
 #ifndef RL_RANDOMNESS_H
 #define RL_RANDOMNESS_H
 
-#include <ctime>
 #include <random>
 
 namespace RL {
@@ -16,7 +15,8 @@ static std::mt19937 mt;
 inline
 void InitRandomness()
 {
-    mt.seed((unsigned int) time(nullptr));
+    std::random_device rd; // non-deterministic generator
+    mt.seed(rd());         // to seed mersenne twister.
 }
 
 inline
