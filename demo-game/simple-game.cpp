@@ -114,9 +114,11 @@ void CSimpleGame::CreateLevel()
         break;
 
     case 5:
+    default:
         RL::CreateSpaceShuttle(level);
         IOPrintString(60, 24, "Space Shuttle");
         break;
+
     }
 
     PlacePlayer();

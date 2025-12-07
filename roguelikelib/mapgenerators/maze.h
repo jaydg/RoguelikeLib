@@ -64,6 +64,7 @@ void CreateMaze(CMap &level, bool allow_loops = false)
                 break;
 
             case 3:
+            default: // make linter happy
                 (*m).x += 2;
 
                 if((*m).x >= static_cast <int> (level.GetWidth()) || level.GetCell((*m).x, (*m).y) == LevelElementCorridor) {

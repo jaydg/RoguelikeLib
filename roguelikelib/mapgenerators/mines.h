@@ -127,6 +127,7 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
                             break;
 
                         case 3: // round room
+                        default:
                             if(Distance(sx / 2, sx / 2, x, y) < sx / 2) {
                                 level.SetCell(p.x + x, p.y + y, LevelElementRoom);
                             }

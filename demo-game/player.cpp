@@ -77,6 +77,9 @@ void CPlayer::DoAction()
     case '9':
         MoveTo(RL::Position(position.x + 1, position.y - 1));
         break;
+
+    default:
+        break;
     }
 }
 
