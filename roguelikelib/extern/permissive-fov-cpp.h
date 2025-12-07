@@ -41,25 +41,25 @@ class fovPrivateT {
 public:
     static int isBlocked(short destX, short destY, void * context)
     {
-        T * typedContext = reinterpret_cast<T *>(context);
+        T * typedContext = static_cast<T *>(context);
         return typedContext->isBlocked(destX, destY);
     }
 
     static void visit(short destX, short destY, void * context)
     {
-        T * typedContext = reinterpret_cast<T *>(context);
+        T * typedContext = static_cast<T *>(context);
         typedContext->visit(destX, destY);
     }
 };
 
 class maskT {
 public:
-    maskT(int north = 0, int south = 0, int east = 0, int west = 0)
+    explicit maskT(int north = 0, int south = 0, int east = 0, int west = 0)
     {
         initPermissiveMask(&mask, north, south, east, west);
     }
 
-    maskT(char const * fileName)
+    explicit maskT(char const * fileName)
     {
         loadPermissiveMask(&mask, fileName);
     }
@@ -89,13 +89,13 @@ public:
         return doesPermissiveVisit(&mask, x, y) == 1;
     }
 
-    permissiveMaskT * getMask(void)
+    permissiveMaskT * getMask()
     {
         return &mask;
     }
 
 private:
-    permissiveMaskT mask;
+    permissiveMaskT mask{};
 };
 
 template <class T>

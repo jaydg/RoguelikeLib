@@ -4,7 +4,6 @@
    license. See LICENSE.txt for details. */
 
 #include <list>
-#include <iostream>
 #include <fstream>
 #include <algorithm>
 #include <string>
@@ -20,30 +19,22 @@ namespace
 {
   struct offsetT
   {
-  public:
-    offsetT(short newX = 0, short newY = 0)
+    explicit offsetT(short newX = 0, short newY = 0)
       : x(newX)
         , y(newY)
     {
     }
-  public:
     short x;
     short y;
   };
 
-  std::ostream & operator<<(std::ostream & stream, offsetT const & right)
-  {
-    stream << "(" << right.x << ", " << right.y << ")";
-    return stream;
-  }
-
   struct fovStateT
   {
     offsetT source;
-    permissiveMaskT * mask;
-    isBlockedFunction isBlocked;
-    visitFunction visit;
-    void * context;
+    permissiveMaskT * mask{};
+    isBlockedFunction isBlocked{};
+    visitFunction visit{};
+    void * context{};
 
     offsetT quadrant;
     offsetT extent;
@@ -51,33 +42,27 @@ namespace
 
   struct lineT
   {
-    lineT(offsetT newNear=offsetT(), offsetT newFar=offsetT())
-      : near(newNear)
-      , far(newFar)
-    {
-    }
-
-    bool isBelow(offsetT const & point)
+    [[nodiscard]] bool isBelow(offsetT const & point) const
     {
       return relativeSlope(point) > 0;
     }
 
-    bool isBelowOrContains(offsetT const & point)
+    [[nodiscard]] bool isBelowOrContains(offsetT const & point) const
     {
       return relativeSlope(point) >= 0;
     }
 
-    bool isAbove(offsetT const & point)
+    [[nodiscard]] bool isAbove(offsetT const & point) const
     {
       return relativeSlope(point) < 0;
     }
 
-    bool isAboveOrContains(offsetT const & point)
+    [[nodiscard]] bool isAboveOrContains(offsetT const & point) const
     {
       return relativeSlope(point) <= 0;
     }
 
-    bool doesContain(offsetT const & point)
+    [[nodiscard]] bool doesContain(offsetT const & point) const
     {
       return relativeSlope(point) == 0;
     }
@@ -85,7 +70,7 @@ namespace
     // negative if the line is above the point.
     // positive if the line is below the point.
     // 0 if the line is on the point.
-    int relativeSlope(offsetT const & point)
+    [[nodiscard]] int relativeSlope(offsetT const & point) const
     {
       return (far.y - near.y)*(far.x - point.x)
         - (far.y - point.y)*(far.x - near.x);
@@ -97,14 +82,14 @@ namespace
 
   struct bumpT
   {
-    bumpT() : parent(NULL) {}
+    bumpT() : parent(nullptr) {}
     offsetT location;
     bumpT * parent;
   };
 
   struct fieldT
   {
-    fieldT() : steepBump(NULL), shallowBump(NULL) {}
+    fieldT() : steepBump(nullptr), shallowBump(nullptr) {}
     lineT steep;
     lineT shallow;
     bumpT * steepBump;
@@ -134,7 +119,7 @@ namespace
     list<bumpT> shallowBumps;
     // activeFields is sorted from shallow-to-steep.
     list<fieldT> activeFields;
-    activeFields.push_back(fieldT());
+    activeFields.emplace_back();
     activeFields.back().shallow.near = offsetT(0, 1);
     activeFields.back().shallow.far = offsetT(state->extent.x, 0);
     activeFields.back().steep.near = offsetT(1, 0);
@@ -148,7 +133,7 @@ namespace
       actIsBlocked(state, dest);
     }
 
-    list<fieldT>::iterator currentField = activeFields.begin();
+    auto currentField = activeFields.begin();
     short i = 0;
     short j = 0;
     int maxI = state->extent.x + state->extent.y;
@@ -203,8 +188,7 @@ namespace
     }
     // The square is between the lines in some way. This means that we
     // need to visit it and determine whether it is blocked.
-    bool isBlocked = actIsBlocked(state, dest);
-    if (!isBlocked)
+    if (actIsBlocked(state, dest))
     {
       // We don't care what case might be left, because this square does
       // not obstruct.
@@ -236,8 +220,8 @@ namespace
     {
       // case BETWEEN
       // The square intersects neither line. We need to split into two fields.
-      list<fieldT>::iterator steeperField = currentField;
-      list<fieldT>::iterator shallowerField = activeFields.insert(currentField, *currentField);
+      auto steeperField = currentField;
+      auto shallowerField = activeFields.insert(currentField, *currentField);
       addSteepBump(bottomRight, shallowerField, steepBumps, shallowBumps);
       checkField(shallowerField, activeFields);
       addShallowBump(topLeft, steeperField, steepBumps, shallowBumps);
@@ -248,7 +232,7 @@ namespace
   list<fieldT>::iterator checkField(list<fieldT>::iterator currentField,
                                     list<fieldT> & activeFields)
   {
-    list<fieldT>::iterator result = currentField;
+    auto result = currentField;
     // If the two slopes are colinear, and if they pass through either
     // extremity, remove the field of view.
     if (currentField->shallow.doesContain(currentField->steep.near)
@@ -263,14 +247,14 @@ namespace
 
   void addShallowBump(offsetT const & point,
                       list<fieldT>::iterator currentField,
-                      list<bumpT> & steepBumps,
+                      [[maybe_unused]] list<bumpT> & steepBumps,
                       list<bumpT> & shallowBumps)
   {
     // First, the far point of shallow is set to the new point.
     currentField->shallow.far = point;
     // Second, we need to add the new bump to the shallow bump list for
     // future steep bump handling.
-    shallowBumps.push_back(bumpT());
+    shallowBumps.emplace_back();
     shallowBumps.back().location = point;
     shallowBumps.back().parent = currentField->shallowBump;
     currentField->shallowBump = & shallowBumps.back();
@@ -278,7 +262,7 @@ namespace
     // any of them are below the line.
     // If there are, we need to replace near point too.
     bumpT * currentBump = currentField->steepBump;
-    while (currentBump != NULL)
+    while (currentBump != nullptr)
     {
       if (currentField->shallow.isAbove(currentBump->location))
       {
@@ -291,17 +275,17 @@ namespace
   void addSteepBump(offsetT const & point,
                     list<fieldT>::iterator currentField,
                     list<bumpT> & steepBumps,
-                    list<bumpT> & shallowBumps)
+                    [[maybe_unused]] list<bumpT> & shallowBumps)
   {
     currentField->steep.far = point;
-    steepBumps.push_back(bumpT());
+    steepBumps.emplace_back();
     steepBumps.back().location = point;
     steepBumps.back().parent = currentField->steepBump;
     currentField->steepBump = & steepBumps.back();
     // Now look through the list of shallow bumps and see if any of them
     // are below the line.
     bumpT * currentBump = currentField->shallowBump;
-    while (currentBump != NULL)
+    while (currentBump != nullptr)
     {
       if (currentField->steep.isBelow(currentBump->location))
       {
@@ -346,7 +330,7 @@ void permissiveSquareFov(short sourceX, short sourceY,
   mask.west = radius;
   mask.width = 2*radius + 1;
   mask.height = 2*radius + 1;
-  mask.mask = NULL;
+  mask.mask = nullptr;
   permissiveFov(sourceX, sourceY, &mask, isBlocked, visit, context);
 }
 
@@ -361,7 +345,7 @@ void permissiveFov(short sourceX, short sourceY,
   state.visit = visit;
   state.context = context;
 
-  static const int quadrantCount = 4;
+  static constexpr int quadrantCount = 4;
   static const offsetT quadrants[quadrantCount] = {offsetT(1, 1),
                                                    offsetT(-1, 1),
                                                    offsetT(-1, -1),
@@ -381,7 +365,7 @@ void permissiveFov(short sourceX, short sourceY,
 
 namespace
 {
-  static const int BITS_PER_INT = sizeof(int)*8;
+  constexpr int BITS_PER_INT = sizeof(int)*8;
 
   #define GET_INT(x,y) (((x)+(y)*mask->width)/BITS_PER_INT)
   #define GET_BIT(x,y) (((x)+(y)*mask->width)%BITS_PER_INT)
@@ -409,7 +393,7 @@ permissiveErrorT initPermissiveMask(permissiveMaskT * mask, int north,
   mask->width = mask->west + 1 + mask->east;
   mask->height = mask->south + 1 + mask->north;
   mask->mask = allocateMask(mask->width, mask->height);
-  if (mask->mask == NULL)
+  if (mask->mask == nullptr)
   {
     result = PERMISSIVE_OUT_OF_MEMORY;
   }
@@ -439,7 +423,7 @@ permissiveErrorT loadPermissiveMask(permissiveMaskT * mask,
   mask->height = static_cast<int>(input.size());
   mask->mask = allocateMask(mask->width, mask->height);
   // TODO: Out of memory
-  list<string>::iterator inputPos = input.begin();
+  auto inputPos = input.begin();
   unsigned int * intPos = mask->mask;
   int bitPos = 0;
   for (int i = 0; i < mask->height; ++i, ++inputPos)
@@ -460,7 +444,7 @@ permissiveErrorT loadPermissiveMask(permissiveMaskT * mask,
         break;
       case '!':
         bit = 0;
-        // Deliberate fall-through.
+        [[fallthrough]]; // Deliberate fall-through.
       case '@':
         // Bit is already set properly.
         mask->south = i;
@@ -495,7 +479,7 @@ permissiveErrorT loadPermissiveMask(permissiveMaskT * mask,
 void cleanupPermissiveMask(permissiveMaskT * mask)
 {
   delete [] mask->mask;
-  mask->mask = NULL;
+  mask->mask = nullptr;
 }
 
 permissiveErrorT savePermissiveMask(permissiveMaskT * mask,
@@ -548,7 +532,7 @@ permissiveErrorT savePermissiveMask(permissiveMaskT * mask,
 
 void setPermissiveVisit(permissiveMaskT * mask, int x, int y)
 {
-  if (mask->mask != NULL)
+  if (mask->mask != nullptr)
   {
     int index = GET_INT(x + mask->west, y + mask->south);
     int shift = GET_BIT(x + mask->west, y + mask->south);
@@ -558,7 +542,7 @@ void setPermissiveVisit(permissiveMaskT * mask, int x, int y)
 
 void clearPermissiveVisit(permissiveMaskT * mask, int x, int y)
 {
-  if (mask->mask != NULL)
+  if (mask->mask != nullptr)
   {
     int index = GET_INT(x + mask->west, y + mask->south);
     int shift = GET_BIT(x + mask->west, y + mask->south);
@@ -568,14 +552,13 @@ void clearPermissiveVisit(permissiveMaskT * mask, int x, int y)
 
 int doesPermissiveVisit(permissiveMaskT * mask, int x, int y)
 {
-  if (mask->mask == NULL)
+  if (mask->mask == nullptr)
   {
     return 1;
   }
-  else
-  {
-    int index = GET_INT(x + mask->west, y + mask->south);
-    int shift = GET_BIT(x + mask->west, y + mask->south);
-    return (mask->mask[index] >> shift) & 0x1;
-  }
+
+  int index = GET_INT(x + mask->west, y + mask->south);
+  int shift = GET_BIT(x + mask->west, y + mask->south);
+  return (mask->mask[index] >> shift) & 0x1;
+
 }
