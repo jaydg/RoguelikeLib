@@ -26,8 +26,8 @@ void CreateStandardDungeon(CMap &level, int max_number_of_rooms = 10, bool with_
         room_size.y = Random(5) +5;
 
         if(FindOnMapRandomRectangleOfType(level, LevelElementWall, p, room_size)) {
-            for(int x = 1; x < room_size.x - 1; x++)
-                for(int y = 1; y < room_size.y - 1; y++) {
+            for(size_t x = 1; x < room_size.x - 1; x++)
+                for(size_t y = 1; y < room_size.y - 1; y++) {
                     level.SetCell(p.x + x, p.y + y, LevelElementRoom);
                 }
         }

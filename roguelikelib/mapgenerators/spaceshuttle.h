@@ -17,41 +17,42 @@ void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool m
 
     std::list < SRoom > list_of_rooms;
     std::list < SRoom >::iterator m;
-    int x, y;
-
-    int x1, y1, x2, y2, rx, ry;
 
     // create until shuttle looks good
     while(true) {
         list_of_rooms.clear();
 
         // fill with walls
-        for(x = 0; x < (int) level.GetWidth(); ++x)
-            for(y = 0; y < (int) level.GetHeight(); ++y) {
+        for(size_t x = 0; x < level.GetWidth(); ++x) {
+            for(size_t y = 0; y < level.GetHeight(); ++y) {
                 level.SetCell(x, y, LevelElementWall_value);
             }
+        }
 
         for(number_of_rooms = 0; number_of_rooms < max_number_of_rooms;) {
+            size_t x1, y1, x2, y2;
+            size_t rx, ry;
+
             if(number_of_rooms == 0) {
-                x1 = (int) level.GetWidth() / 2 - Random(room_max_size);
-                y1 = (int) level.GetHeight() / 2 - Random(room_max_size) - room_min_size;
+                x1 = level.GetWidth() / 2 - Random(room_max_size);
+                y1 = level.GetHeight() / 2 - Random(room_max_size) - room_min_size;
                 rx = Random(room_max_size) + room_min_size;
                 ry = Random(room_max_size - room_min_size) + room_min_size;
                 x2 = x1 + rx;
-                y2 = (int) level.GetHeight() / 2;
+                y2 = level.GetHeight() / 2;
 
-                if(x2 >= (int) level.GetWidth()) {
+                if(x2 >= level.GetWidth()) {
                     continue;
                 }
             } else {
-                x1 = Random((int) level.GetWidth() - room_min_size) + 1;
-                y1 = Random((int) level.GetHeight() - room_min_size) / 2 + 1;
+                x1 = Random(static_cast<int>(level.GetWidth()) - room_min_size) + 1;
+                y1 = Random(static_cast<int>(level.GetHeight()) - room_min_size) / 2 + 1;
                 rx = Random(room_max_size - room_min_size) + room_min_size;
                 ry = Random(room_max_size - room_min_size) + room_min_size;
                 x2 = x1 + rx;
                 y2 = y1 + ry;
 
-                if(x2 >= (int) level.GetWidth() - 1 || y2 >= (int) level.GetHeight() / 2 + 3) {
+                if(x2 >= level.GetWidth() - 1 || y2 >= level.GetHeight() / 2 + 3) {
                     continue;
                 }
             }
@@ -108,17 +109,17 @@ void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool m
             SRoom room = *m;
 
             if(mirror_vertical) {
-                room.corner1.x = (int) level.GetWidth() - room.corner1.x - 1;
-                room.corner2.x = (int) level.GetWidth() - room.corner2.x - 1;
-                x1 = room.corner1.x;
+                room.corner1.x = level.GetWidth() - room.corner1.x - 1;
+                room.corner2.x = level.GetWidth() - room.corner2.x - 1;
+                size_t orig_x = room.corner1.x;
                 room.corner1.x = room.corner2.x;
-                room.corner2.x = x1;
+                room.corner2.x = orig_x;
             } else {
-                room.corner1.y = (int) level.GetHeight() - room.corner1.y - 1;
-                room.corner2.y = (int) level.GetHeight() - room.corner2.y - 1;
-                y1 = room.corner1.y;
+                room.corner1.y = level.GetHeight() - room.corner1.y - 1;
+                room.corner2.y = level.GetHeight() - room.corner2.y - 1;
+                size_t orig_y = room.corner1.y;
                 room.corner1.y = room.corner2.y;
-                room.corner2.y = y1;
+                room.corner2.y = orig_y;
             }
 
             list_of_rooms.insert(m, room);
@@ -127,8 +128,8 @@ void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool m
         for(m = list_of_rooms.begin(); m != list_of_rooms.end(); ++m) {
             const SRoom &room = *m;
 
-            for(x = room.corner1.x; x <= room.corner2.x; x++)
-                for(y = room.corner1.y; y <= room.corner2.y; y++) {
+            for(size_t x = room.corner1.x; x <= room.corner2.x; x++)
+                for(size_t y = room.corner1.y; y <= room.corner2.y; y++) {
                     if(level.GetCell(x, y) == LevelElementWall_value) {
                         level.SetCell(x, y, room.type);
                     }
@@ -136,10 +137,10 @@ void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool m
         }
 
         // Create walls on connections
-        int free_cells = 0;
+        size_t free_cells = 0;
 
-        for(x = 0; x < (int) level.GetWidth() - 1; x++) {
-            for(y = 0; y < (int) level.GetHeight() / 2; y++) {
+        for(size_t x = 0; x < level.GetWidth() - 1; x++) {
+            for(size_t y = 0; y < level.GetHeight() / 2; y++) {
                 if(level.GetCell(x, y) != level.GetCell(x + 1, y) && level.GetCell(x + 1, y) != LevelElementWall_value) {
                     level.SetCell(x, y, LevelElementWall_value);
                 } else if(level.GetCell(x, y) != level.GetCell(x, y + 1) && level.GetCell(x, y + 1) != LevelElementWall_value) {
@@ -158,7 +159,7 @@ void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool m
         }
 
         // Size of ship
-        if(free_cells < (int) level.GetHeight() * (int) level.GetWidth() / 4) {
+        if(free_cells < level.GetHeight() * level.GetWidth() / 4) {
             continue;
         }
 

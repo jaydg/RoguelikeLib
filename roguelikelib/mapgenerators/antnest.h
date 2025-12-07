@@ -20,7 +20,7 @@ void CreateAntNest(CMap &level, bool with_rooms = false)
     double dx, dy;
     int px, py;
 
-    for(int object = 0; object < (int) level.GetWidth() * (int) level.GetHeight() / 3; ++object) {
+    for(size_t object = 0; object < level.GetWidth() * level.GetHeight() / 3; ++object) {
         // degree
         double k = Random(360) * 3.1419532 / 180;
         // position on ellipse by degree
@@ -79,8 +79,8 @@ void CreateAntNest(CMap &level, bool with_rooms = false)
             // if object has something to catch, then catch it
             if((px > 0 && level.GetCell(px - 1, py) == LevelElementCorridor) ||
                     (py > 0 && level.GetCell(px, py - 1) == LevelElementCorridor) ||
-                    (px < (int) level.GetWidth() - 1 && level.GetCell(px + 1, py) == LevelElementCorridor) ||
-                    (py < (int) level.GetHeight() - 1 && level.GetCell(px, py + 1) == LevelElementCorridor)) {
+                    (px < static_cast<int>(level.GetWidth()) - 1 && level.GetCell(px + 1, py) == LevelElementCorridor) ||
+                    (py < static_cast<int>(level.GetHeight()) - 1 && level.GetCell(px, py + 1) == LevelElementCorridor)) {
                 level.SetCell(px, py, LevelElementCorridor);
                 break;
             }
@@ -89,9 +89,9 @@ void CreateAntNest(CMap &level, bool with_rooms = false)
 
     if(with_rooms) {
         // add halls at the end of corridors
-        for(int y = 1; y < (int) level.GetHeight() - 1; y++) {
-            for(int x = 1; x < (int) level.GetWidth() - 1; x++) {
-                if((x > (int) level.GetWidth() / 2 - 10 && x < (int) level.GetWidth() / 2 + 10 && y > (int) level.GetHeight() / 2 - 5 && y < (int) level.GetHeight() / 2 + 5) || level.GetCell(x, y) == LevelElementWall) {
+        for(size_t y = 1; y < level.GetHeight() - 1; y++) {
+            for(size_t x = 1; x < level.GetWidth() - 1; x++) {
+                if((x > level.GetWidth() / 2 - 10 && x < level.GetWidth() / 2 + 10 && y > level.GetHeight() / 2 - 5 && y < level.GetHeight() / 2 + 5) || level.GetCell(x, y) == LevelElementWall) {
                     continue;
                 }
 

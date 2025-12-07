@@ -29,9 +29,14 @@ void CreateMaze(CMap &level, bool allow_loops = false)
 
             switch(Random(4)) {
             case 0:
+                if (m->y < 2) {
+                    remove_driller = true;
+                    break;
+                }
+
                 m->y -= 2;
 
-                if(m->y < 0 || (level.GetCell(m->x, m->y) == LevelElementCorridor)) {
+                if(level.GetCell(m->x, m->y) == LevelElementCorridor) {
                     if(!allow_loops || (allow_loops && Random(5))) {
                         remove_driller = true;
                         break;
@@ -44,7 +49,7 @@ void CreateMaze(CMap &level, bool allow_loops = false)
             case 1:
                 m->y += 2;
 
-                if(m->y >= static_cast <int> (level.GetHeight()) || level.GetCell(m->x, m->y) == LevelElementCorridor) {
+                if(m->y >= level.GetHeight() || level.GetCell(m->x, m->y) == LevelElementCorridor) {
                     remove_driller = true;
                     break;
                 }
@@ -53,9 +58,13 @@ void CreateMaze(CMap &level, bool allow_loops = false)
                 break;
 
             case 2:
-                (*m).x -= 2;
+                if (m->x < 2) {
+                    remove_driller = true;
+                    break;
+                }
+                m->x -= 2;
 
-                if(m->x < 0 || level.GetCell(m->x, m->y) == LevelElementCorridor) {
+                if(level.GetCell(m->x, m->y) == LevelElementCorridor) {
                     remove_driller = true;
                     break;
                 }
@@ -67,7 +76,7 @@ void CreateMaze(CMap &level, bool allow_loops = false)
             default: // make linter happy
                 m->x += 2;
 
-                if(m->x >= static_cast <int> (level.GetWidth()) || level.GetCell(m->x, m->y) == LevelElementCorridor) {
+                if(m->x >= level.GetWidth() || level.GetCell(m->x, m->y) == LevelElementCorridor) {
                     remove_driller = true;
                     break;
                 }

@@ -18,13 +18,13 @@ void CreateCaves(CMap &level, int iterations = 1, float density = 0.65)
 
     level.Clear(LevelElementRoom);
 
-    for(int fill = 0; fill < (level.GetWidth() * level.GetHeight() * density); fill++) {
+    for(int fill = 0; fill < static_cast<int>(static_cast<float>(level.GetWidth() * level.GetHeight()) * density); fill++) {
         level.SetCell(Random((int) level.GetWidth()), Random((int) level.GetHeight()), LevelElementWall);
     }
 
     for(int iteration = 0; iteration < iterations; iteration++) {
-        for(int x = 0; x < (int) level.GetWidth(); x++) {
-            for(int y = 0; y < (int) level.GetHeight(); y++) {
+        for (size_t x = 0; x < level.GetWidth(); x++) {
+            for(size_t y = 0; y < level.GetHeight(); y++) {
                 int neighbours = CountNeighboursOfType(level, LevelElementWall, Position(x, y));
 
                 if(level.GetCell(x, y) == LevelElementWall) {
@@ -37,7 +37,7 @@ void CreateCaves(CMap &level, int iterations = 1, float density = 0.65)
                     }
                 }
 
-                if(x == 0 || x == (int) level.GetWidth() - 1 || y == 0 || y == (int) level.GetHeight() - 1) {
+                if(x == 0 || x == level.GetWidth() - 1 || y == 0 || y == level.GetHeight() - 1) {
                     level.SetCell(x, y, LevelElementWall);
                 }
             }

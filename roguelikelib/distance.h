@@ -34,10 +34,10 @@ void InitSquareRoot(int size)
 }
 
 static
-int Distance(const int& x1, const int& y1, const int& x2, const int& y2)
+int Distance(const size_t& x1, const size_t& y1, const size_t& x2, const size_t& y2)
 {
-    const int diff_x = x2 - x1;
-    const int diff_y = y2 - y1;
+    const int diff_x = static_cast<int>(x2) - x1;
+    const int diff_y = static_cast<int>(y2) - y1;
     int dist = diff_x * diff_x + diff_y * diff_y;
 
     if(dist >= static_cast <int> (square_root.size())) {

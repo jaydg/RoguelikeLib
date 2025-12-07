@@ -25,8 +25,8 @@ void CreateSimpleCity(CMap &level, const int& a_number_of_buildings)
         SRoom main;
         main.corner1.x = 0;
         main.corner1.y = 0;
-        main.corner2.x = (int) level.GetWidth();
-        main.corner2.y = (int) level.GetHeight();
+        main.corner2.x = level.GetWidth();
+        main.corner2.y = level.GetHeight();
 
         AddRecursiveRooms(level, LevelElementCorridor, max_building_width, max_building_height, main, false);
 
@@ -95,7 +95,7 @@ void CreateSimpleCity(CMap &level, const int& a_number_of_buildings)
 
         if(tries < 100) {
             // plant some trees
-            for(int index = 0; index < level.GetWidth() * level.GetHeight() * 0.3; index++) {
+            for(size_t index = 0; index < level.GetWidth() * static_cast<size_t>(static_cast<float>(level.GetHeight()) * 0.3); index++) {
                 int x = Random(static_cast <int> (level.GetWidth()));
                 int y = Random(static_cast <int> (level.GetHeight()));
 

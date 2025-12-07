@@ -6,25 +6,25 @@
 #ifndef RL_MAP_H
 #define RL_MAP_H
 
-#include <climits>
 #include <limits>
+#include <climits>
 #include <vector>
 #include <iostream>
 
 namespace RL {
 struct Position {
-    int x;
-    int y;
+    static constexpr size_t invalid = std::numeric_limits<size_t>::max();
+
+    size_t x;
+    size_t y;
+
     Position()
     {
-        x = -1;
-        y = -1;
+        x = invalid;
+        y = invalid;
     }
 
-    Position(int a_x, int a_y): x(a_x), y(a_y) {};
-
-    Position(size_t a_x, size_t a_y)
-        : x(static_cast<int>(a_x)), y(static_cast<int>(a_y)) {};
+    Position(size_t a_x, size_t a_y): x(a_x), y(a_y) {};
 
     const Position& operator+=(const Position& r)
     {
@@ -109,8 +109,8 @@ public:
             return;
         }
 
-        for(int x = 0; x < size.x; ++x)
-            for(int y = 0; y < size.y; ++y) {
+        for(size_t x = 0; x < size.x; ++x)
+            for(size_t y = 0; y < size.y; ++y) {
                 m_map[x * size.y + y] = filler;
             }
     }
@@ -121,15 +121,15 @@ public:
             return;
         }
 
-        for(int x = 0; x < size.x; ++x)
-            for(int y = 0; y < size.y; ++y) {
+        for(size_t x = 0; x < size.x; ++x)
+            for(size_t y = 0; y < size.y; ++y) {
                 m_map[x * size.y + y] = filler;
             }
     }
 
-    [[nodiscard]] bool OnMap(const int& x, const int& y) const
+    [[nodiscard]] bool OnMap(const size_t& x, const size_t& y) const
     {
-        return (x >= 0 && x < (int) size.x && y >= 0 && y < (int) size.y);
+        return (x < size.x && y < size.y);
     }
 
     [[nodiscard]] bool OnMap(const Position &pos) const
@@ -137,14 +137,14 @@ public:
         return OnMap(pos.x, pos.y);
     }
 
-    void SetCell(const int& x, const int& y, ELevelElement element)
+    void SetCell(const size_t& x, const size_t& y, ELevelElement element)
     {
         if(OnMap(x, y)) {
             m_map[x * size.y + y] = element;
         }
     }
 
-    void SetCell(const int& x, const int& y, int element)
+    void SetCell(const size_t& x, const size_t& y, int element)
     {
         if(OnMap(x, y)) {
             m_map[x * size.y + y] = element;
@@ -156,7 +156,7 @@ public:
         return SetCell(pos.x, pos.y, element);
     }
 
-    [[nodiscard]] int GetCell(const int& x, const int& y) const {
+    [[nodiscard]] int GetCell(const size_t& x, const size_t& y) const {
         if(OnMap(x, y)) {
             return m_map[x * size.y + y];
         } else {
@@ -171,8 +171,8 @@ public:
 
     void PrintMap() const
     {
-        for(int y = 0; y < size.y; ++y) {
-            for(int x = 0; x < size.x; ++x) {
+        for(size_t y = 0; y < size.y; ++y) {
+            for(size_t x = 0; x < size.x; ++x) {
                 std::cout << static_cast <char> ((int) GetCell(x, y));
             }
 
@@ -190,7 +190,7 @@ struct SRoom {
         return (pos.x >= corner1.x && pos.x <= corner2.x && pos.y >= corner1.y && pos.y <= corner2.y);
     }
 
-    [[nodiscard]] bool IsInRoom(const int x, const int y) const
+    [[nodiscard]] bool IsInRoom(const size_t x, const size_t y) const
     {
         return (x >= corner1.x && x <= corner2.x && y >= corner1.y && y <= corner2.y);
     }

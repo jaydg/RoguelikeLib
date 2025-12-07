@@ -20,15 +20,15 @@ void FindOnMapAllRectanglesOfType(CMap &level, const ELevelElement& type, const 
 {
     CMap good_points = level;
 
-    for(unsigned int y = 0; y < level.GetHeight(); ++y)
-        for(unsigned int x = 0; x < level.GetWidth(); ++x) {
+    for(size_t y = 0; y < level.GetHeight(); ++y)
+        for(size_t x = 0; x < level.GetWidth(); ++x) {
             good_points.SetCell(x, y, 0);
         }
 
-    for(unsigned int y = 0; y < level.GetHeight(); ++y) {
-        int horizontal_count = 0;
+    for(size_t y = 0; y < level.GetHeight(); ++y) {
+        size_t horizontal_count = 0;
 
-        for(unsigned int x = 0; x < level.GetWidth(); ++x) {
+        for(size_t x = 0; x < level.GetWidth(); ++x) {
             if(level.GetCell(x, y) == type) {
                 horizontal_count++;
             } else {
@@ -43,10 +43,10 @@ void FindOnMapAllRectanglesOfType(CMap &level, const ELevelElement& type, const 
     }
 
     // count verticals
-    for(int x = 0; x < level.GetWidth(); ++x) {
-        int vertical_count = 0;
+    for(size_t x = 0; x < level.GetWidth(); ++x) {
+        size_t vertical_count = 0;
 
-        for(int y = 0; y < level.GetHeight(); ++y) {
+        for(size_t y = 0; y < level.GetHeight(); ++y) {
             if(good_points.GetCell(x, y) == 1) {
                 vertical_count++;
             } else {
@@ -79,12 +79,12 @@ bool FloodFill(CMap &level, Position position, int value, bool diagonal = true, 
     while(m != positions.end()) {
 
         // Fill only to the end?
-        if(end.x != -1 && end == (*m)) {
+        if(end.x != Position::invalid && end == (*m)) {
             break;
         }
 
-        int pos_x = (*m).x;
-        int pos_y = (*m).y;
+        size_t pos_x = (*m).x;
+        size_t pos_y = (*m).y;
 
         int this_value = level.GetCell(pos_x, pos_y);
 
@@ -94,7 +94,7 @@ bool FloodFill(CMap &level, Position position, int value, bool diagonal = true, 
                 positions.emplace_back(pos_x - 1, pos_y);
             }
 
-        if(pos_x < (int) level.GetWidth() - 1)
+        if(pos_x < level.GetWidth() - 1)
             if(level.GetCell(pos_x + 1, pos_y) == area_value) {
                 level.SetCell(pos_x + 1, pos_y, this_value + gradient);
                 positions.emplace_back(pos_x + 1, pos_y);
@@ -106,7 +106,7 @@ bool FloodFill(CMap &level, Position position, int value, bool diagonal = true, 
                 positions.emplace_back(pos_x, pos_y - 1);
             }
 
-        if(pos_y < (int) level.GetHeight() - 1)
+        if(pos_y < level.GetHeight() - 1)
             if(level.GetCell(pos_x, pos_y + 1) == area_value) {
                 level.SetCell(pos_x, pos_y + 1, this_value + gradient);
                 positions.emplace_back(pos_x, pos_y + 1);
@@ -119,19 +119,19 @@ bool FloodFill(CMap &level, Position position, int value, bool diagonal = true, 
                     positions.emplace_back(pos_x - 1, pos_y - 1);
                 }
 
-            if(pos_x < (int) level.GetWidth() - 1 && pos_y < (int) level.GetHeight() - 1)
+            if(pos_x < level.GetWidth() - 1 && pos_y < level.GetHeight() - 1)
                 if(level.GetCell(pos_x + 1, pos_y + 1) == area_value) {
                     level.SetCell(pos_x + 1, pos_y + 1, this_value + gradient);
                     positions.emplace_back(pos_x + 1, pos_y + 1);
                 }
 
-            if(pos_x < (int) level.GetWidth() - 1 && pos_y > 0)
+            if(pos_x < level.GetWidth() - 1 && pos_y > 0)
                 if(level.GetCell(pos_x + 1, pos_y - 1) == area_value) {
                     level.SetCell(pos_x + 1, pos_y - 1, this_value + gradient);
                     positions.emplace_back(pos_x + 1, pos_y - 1);
                 }
 
-            if(pos_x > 0 && pos_y < (int) level.GetHeight() - 1)
+            if(pos_x > 0 && pos_y < level.GetHeight() - 1)
                 if(level.GetCell(pos_x - 1, pos_y + 1) == area_value) {
                     level.SetCell(pos_x - 1, pos_y + 1, this_value + gradient);
                     positions.emplace_back(pos_x - 1, pos_y + 1);
@@ -146,7 +146,7 @@ bool FloodFill(CMap &level, Position position, int value, bool diagonal = true, 
         return false;
     }
 
-    if(end.x != -1 && end != (*m)) {
+    if(end.x != Position::invalid && end != (*m)) {
         return false;
     }
 
@@ -182,12 +182,12 @@ int CountNeighboursOfType(CMap &level, ELevelElement type, const Position& pos, 
             neighbours++;
         }
 
-    if(pos.x < (int) level.GetWidth() - 1)
+    if(pos.x < level.GetWidth() - 1)
         if(level.GetCell(pos.x + 1, pos.y) == type) { // E
             neighbours++;
         }
 
-    if(pos.x > 0 && pos.y < (int) level.GetHeight() - 1)
+    if(pos.x > 0 && pos.y < level.GetHeight() - 1)
         if(level.GetCell(pos.x, pos.y + 1) == type) { // S
             neighbours++;
         }
@@ -203,18 +203,18 @@ int CountNeighboursOfType(CMap &level, ELevelElement type, const Position& pos, 
                 neighbours++;
             }
 
-        if(pos.x < (int) level.GetWidth() - 1 && pos.y > 0)
+        if(pos.x < level.GetWidth() - 1 && pos.y > 0)
             if(level.GetCell(pos.x + 1, pos.y - 1) == type) { // NE
                 neighbours++;
             }
 
-        if(pos.x < (int) level.GetWidth() - 1 && pos.y < (int) level.GetHeight() - 1) // SE
+        if(pos.x < level.GetWidth() - 1 && pos.y < level.GetHeight() - 1) // SE
             if(level.GetCell(pos.x + 1, pos.y + 1) == type) {
                 neighbours++;
             }
 
 
-        if(pos.x > 0 && pos.y < (int) level.GetHeight() - 1)
+        if(pos.x > 0 && pos.y < level.GetHeight() - 1)
             if(level.GetCell(pos.x - 1, pos.y + 1) == type) { // SW
                 neighbours++;
             }
@@ -260,17 +260,17 @@ void AddDoors(CMap &level, float door_probability, float open_probability)
 //////////////////////////////////////////////////////////////////////////
 
 inline
-bool AddCorridor(CMap &level, const int& start_x1, const int& start_y1, const int& start_x2, const int& start_y2, bool straight = false)
+bool AddCorridor(CMap &level, const size_t &start_x1, const size_t &start_y1, const size_t &start_x2, const size_t &start_y2, bool straight = false)
 {
     if(!level.OnMap(start_x1, start_y1) || !level.OnMap(start_x2, start_y2)) {
         return false;
     }
 
     // we start from both sides
-    int x1 = start_x1;
-    int y1 = start_y1;
-    int x2 = start_x2;
-    int y2 = start_y2;
+    size_t x1 = start_x1;
+    size_t y1 = start_y1;
+    size_t x2 = start_x2;
+    size_t y2 = start_y2;
 
     int dir_x;
     int dir_y;
@@ -453,12 +453,12 @@ void ConnectClosestRooms(CMap &level, bool with_doors, bool straight_connections
 
             for(m = rooms[room_a].begin(), _m = rooms[room_a].end(); m != _m; ++m) {
                 // for each border cell in room_a try each border cell of room_b
-                int x1 = (*m).x;
-                int y1 = (*m).y;
+                size_t x1 = (*m).x;
+                size_t y1 = (*m).y;
 
                 for(k = rooms[room_b].begin(), _k = rooms[room_b].end(); k != _k; ++k) {
-                    int x2 = (*k).x;
-                    int y2 = (*k).y;
+                    size_t x2 = (*k).x;
+                    size_t y2 = (*k).y;
 
                     int dist_ab = Distance(x1, y1, x2, y2);
 
@@ -495,10 +495,10 @@ void ConnectClosestRooms(CMap &level, bool with_doors, bool straight_connections
         std::pair < Position, Position > closest_cells;
         closest_cells = closest_cells_matrix[room_a][closest_room];
 
-        int x1 = closest_cells.first.x;
-        int y1 = closest_cells.first.y;
-        int x2 = closest_cells.second.x;
-        int y2 = closest_cells.second.y;
+        size_t x1 = closest_cells.first.x;
+        size_t y1 = closest_cells.first.y;
+        size_t x2 = closest_cells.second.x;
+        size_t y2 = closest_cells.second.y;
 
         if(room_connections[room_a][closest_room] == false && AddCorridor(level, x1, y1, x2, y2, straight_connections)) {
             room_connections[room_a][closest_room] = true;
@@ -568,15 +568,15 @@ void ConnectClosestRooms(CMap &level, bool with_doors, bool straight_connections
 //////////////////////////////////////////////////////////////////////////
 
 inline
-void AddRecursiveRooms(CMap &level, const ELevelElement& type, int min_size_x, int min_size_y, const SRoom& room, bool with_doors = true)
+void AddRecursiveRooms(CMap &level, const ELevelElement& type, size_t min_size_x, size_t min_size_y, const SRoom& room, bool with_doors = true)
 {
-    int size_x = room.corner2.x - room.corner1.x;
+    size_t size_x = room.corner2.x - room.corner1.x;
 
     if(size_x % 2 != 0) {
         size_x -= CoinToss();
     }
 
-    int size_y = room.corner2.y - room.corner1.y;
+    size_t size_y = room.corner2.y - room.corner1.y;
 
     if(size_y % 2 != 0) {
         size_y -= CoinToss();
@@ -599,7 +599,7 @@ void AddRecursiveRooms(CMap &level, const ELevelElement& type, int min_size_x, i
 
         int split = size_y / 2 + Random(size_y / 2 - min_size_y);
 
-        for(int x = room.corner1.x; x < room.corner2.x; x++) {
+        for(size_t x = room.corner1.x; x < room.corner2.x; x++) {
             level.SetCell(x, room.corner1.y + split, type);
         }
 
@@ -621,7 +621,7 @@ void AddRecursiveRooms(CMap &level, const ELevelElement& type, int min_size_x, i
 
         int split = size_x / 2 + Random(size_x / 2 - min_size_x);
 
-        for(int y = room.corner1.y; y < room.corner2.y; y++) {
+        for(size_t y = room.corner1.y; y < room.corner2.y; y++) {
             level.SetCell(room.corner1.x + split, y, type);
         }
 
@@ -644,8 +644,8 @@ void AddRecursiveRooms(CMap &level, const ELevelElement& type, int min_size_x, i
 inline
 void ConvertValuesToTiles(CMap &level)
 {
-    for(unsigned int y = 0; y < level.GetHeight(); ++y) {
-        for(unsigned int x = 0; x < level.GetWidth(); ++x) {
+    for(size_t y = 0; y < level.GetHeight(); ++y) {
+        for(size_t x = 0; x < level.GetWidth(); ++x) {
             if(level.GetCell(x, y) == LevelElementCorridor_value) {
                 level.SetCell(x, y, LevelElementCorridor);
             } else if(level.GetCell(x, y) == LevelElementWall_value) {
@@ -662,10 +662,11 @@ void ConvertValuesToTiles(CMap &level)
 inline
 void DrawRectangleOnMap(CMap &level, const Position& p1, const Position& p2, int value)
 {
-    for(int y = p1.y; y < p2.y; ++y)
-        for(int x = p1.x; x < p2.x; ++x) {
+    for(size_t y = p1.y; y < p2.y; ++y) {
+        for(size_t x = p1.x; x < p2.x; ++x) {
             level.SetCell(x, y, value);
         }
+    }
 }
 
 }

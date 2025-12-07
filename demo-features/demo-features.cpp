@@ -135,7 +135,7 @@ int main(void)
                 temp_level.SetCell(pos, RL::LevelElementCorridor_value); // conversion
 
                 // set top-left corner
-                if(start.x == -1) {
+                if(start.x == RL::Position::invalid) {
                     start = pos;
                 }
 
@@ -165,4 +165,3 @@ int main(void)
     //////////////////////////////////////////////////////////////////////////
     return 0;
 }
-

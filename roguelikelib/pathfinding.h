@@ -47,21 +47,21 @@ inline bool FindPath(CMap &level, const Position& start, const Position& end, st
                     continue;
                 }
 
-            if(pos.x < (int) level.GetWidth() - 1 && pos.y > 0)
+            if(pos.x < level.GetWidth() - 1 && pos.y > 0)
                 if(level.GetCell(pos.x + 1, pos.y - 1) < current_value) { // NE
                     new_pos.x++;
                     new_pos.y--;
                     continue;
                 }
 
-            if(pos.x < (int) level.GetWidth() - 1 && pos.y < (int) level.GetHeight() - 1) // SE
+            if(pos.x < level.GetWidth() - 1 && pos.y < level.GetHeight() - 1) // SE
                 if(level.GetCell(pos.x + 1, pos.y + 1) < current_value) {
                     new_pos.x++;
                     new_pos.y++;
                     continue;
                 }
 
-            if(pos.x > 0 && pos.y < (int) level.GetHeight() - 1)
+            if(pos.x > 0 && pos.y < level.GetHeight() - 1)
                 if(level.GetCell(pos.x - 1, pos.y + 1) < current_value) { // SW
                     new_pos.x--;
                     new_pos.y++;
@@ -75,13 +75,13 @@ inline bool FindPath(CMap &level, const Position& start, const Position& end, st
                 continue;
             }
 
-        if(pos.x < (int) level.GetWidth() - 1)
+        if(pos.x < level.GetWidth() - 1)
             if(level.GetCell(pos.x + 1, pos.y) < current_value) { // E
                 new_pos.x++;
                 continue;
             }
 
-        if(pos.x > 0 && pos.y < (int) level.GetHeight() - 1)
+        if(pos.x > 0 && pos.y < level.GetHeight() - 1)
             if(level.GetCell(pos.x, pos.y + 1) < current_value) { // S
                 new_pos.y++;
                 continue;
