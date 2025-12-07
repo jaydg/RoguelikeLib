@@ -1,3 +1,6 @@
+#ifndef DEMO_GAME_MONSTER_H
+#define DEMO_GAME_MONSTER_H
+
 #include "../roguelikelib/map.h"
 
 class CMonster {
@@ -19,3 +22,5 @@ public:
     virtual void Print() const;
     RL::Position GetPosition() const;
 };
+
+#endif

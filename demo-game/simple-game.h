@@ -1,3 +1,6 @@
+#ifndef DEMO_GAME_SIMPLE_GAME_H
+#define DEMO_GAME_SIMPLE_GAME_H
+
 #include <set>
 #include <list>
 #include "player.h"
@@ -22,3 +25,5 @@ public:
     void CreateLevel();
     void MainLoop();
 };
+
+#endif

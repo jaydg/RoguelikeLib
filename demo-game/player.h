@@ -1,3 +1,6 @@
+#ifndef DEMO_GAME_PLAYER_H
+#define DEMO_GAME_PLAYER_H
+
 #include "monster.h"
 
 class CPlayer final : public CMonster {
@@ -14,3 +17,5 @@ public:
     void Print() const override;
     void LookAround() override;
 };
+
+#endif
