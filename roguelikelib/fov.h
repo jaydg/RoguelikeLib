@@ -22,7 +22,7 @@ public:
         level.Clear(0);
     }
 
-    bool isBlocked(short destX, short destY)
+    [[nodiscard]] bool isBlocked(short destX, short destY) const
     {
         return blocked.GetCell(destX, destY) != false;
     }
@@ -37,16 +37,16 @@ class FOVRoundContext {
     CMap &level;
     CMap blocked;
     Position start;
-    int radius;
+    unsigned radius;
 public:
-    FOVRoundContext(CMap &input_level, const Position &a_start, const int &a_radius)
+    FOVRoundContext(CMap &input_level, const Position &a_start, const unsigned &a_radius)
         : level(input_level), start(a_start), radius(a_radius)
     {
         blocked = input_level;
         level.Clear(0);
     }
 
-    bool isBlocked(short destX, short destY)
+    [[nodiscard]] bool isBlocked(short destX, short destY) const
     {
         if(start.Distance(Position(destX, destY)) >= radius) {
             return true;
