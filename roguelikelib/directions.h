@@ -31,12 +31,12 @@ public:
 
     Direction(EDirection start): direction(start) {};
 
-    inline EDirection Get()
+    EDirection Get()
     {
         return direction;
     }
 
-    inline void Set(EDirection to_set)
+    void Set(EDirection to_set)
     {
         direction = to_set;
     }
