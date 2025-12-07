@@ -6,21 +6,28 @@
 #ifndef RL_DISTANCE_H
 #define RL_DISTANCE_H
 
-#include "map.h"
 #include <cmath>
 
+#include "map.h"
+
 namespace RL {
+
+template<typename T>
+T diff(T a, T b){
+    return (a > b) ? (a - b) : (b - a);
+}
+
 //////////////////////////////////////////////////////////////////////////
 // To speed up distance calculation
-static std::vector <int> square_root;
+static std::vector <size_t> square_root;
 //////////////////////////////////////////////////////////////////////////
 
 static
-void InitSquareRoot(int size)
+void InitSquareRoot(size_t size)
 {
-    size_t old_size = square_root.size();
+    const size_t old_size = square_root.size();
 
-    if(size < 0 || static_cast <size_t>(size) < old_size) {
+    if(size < old_size) {
         return;
     }
 
@@ -28,19 +35,20 @@ void InitSquareRoot(int size)
     square_root.resize(size);
 
     // count square root
-    for(size_t a = old_size; a < static_cast <size_t>(size); ++a) {
-        square_root[a] = (int)ceil(std::sqrt((double) a));
+    for(size_t a = old_size; a < size; ++a) {
+        square_root[a] = static_cast<size_t>(ceil(std::sqrt(static_cast<double>(a))));
     }
 }
 
 static
-int Distance(const size_t& x1, const size_t& y1, const size_t& x2, const size_t& y2)
+size_t Distance(const size_t& x1, const size_t& y1, const size_t& x2, const size_t& y2)
 {
-    const int diff_x = static_cast<int>(x2) - x1;
-    const int diff_y = static_cast<int>(y2) - y1;
-    int dist = diff_x * diff_x + diff_y * diff_y;
+    const size_t diff_x = diff(x1, x2);
+    const size_t diff_y = diff(y1, y2);
 
-    if(dist >= static_cast <int> (square_root.size())) {
+    const size_t dist = diff_x * diff_x + diff_y * diff_y;
+
+    if(dist >= square_root.size()) {
         InitSquareRoot(dist);
     }
 
@@ -48,7 +56,7 @@ int Distance(const size_t& x1, const size_t& y1, const size_t& x2, const size_t&
 }
 
 static
-int Distance(const Position &p1, const Position &p2)
+size_t Distance(const Position &p1, const Position &p2)
 {
     return Distance(p1.x, p1.y, p2.x, p2.y);
 }
