@@ -15,21 +15,17 @@ void CreateAntNest(CMap &level, bool with_rooms = false)
 
     level.Clear();
 
-    int x, y;
-
     level.SetCell(level.GetWidth() / 2, level.GetHeight() / 2, LevelElementCorridor);
 
-    double x1, y1;
-    double k;
     double dx, dy;
     int px, py;
 
     for(int object = 0; object < (int) level.GetWidth() * (int) level.GetHeight() / 3; ++object) {
         // degree
-        k = Random(360) * 3.1419532 / 180;
+        double k = Random(360) * 3.1419532 / 180;
         // position on ellipse by degree
-        x1 = (double) level.GetWidth() / 2 + ((double)level.GetWidth() / 2) * sin(k);
-        y1 = (double) level.GetHeight() / 2 + ((double)level.GetHeight() / 2) * cos(k);
+        double x1 = (double) level.GetWidth() / 2 + ((double) level.GetWidth() / 2) * sin(k);
+        double y1 = (double) level.GetHeight() / 2 + ((double) level.GetHeight() / 2) * cos(k);
 
         // object will move not too horizontal and not too vertical
         do {
@@ -44,7 +40,7 @@ void CreateAntNest(CMap &level, bool with_rooms = false)
 
         int counter = 0;
 
-        while(1) {
+        while(true) {
             // didn't catch anything after 1000 steps (just to avoid infinite loops)
             if(counter++ > 1000) {
                 object--;
@@ -93,8 +89,8 @@ void CreateAntNest(CMap &level, bool with_rooms = false)
 
     if(with_rooms) {
         // add halls at the end of corridors
-        for(y = 1; y < (int) level.GetHeight() - 1; y++) {
-            for(x = 1; x < (int) level.GetWidth() - 1; x++) {
+        for(int y = 1; y < (int) level.GetHeight() - 1; y++) {
+            for(int x = 1; x < (int) level.GetWidth() - 1; x++) {
                 if((x > (int) level.GetWidth() / 2 - 10 && x < (int) level.GetWidth() / 2 + 10 && y > (int) level.GetHeight() / 2 - 5 && y < (int) level.GetHeight() / 2 + 5) || level.GetCell(x, y) == LevelElementWall) {
                     continue;
                 }

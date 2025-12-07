@@ -26,7 +26,7 @@ int main(void)
     //////////////////////////////////////////////////////////////////////////
 
     cout << endl << "Standard Dungeon" << endl << endl;
-    RL::CreateStandardDunegon(level, 20);
+    RL::CreateStandardDungeon(level, 20);
     level.PrintMap();
 
     cout << endl << "Ant's Nest" << endl << endl;

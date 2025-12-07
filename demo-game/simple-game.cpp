@@ -87,7 +87,7 @@ void CSimpleGame::CreateLevel()
 
     switch(level_type) {
     case 0:
-        RL::CreateStandardDunegon(level, 20, false);
+        RL::CreateStandardDungeon(level, 20, false);
         IOPrintString(60, 24, "Standard Dungeon");
         break;
 

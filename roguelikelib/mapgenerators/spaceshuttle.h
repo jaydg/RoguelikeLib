@@ -10,11 +10,10 @@ namespace RL {
 inline
 void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool mirror_vertical = false)
 {
-    const int room_min_size = 3;
-    const int room_max_size = 15;
+    constexpr int room_max_size = 15;
+    constexpr int room_min_size = 3;
 
     int number_of_rooms;
-    int free_cells;
 
     std::list < SRoom > list_of_rooms;
     std::list < SRoom >::iterator m;
@@ -22,7 +21,8 @@ void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool m
 
     int x1, y1, x2, y2, rx, ry;
 
-    while(1) { // create until shuttle looks good
+    // create until shuttle looks good
+    while(true) {
         list_of_rooms.clear();
 
         // fill with walls
@@ -103,9 +103,8 @@ void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool m
 
         // create mirror
         m = list_of_rooms.begin();
-        int index;
 
-        for(index = 0; index < number_of_rooms; index++, ++m) {
+        for(int index = 0; index < number_of_rooms; index++, ++m) {
             SRoom room = *m;
 
             if(mirror_vertical) {
@@ -137,7 +136,7 @@ void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool m
         }
 
         // Create walls on connections
-        free_cells = 0;
+        int free_cells = 0;
 
         for(x = 0; x < (int) level.GetWidth() - 1; x++) {
             for(y = 0; y < (int) level.GetHeight() / 2; y++) {

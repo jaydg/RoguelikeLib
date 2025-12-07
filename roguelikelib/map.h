@@ -88,9 +88,9 @@ public:
         m_map.resize(size.x * size.y);
     }
 
-    void Resize(Size size)
+    void Resize(Size new_size)
     {
-        return Resize(size.x, size.y);
+        return Resize(new_size.x, new_size.y);
     }
 
     [[nodiscard]] size_t GetWidth() const
@@ -105,7 +105,7 @@ public:
 
     void Clear(int filler)
     {
-        if(m_map.size() == 0) {
+        if(m_map.empty()) {
             return;
         }
 
@@ -117,7 +117,7 @@ public:
 
     void Clear(ELevelElement filler = LevelElementWall)
     {
-        if(m_map.size() == 0) {
+        if(m_map.empty()) {
             return;
         }
 

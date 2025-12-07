@@ -8,7 +8,7 @@
 
 namespace RL {
 inline
-void CreateStandardDunegon(CMap &level, int max_number_of_rooms = 10, bool with_doors = true)
+void CreateStandardDungeon(CMap &level, int max_number_of_rooms = 10, bool with_doors = true)
 {
     if(level.GetWidth() == 0 || level.GetHeight() == 0) {
         return;
@@ -17,7 +17,6 @@ void CreateStandardDunegon(CMap &level, int max_number_of_rooms = 10, bool with_
     level.Clear();
 
     Position p;
-    Position room;
     Size room_size;
 
     // place rooms

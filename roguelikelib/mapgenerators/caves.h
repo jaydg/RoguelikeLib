@@ -7,6 +7,8 @@
 #include "../maputils.h"
 
 namespace RL {
+
+// create a game of life cave
 inline
 void CreateCaves(CMap &level, int iterations = 1, float density = 0.65)
 {
@@ -16,17 +18,13 @@ void CreateCaves(CMap &level, int iterations = 1, float density = 0.65)
 
     level.Clear(LevelElementRoom);
 
-    // create a game of life cave
-
-    int x, y;
-
     for(int fill = 0; fill < (level.GetWidth() * level.GetHeight() * density); fill++) {
         level.SetCell(Random((int) level.GetWidth()), Random((int) level.GetHeight()), LevelElementWall);
     }
 
     for(int iteration = 0; iteration < iterations; iteration++) {
-        for(x = 0; x < (int) level.GetWidth(); x++) {
-            for(y = 0; y < (int) level.GetHeight(); y++) {
+        for(int x = 0; x < (int) level.GetWidth(); x++) {
+            for(int y = 0; y < (int) level.GetHeight(); y++) {
                 int neighbours = CountNeighboursOfType(level, LevelElementWall, Position(x, y));
 
                 if(level.GetCell(x, y) == LevelElementWall) {

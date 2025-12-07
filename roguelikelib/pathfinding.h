@@ -26,7 +26,7 @@ inline bool FindPath(CMap &level, const Position& start, const Position& end, st
     Position pos = start;
     Position new_pos = start;
 
-    while(1) {
+    while(true) {
         if(pos == end) {
             return true;
         }

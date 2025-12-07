@@ -17,7 +17,7 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
 
     level.Clear();
 
-    int x, y, sx, sy;
+    int x, y;
 
     typedef std::list < SRoom > list_of_rooms;
 
@@ -25,25 +25,22 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
     list_of_rooms rooms;
     SRoom room;
 
-    int random_number;
-    int diff_x, diff_y;
-
     Position p, p1, p2;
 
     // Place rooms
     for(int room_number = 0; room_number < max_number_of_rooms; ++room_number) {
         // size of room
-        sx = Random(5) +6;
-        sy = Random(5) +6;
+        const int sx = Random(5) + 6;
+        const int sy = Random(5) + 6;
 
         if(FindOnMapRandomRectangleOfType(level, LevelElementWall, p, Size(sx + 4, sy + 4))) {
             p.x += 2;
             p.y += 2;
 
             // Connect the room to existing one
-            if(rooms.size() > 0) {
+            if(!rooms.empty()) {
 
-                random_number = Random(static_cast<int>(rooms.size()));
+                int random_number = Random(static_cast<int>(rooms.size()));
 
                 for(m = rooms.begin(); --random_number > 0; ++m);
 
@@ -52,12 +49,12 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
                 p1.y = p.y + sy / 2;
 
                 // center of second room
-                p2.x = (*m).corner1.x + ((*m).corner2.x - (*m).corner1.x) / 2;
-                p2.y = (*m).corner1.y + ((*m).corner2.y - (*m).corner1.y) / 2;
+                p2.x = m->corner1.x + (m->corner2.x - m->corner1.x) / 2;
+                p2.y = m->corner1.y + (m->corner2.y - m->corner1.y) / 2;
 
                 // found the way to connect rooms
-                diff_x = p2.x - p1.x;
-                diff_y = p2.y - p1.y;
+                int diff_x = p2.x - p1.x;
+                int diff_y = p2.y - p1.y;
 
                 if(diff_x < 0) {
                     diff_x = -diff_x;

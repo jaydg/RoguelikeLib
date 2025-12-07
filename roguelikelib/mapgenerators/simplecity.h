@@ -38,7 +38,7 @@ void CreateSimpleCity(CMap &level, const int& a_number_of_buildings)
             int size_x = max_building_width * 2;
             int size_y = max_building_height * 2;
 
-            while(1) {
+            while(true) {
                 Position pos;
 
                 if(FindOnMapRandomRectangleOfType(level, LevelElementGrass, pos, Size(size_x + 2, size_y + 2))) {

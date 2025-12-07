@@ -18,8 +18,7 @@ namespace RL {
 inline
 void FindOnMapAllRectanglesOfType(CMap &level, const ELevelElement& type, const Size &size, std::vector < Position >& positions)
 {
-    CMap good_points;
-    good_points = level;
+    CMap good_points = level;
 
     for(unsigned int y = 0; y < level.GetHeight(); ++y)
         for(unsigned int x = 0; x < level.GetWidth(); ++x) {
@@ -162,7 +161,7 @@ bool FindOnMapRandomRectangleOfType(CMap &level, const ELevelElement& type, Posi
     std::vector < Position > positions;
     FindOnMapAllRectanglesOfType(level, type, size, positions);
 
-    if(positions.size() == 0) {
+    if(positions.empty()) {
         return false;
     }
 
@@ -268,12 +267,10 @@ bool AddCorridor(CMap &level, const int& start_x1, const int& start_y1, const in
     }
 
     // we start from both sides
-    int x1, y1, x2, y2;
-
-    x1 = start_x1;
-    y1 = start_y1;
-    x2 = start_x2;
-    y2 = start_y2;
+    int x1 = start_x1;
+    int y1 = start_y1;
+    int x2 = start_x2;
+    int y2 = start_y2;
 
     int dir_x;
     int dir_y;
@@ -294,7 +291,7 @@ bool AddCorridor(CMap &level, const int& start_x1, const int& start_y1, const in
     bool first_horizontal = CoinToss();
     bool second_horizontal = CoinToss();
 
-    while(1) {
+    while(true) {
         if(!straight) {
             first_horizontal = CoinToss();
             second_horizontal = CoinToss();
@@ -357,9 +354,7 @@ bool AddCorridor(CMap &level, const int& start_x1, const int& start_y1, const in
 
             return true;
         }
-    }
-
-    return true;
+    } // while (true)
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -514,7 +509,6 @@ void ConnectClosestRooms(CMap &level, bool with_doors, bool straight_connections
     // The closest rooms connected. Connect the rest until all areas are connected
     for(int to_connect_a = 0; to_connect_a != -1;) {
         size_t a, b, c;
-        int to_connect_b;
 
         for(a = 0; a < rooms.size(); a++) {
             for(b = 0; b < rooms.size(); b++) {
@@ -548,6 +542,8 @@ void ConnectClosestRooms(CMap &level, bool with_doors, bool straight_connections
         }
 
         if(to_connect_a != -1) {
+            int to_connect_b;
+
             // connect rooms a & b
             do {
                 to_connect_b = Random((int) rooms.size());
