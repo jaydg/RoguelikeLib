@@ -78,7 +78,7 @@ private:
 public:
     void Resize(size_t width, size_t height)
     {
-        if(width <= 0 || height <= 0) {
+        if(width == 0 || height == 0) {
             return;
         }
 
