@@ -51,25 +51,28 @@
  * enough number of cells is dug.
  *
  */
+
 #pragma once
-#ifndef RL_DELVE_H
-#define RL_DELVE_H
 
 #include "../map.h"
 #include "../randomness.h"
+#include "../position.h"
 
-#include <cstdio>
-#include <cctype>
+#include <array>
+#include <string>
+#include <string_view>
+#include <sstream>
 #include <vector>
+#include <algorithm>
 
 namespace RL {
 
 namespace delve_detail {
 
-static const int Xoff[8] = {1, 1, 0, -1, -1, -1, 0, 1};
-static const int Yoff[8] = {0, 1, 1, 1, 0, -1, -1, -1};
+constexpr std::array<int, 8> Xoff = {1, 1, 0, -1, -1, -1, 0, 1};
+constexpr std::array<int, 8> Yoff = {0, 1, 1, 1, 0, -1, -1, -1};
 
-static const int Hamming[256] = {
+constexpr std::array<int, 256> Hamming = {
     0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4,
     1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,
     1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,
@@ -88,7 +91,7 @@ static const int Hamming[256] = {
     4,5,5,6,5,6,6,7,5,6,6,7,6,7,7,8
 };
 
-static const int NgbGrouptab[256] = {
+constexpr std::array<int, 256> NgbGrouptab = {
     0,1,1,1,1,1,1,1,1,2,2,2,1,1,1,1,
     1,2,2,2,1,1,1,1,1,2,2,2,1,1,1,1,
     1,2,2,2,2,2,2,2,2,3,3,3,2,2,2,2,
@@ -107,7 +110,7 @@ static const int NgbGrouptab[256] = {
     1,1,2,1,1,1,1,1,1,1,2,1,1,1,1,1
 };
 
-static const char* DigpermStrings[] = {
+constexpr std::array<std::string_view, 24> DigpermStrings = {
     "rmaze1 1:1000 3:1000 6:1000 17:1000 14:0 19:1000 25:1000 27:1000 29:0 "
     "51:1000 57:1000 102:1000 59:1000 107:0 110:1000 187:1000 127:0 255:0",
     "rmaze2 1:1000 17:1000 14:1000 19:1000 25:1000 27:1000 29:0 51:1000 "
@@ -165,8 +168,7 @@ static const char* DigpermStrings[] = {
     "41:2 42:2 43:2 45:2 46:2 47:2 51:2 53:1000 54:1000 55:1000 57:2 58:2 "
     "59:2 61:1000 62:1000 63:1000 85:1000 86:1000 87:1000 90:2 91:1000 "
     "94:1000 95:1000 102:2 103:1000 106:2 107:2 110:2 111:1000 119:1000 "
-    "122:2 123:1000 126:1000 127:1000 170:2 171:2 175:2 187:2 191:1000 255:1000",
-    nullptr
+    "122:2 123:1000 126:1000 127:1000 170:2 171:2 175:2 187:2 191:1000 255:1000"
 };
 
 inline int Rotl8(int d, int n)
@@ -183,31 +185,25 @@ inline int ICbrt(int arg)
     else if (arg < 1000000) ret = 100;
     else if (arg < 1000000000) ret = 1000;
     else ret = 1290;
+
     int delta;
     do {
         delta = (arg - ret * ret * ret) / (2 * ret * ret);
         ret += delta;
     } while (delta);
+
     if (ret * ret * ret > arg) ret--;
     return ret;
 }
 
-inline bool InBord(int xsize, int ysize, int x, int y)
+inline bool InBord(size_t xsize, size_t ysize, int x, int y)
 {
-    return (x >= 1 && x < xsize - 1 && y >= 1 && y < ysize - 1);
+    // Evaluates with int cast to avoid unsigned underflow issues if x or y hit negative bounds
+    return (x >= 1 && x < static_cast<int>(xsize) - 1 &&
+            y >= 1 && y < static_cast<int>(ysize) - 1);
 }
 
-inline void RndPerm(int* tab, int nelem)
-{
-    for (int i = 0; i < nelem; i++) {
-        int rind = static_cast<int>(Random(i + 1));
-        int tmp = tab[rind];
-        tab[rind] = tab[i];
-        tab[i] = tmp;
-    }
-}
-
-inline void SetSymmetr(int* digperm, int idx, int prob)
+inline void SetSymmetr(std::array<int, 256>& digperm, int idx, int prob)
 {
     digperm[idx] = prob;
     for (int i = 2; i <= 6; i += 2) {
@@ -215,24 +211,32 @@ inline void SetSymmetr(int* digperm, int idx, int prob)
     }
 }
 
-inline void FillDigperm(int* digperm, int ngb_min, int ngb_max, int conmil, const char* desc)
+inline void FillDigperm(std::array<int, 256>& digperm, int ngb_min, int ngb_max, int conmil, std::string_view desc)
 {
-    for (int i = 0; i < 256; i++) {
-        digperm[i] = 0;
-    }
-    if (desc) {
-        for (int i = 0; desc[i]; i++) {
-            if (isdigit(static_cast<unsigned char>(desc[i])) &&
-                (i == 0 || isspace(static_cast<unsigned char>(desc[i - 1])))) {
-                int idx, prob;
-                if (std::sscanf(&(desc[i]), "%d:%d", &idx, &prob) == 2 &&
-                    idx > 0 && idx < 256 && prob >= 0 && prob <= 1000) {
-                    SetSymmetr(digperm, idx, prob);
+    digperm.fill(0);
+
+    if (!desc.empty()) {
+        std::istringstream iss{std::string(desc)};
+        std::string token;
+
+        iss >> token; // Skip the identifier name at the start
+
+        while (iss >> token) {
+            auto colon_pos = token.find(':');
+            if (colon_pos != std::string::npos) {
+                try {
+                    int idx = std::stoi(token.substr(0, colon_pos));
+                    int prob = std::stoi(token.substr(colon_pos + 1));
+                    if (idx > 0 && idx < 256 && prob >= 0 && prob <= 1000) {
+                        SetSymmetr(digperm, idx, prob);
+                    }
+                } catch (...) {
+                    // Suppress parsing exceptions (analogous to skipping on failed std::sscanf)
                 }
             }
         }
     } else {
-        for (int i = 0; i < 256; i++) {
+        for (size_t i = 0; i < 256; i++) {
             if (Hamming[i] >= ngb_min && Hamming[i] <= ngb_max) {
                 digperm[i] = (NgbGrouptab[i] == 1) ? 1000 : conmil;
             }
@@ -240,12 +244,13 @@ inline void FillDigperm(int* digperm, int ngb_min, int ngb_max, int conmil, cons
     }
 }
 
-inline int FindSeed(const int* digperm, int maxham)
+inline int FindSeed(const std::array<int, 256>& digperm, int maxham)
 {
     int ret = -1;
     int sumprob = 0;
     int maxtillnow = 0;
-    for (int i = 0; i < 256; i++) {
+
+    for (size_t i = 0; i < 256; i++) {
         if (Hamming[i] <= maxham && digperm[i] > 0) {
             if (Hamming[i] > maxtillnow) {
                 sumprob = digperm[i];
@@ -256,36 +261,38 @@ inline int FindSeed(const int* digperm, int maxham)
                 continue;
             }
             if (sumprob > 0 && static_cast<int>(Random(sumprob)) < digperm[i]) {
-                ret = i;
+                ret = static_cast<int>(i);
             }
         }
     }
     return ret;
 }
 
-inline const char* FindDesc(const char* name)
+inline std::string_view FindDesc(std::string_view name)
 {
-    for (int i = 0; DigpermStrings[i]; i++) {
-        int off;
-        for (off = 0; name[off] && DigpermStrings[i][off]; off++) {
-            if (name[off] != DigpermStrings[i][off]) break;
-        }
-        if (name[off] == 0 && isspace(static_cast<unsigned char>(DigpermStrings[i][off]))) {
-            return DigpermStrings[i];
+    for (const auto& desc : DigpermStrings) {
+        if (desc.starts_with(name)) {
+            // Guarantee exact word match rather than simple prefix match
+            if (desc.length() == name.length() || std::isspace(desc[name.length()])) {
+                return desc;
+            }
         }
     }
-    return nullptr;
+    return {};
 }
 
-inline void RandDigperm(int* digperm)
+inline void RandDigperm(std::array<int, 256>& digperm)
 {
-    for (int i = 0; i < 256; i++) digperm[i] = 0;
-    int expand[] = {1, 2, 3, 6, 14};
-    SetSymmetr(digperm, expand[Random(sizeof(expand) / sizeof(expand[0]))], 1000);
+    digperm.fill(0);
+
+    constexpr std::array<int, 5> expand = {1, 2, 3, 6, 14};
+    SetSymmetr(digperm, expand[Random(expand.size())], 1000);
+
     int c1000 = static_cast<int>(Random(5)) + ((Random(4) == 0) ? static_cast<int>(Random(30)) : 4);
     for (int i = 0; i < c1000; i++) {
         SetSymmetr(digperm, static_cast<int>(Random(256)), 1000);
     }
+
     int c200 = static_cast<int>(Random(5)) + ((Random(4) == 0) ? static_cast<int>(Random(30)) : 4);
     for (int i = 0; i < c200; i++) {
         SetSymmetr(digperm, static_cast<int>(Random(256)), 200);
@@ -293,28 +300,24 @@ inline void RandDigperm(int* digperm)
 }
 
 struct CellStore {
-    std::vector<int> xs;
-    std::vector<int> ys;
-    int index;
+    std::vector<Position> cells;
+    size_t index = 0;
 
-    void Init(int size)
+    void Init(size_t size)
     {
-        xs.resize(size);
-        ys.resize(size);
+        cells.resize(size);
         index = 0;
     }
 
-    bool Store(int x, int y)
+    bool Store(size_t x, size_t y)
     {
-        if (index < static_cast<int>(xs.size())) {
-            xs[index] = x;
-            ys[index] = y;
+        if (index < cells.size()) {
+            cells[index] = Position(x, y);
             index++;
             return true;
         } else {
-            int rind = static_cast<int>(Random(index));
-            xs[rind] = x;
-            ys[rind] = y;
+            size_t rind = Random(index);
+            cells[rind] = Position(x, y);
             return false;
         }
     }
@@ -322,14 +325,15 @@ struct CellStore {
     bool Pull(int& x, int& y, int pullflag)
     {
         if (index <= 0) return false;
-        int rind;
+
+        size_t rind;
         switch (pullflag) {
             case 1:
-                rind = (index < 125) ? static_cast<int>(Random(index)) :
-                    (index - static_cast<int>(Random(25 * ICbrt(index))) - 1);
+                rind = (index < 125) ? Random(index) :
+                    (index - Random(25 * ICbrt(static_cast<int>(index))) - 1);
                 break;
             case 2:
-                rind = static_cast<int>(Random(index));
+                rind = Random(index);
                 break;
             case 3:
                 rind = 0;
@@ -337,18 +341,19 @@ struct CellStore {
             default:
                 return false;
         }
-        x = xs[rind];
-        y = ys[rind];
+
+        x = static_cast<int>(cells[rind].x);
+        y = static_cast<int>(cells[rind].y);
+
         if (index - 1 != rind) {
-            xs[rind] = xs[index - 1];
-            ys[rind] = ys[index - 1];
+            cells[rind] = cells[index - 1];
         }
         index--;
         return true;
     }
 };
 
-inline bool IsPermitted(const CMap& level, const int* digperm, int xsize, int ysize, int x, int y, int flo)
+inline bool IsPermitted(const CMap& level, const std::array<int, 256>& digperm, size_t xsize, size_t ysize, int x, int y, int flo)
 {
     int bitmap = 0;
     for (int i = 0; i < 8; i++) {
@@ -362,16 +367,19 @@ inline bool IsPermitted(const CMap& level, const int* digperm, int xsize, int ys
     return static_cast<int>(Random(1000)) < digperm[bitmap];
 }
 
-inline int DigCell(CMap& level, CellStore& cstore, int xsize, int ysize, int x, int y, int storeflag, int flo, int ava)
+inline int DigCell(CMap& level, CellStore& cstore, size_t xsize, size_t ysize, int x, int y, int storeflag, int flo, int ava)
 {
-    int order[8] = {0, 1, 2, 3, 4, 5, 6, 7};
     if (!InBord(xsize, ysize, x, y) || level.GetCell(static_cast<size_t>(x), static_cast<size_t>(y)) != ava) {
         return 0;
     }
+
     level.SetCell(static_cast<size_t>(x), static_cast<size_t>(y), flo);
+
+    std::array<int, 8> order = {0, 1, 2, 3, 4, 5, 6, 7};
+
     switch (storeflag) {
         case 1:
-            RndPerm(order, 8);
+            RL::Shuffle(order.begin(), order.end());
             break;
         case 2: {
             int r = static_cast<int>(Random(8));
@@ -386,18 +394,20 @@ inline int DigCell(CMap& level, CellStore& cstore, int xsize, int ysize, int x, 
         default:
             return 0;
     }
+
     for (int i = 0; i < 8; i++) {
         int j = order[i];
         int nx = x + Xoff[j];
         int ny = y + Yoff[j];
+
         if (InBord(xsize, ysize, nx, ny) && level.GetCell(static_cast<size_t>(nx), static_cast<size_t>(ny)) == ava) {
-            cstore.Store(nx, ny);
+            cstore.Store(static_cast<size_t>(nx), static_cast<size_t>(ny));
         }
     }
     return 1;
 }
 
-inline int DelveOn(CMap& level, CellStore& cstore, int xsize, int ysize, const int* digperm, int cellnum, int pullflag, int storeflag, int flo, int ava)
+inline int DelveOn(CMap& level, CellStore& cstore, size_t xsize, size_t ysize, const std::array<int, 256>& digperm, int cellnum, int pullflag, int storeflag, int flo, int ava)
 {
     int count = 0;
     int x, y;
@@ -409,16 +419,20 @@ inline int DelveOn(CMap& level, CellStore& cstore, int xsize, int ysize, const i
     return count;
 }
 
-inline int Cavern(CMap& level, int xorig, int yorig, const int* digperm, int cellnum, int pullflag, int storeflag, int flo, int ava)
+inline int Cavern(CMap& level, int xorig, int yorig, const std::array<int, 256>& digperm, int cellnum, int pullflag, int storeflag, int flo, int ava)
 {
-    int xsize = static_cast<int>(level.GetWidth());
-    int ysize = static_cast<int>(level.GetHeight());
+    size_t xsize = level.GetWidth();
+    size_t ysize = level.GetHeight();
+
     int seed = FindSeed(digperm, cellnum);
     if (seed < 0) return 0;
+
     CellStore cstore;
     cstore.Init(8 * xsize * ysize);
+
     int count = 0;
     count += DigCell(level, cstore, xsize, ysize, xorig, yorig, storeflag, flo, ava);
+
     for (int i = 0; i < 8; i++) {
         int x = xorig + Xoff[i];
         int y = yorig + Yoff[i];
@@ -426,6 +440,7 @@ inline int Cavern(CMap& level, int xorig, int yorig, const int* digperm, int cel
             count += DigCell(level, cstore, xsize, ysize, x, y, storeflag, flo, ava);
         }
     }
+
     if (count < cellnum) {
         count += DelveOn(level, cstore, xsize, ysize, digperm, cellnum - count, pullflag, storeflag, flo, ava);
     }
@@ -437,43 +452,41 @@ inline int Cavern(CMap& level, int xorig, int yorig, const int* digperm, int cel
 inline
 void CreateDelve(CMap &level, const char* digperm_name = nullptr, int cellnum = 0, int pullflag = 1, int storeflag = 1)
 {
-    if(level.GetWidth() < 3 || level.GetHeight() < 3) {
+    if (level.GetWidth() < 3 || level.GetHeight() < 3) {
         return;
     }
 
-    int xsize = static_cast<int>(level.GetWidth());
-    int ysize = static_cast<int>(level.GetHeight());
+    size_t xsize = level.GetWidth();
+    size_t ysize = level.GetHeight();
 
-    if(cellnum <= 0) {
-        cellnum = xsize * ysize / 5;
+    if (cellnum <= 0) {
+        cellnum = static_cast<int>(xsize * ysize) / 5;
     }
 
     level.Clear(LevelElementWall);
 
-    int digperm[256] = {0};
+    std::array<int, 256> digperm{};
     int dugcells = 0;
     bool use_random = true;
 
-    if(digperm_name && *digperm_name) {
-        const char* desc = delve_detail::FindDesc(digperm_name);
-        if(desc) {
+    if (digperm_name && *digperm_name) {
+        std::string_view desc = delve_detail::FindDesc(digperm_name);
+        if (!desc.empty()) {
             use_random = false;
             delve_detail::FillDigperm(digperm, 0, 0, 0, desc);
-            dugcells = delve_detail::Cavern(level, xsize / 2, ysize / 2, digperm,
+            dugcells = delve_detail::Cavern(level, static_cast<int>(xsize) / 2, static_cast<int>(ysize) / 2, digperm,
                 cellnum, pullflag, storeflag, LevelElementCorridor, LevelElementWall);
         }
     }
 
-    if(use_random) {
+    if (use_random) {
         do {
             delve_detail::RandDigperm(digperm);
             level.Clear(LevelElementWall);
-            dugcells = delve_detail::Cavern(level, xsize / 2, ysize / 2, digperm,
+            dugcells = delve_detail::Cavern(level, static_cast<int>(xsize) / 2, static_cast<int>(ysize) / 2, digperm,
                 cellnum, pullflag, storeflag, LevelElementCorridor, LevelElementWall);
-        } while(dugcells < cellnum && dugcells < xsize * ysize / 3);
+        } while (dugcells < cellnum && dugcells < static_cast<int>(xsize * ysize) / 3);
     }
 }
 
 } // namespace RL
-
-#endif
