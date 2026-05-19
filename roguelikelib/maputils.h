@@ -20,56 +20,8 @@ namespace RL {
 
 // Internal Math and Path Helpers
 namespace detail {
-    inline int Sign(int n) {
-        return (n > 0) ? 1 : ((n == 0) ? 0 : -1);
-    }
-
     inline int Sqr(int x) {
         return x * x;
-    }
-
-    inline void BuildBresenhamLine(std::vector<Position>& ret, const Position& p1, const Position& p2) {
-        ret.clear();
-        int x1 = p1.x, y1 = p1.y;
-        int x2 = p2.x, y2 = p2.y;
-
-        int xstep = Sign(x2 - x1);
-        int ystep = Sign(y2 - y1);
-
-        int xc = x1;
-        int yc = y1;
-
-        ret.emplace_back(xc, yc);
-
-        if (x1 == x2 && y1 == y2) {
-            return;
-        }
-
-        if (std::abs(x2 - x1) >= std::abs(y2 - y1)) {
-            int acc = std::abs(x2 - x1);
-            do {
-                xc += xstep;
-                acc += 2 * std::abs(y2 - y1);
-
-                if (acc >= 2 * std::abs(x2 - x1)) {
-                    acc -= 2 * std::abs(x2 - x1);
-                    yc += ystep;
-                }
-                ret.emplace_back(xc, yc);
-            } while (xc != x2);
-        } else {
-            int acc = std::abs(y2 - y1);
-            do {
-                yc += ystep;
-                acc += 2 * std::abs(x2 - x1);
-
-                if (acc >= 2 * std::abs(y2 - y1)) {
-                    acc -= 2 * std::abs(y2 - y1);
-                    xc += xstep;
-                }
-                ret.emplace_back(xc, yc);
-            } while (yc != y2);
-        }
     }
 
     inline void CutCorners(std::vector<Position>& seq) {
@@ -209,9 +161,9 @@ namespace detail {
         if (waypts.size() <= 1) return;
 
         result.push_back(waypts[0]);
-        std::vector<Position> segment;
+
         for (size_t i = 0; i < waypts.size() - 1; ++i) {
-            BuildBresenhamLine(segment, waypts[i], waypts[i + 1]);
+            std::vector<Position> segment = waypts[i].BuildBresenhamLine(waypts[i + 1]);
             for (size_t j = 1; j < segment.size(); ++j) {
                 result.push_back(segment[j]);
             }
@@ -913,8 +865,7 @@ bool AddWindingCorridor(CMap &level, const Position& start, const Position& end,
         return false;
     }
 
-    std::vector<Position> waypts;
-    detail::BuildBresenhamLine(waypts, start, end);
+    std::vector<Position> waypts = start.BuildBresenhamLine(end);
 
     std::vector<Position> road;
     if (waypts.size() < 5) {

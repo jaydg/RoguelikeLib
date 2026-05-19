@@ -2,10 +2,15 @@
 #define POSITION_H
 
 #include <limits>
+#include <vector>
 
 #include "distance.h"
 
 namespace RL {
+inline int Sign(int n) {
+    return (n > 0) ? 1 : ((n == 0) ? 0 : -1);
+}
+
 struct Position {
     static constexpr size_t invalid = std::numeric_limits<size_t>::max();
 
@@ -51,6 +56,54 @@ struct Position {
     [[nodiscard]] size_t Distance(const Position &other) const
     {
         return RL::Distance(x, y, other.x, other.y);
+    }
+
+    [[nodiscard]] std::vector<Position> BuildBresenhamLine(const Position& p2) const
+    {
+        std::vector<Position> ret;
+
+        int x1 = x, y1 = y;
+        int x2 = p2.x, y2 = p2.y;
+
+        int xstep = Sign(x2 - x1);
+        int ystep = Sign(y2 - y1);
+
+        int xc = x1;
+        int yc = y1;
+
+        ret.emplace_back(xc, yc);
+
+        if (x1 == x2 && y1 == y2) {
+            return ret;
+        }
+
+        if (std::abs(x2 - x1) >= std::abs(y2 - y1)) {
+            int acc = std::abs(x2 - x1);
+            do {
+                xc += xstep;
+                acc += 2 * std::abs(y2 - y1);
+
+                if (acc >= 2 * std::abs(x2 - x1)) {
+                    acc -= 2 * std::abs(x2 - x1);
+                    yc += ystep;
+                }
+                ret.emplace_back(xc, yc);
+            } while (xc != x2);
+        } else {
+            int acc = std::abs(y2 - y1);
+            do {
+                yc += ystep;
+                acc += 2 * std::abs(x2 - x1);
+
+                if (acc >= 2 * std::abs(y2 - y1)) {
+                    acc -= 2 * std::abs(y2 - y1);
+                    xc += xstep;
+                }
+                ret.emplace_back(xc, yc);
+            } while (yc != y2);
+        }
+
+        return ret;
     }
 };
 
