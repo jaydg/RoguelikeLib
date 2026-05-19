@@ -45,6 +45,10 @@ int main(void)
     RL::CreateCaves(level, 3);
     level.PrintMap();
 
+    cout << endl << "Delve" << endl << endl;
+    RL::CreateDelve(level);
+    level.PrintMap();
+
     cout << endl << "Space shuttle" << endl << endl;
     RL::CreateSpaceShuttle(level, 25);
     level.PrintMap();

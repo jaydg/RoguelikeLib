@@ -13,5 +13,6 @@
 #include "mapgenerators/caves.h"
 #include "mapgenerators/spaceshuttle.h"
 #include "mapgenerators/simplecity.h"
+#include "mapgenerators/delve.h"
 
 #endif
