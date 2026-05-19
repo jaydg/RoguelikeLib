@@ -6,6 +6,7 @@
 #ifndef RL_RANDOMNESS_H
 #define RL_RANDOMNESS_H
 
+#include <algorithm>
 #include <random>
 
 namespace RL {
@@ -51,7 +52,7 @@ void Shuffle(RandomAccessIterator first, RandomAccessIterator last)
 {
     for(auto i = (last - first) -1; i > 0; --i) {
         std::uniform_int_distribution<decltype(i)> d(0, i);
-        swap(first[i], first[d(mt)]);
+        std::swap(first[i], first[d(mt)]);
     }
 }
 
