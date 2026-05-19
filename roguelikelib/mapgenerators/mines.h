@@ -39,7 +39,12 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
             if(!rooms.empty()) {
                 size_t random_number = Random(rooms.size());
 
-                for(m = rooms.begin(); --random_number > 0; ++m);
+                for(m = rooms.begin(); ; ++m) {
+                    if(random_number == 0) {
+                        break;
+                    }
+                    random_number--;
+                }
 
                 // center of this room
                 p1.x = p.x + sx / 2;
