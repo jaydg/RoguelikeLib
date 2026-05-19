@@ -13,8 +13,212 @@
 #include <algorithm>
 #include <climits>
 #include <list>
+#include <vector>
+#include <cmath>
 
 namespace RL {
+
+// Internal Math and Path Helpers
+namespace detail {
+    inline int Sign(int n) {
+        return (n > 0) ? 1 : ((n == 0) ? 0 : -1);
+    }
+
+    inline int Sqr(int x) {
+        return x * x;
+    }
+
+    inline void BuildBresenhamLine(std::vector<Position>& ret, const Position& p1, const Position& p2) {
+        ret.clear();
+        int x1 = p1.x, y1 = p1.y;
+        int x2 = p2.x, y2 = p2.y;
+
+        int xstep = Sign(x2 - x1);
+        int ystep = Sign(y2 - y1);
+
+        int xc = x1;
+        int yc = y1;
+
+        ret.emplace_back(xc, yc);
+
+        if (x1 == x2 && y1 == y2) {
+            return;
+        }
+
+        if (std::abs(x2 - x1) >= std::abs(y2 - y1)) {
+            int acc = std::abs(x2 - x1);
+            do {
+                xc += xstep;
+                acc += 2 * std::abs(y2 - y1);
+
+                if (acc >= 2 * std::abs(x2 - x1)) {
+                    acc -= 2 * std::abs(x2 - x1);
+                    yc += ystep;
+                }
+                ret.emplace_back(xc, yc);
+            } while (xc != x2);
+        } else {
+            int acc = std::abs(y2 - y1);
+            do {
+                yc += ystep;
+                acc += 2 * std::abs(x2 - x1);
+
+                if (acc >= 2 * std::abs(y2 - y1)) {
+                    acc -= 2 * std::abs(y2 - y1);
+                    xc += xstep;
+                }
+                ret.emplace_back(xc, yc);
+            } while (yc != y2);
+        }
+    }
+
+    inline void CutCorners(std::vector<Position>& seq) {
+        if (seq.size() < 3) return;
+
+        size_t j = 1;
+        for (size_t i = 1; i < seq.size() - 1; ++i) {
+            seq[j] = seq[i];
+            int dx = std::abs(int(seq[j - 1].x - seq[i + 1].x));
+            int dy = std::abs(int(seq[j - 1].y - seq[i + 1].y));
+            if (std::max(dx, dy) > 1) {
+                j++;
+            }
+        }
+        seq[j] = seq.back();
+        j++;
+        seq.resize(j);
+    }
+
+    inline void BuildZigzagPath(std::vector<Position>& ret, const Position& p1, const Position& p2, unsigned turnpct, unsigned diagpct) {
+        ret.clear();
+        int xc = p1.x;
+        int yc = p1.y;
+        int x2 = p2.x;
+        int y2 = p2.y;
+
+        int deltax = 0, deltay = 0;
+        ret.emplace_back(xc, yc);
+
+        while (xc != x2 || yc != y2) {
+            int xremain = std::abs(x2 - xc);
+            int yremain = std::abs(y2 - yc);
+
+            if (ret.size() == 1 || (Random(100) < turnpct) ||
+                (std::abs(x2 - (xc + deltax)) > xremain) ||
+                (std::abs(y2 - (yc + deltay)) > yremain) ||
+                ((xremain == yremain) && (Random(100) < diagpct))) {
+
+                deltax = Sign(x2 - xc);
+                deltay = Sign(y2 - yc);
+
+                if (Random(100) < diagpct) {
+                    if (xremain > yremain) {
+                        if (int(Random(xremain)) < (xremain - yremain)) {
+                            deltay = 0;
+                        }
+                    } else if (xremain < yremain) {
+                        if (int(Random(yremain)) < (yremain - xremain)) {
+                            deltax = 0;
+                        }
+                    }
+                } else {
+                    if (int(Random(xremain + yremain)) < xremain) {
+                        if (deltax != 0) {
+                            deltay = 0;
+                        }
+                    } else {
+                        if (deltay != 0) {
+                            deltax = 0;
+                        }
+                    }
+                }
+            }
+
+            xc += deltax;
+            yc += deltay;
+            ret.emplace_back(xc, yc);
+        }
+    }
+
+    inline int SignCos2(const Position& p0, const Position& p1, const Position& p2) {
+        int sqlen01 = Sqr(p1.x - p0.x) + Sqr(p1.y - p0.y);
+        int sqlen12 = Sqr(p2.x - p1.x) + Sqr(p2.y - p1.y);
+        if (sqlen01 == 0 || sqlen12 == 0) return 0;
+
+        int prod = (p1.x - p0.x) * (p2.x - p1.x) + (p1.y - p0.y) * (p2.y - p1.y);
+        long long prod_ll = prod; // Prevent overflow
+        long long val = 1000LL * (prod_ll * prod_ll / sqlen01) / sqlen12;
+        if (prod < 0) {
+            val = -val;
+        }
+        return static_cast<int>(val);
+    }
+
+    inline void PerturbPath(std::vector<Position>& way, const CMap& level, int mindist, int maxdist, int pertamt) {
+        if (way.size() < 3) return;
+
+        static const int Xoff[8] = {1,  1,  0, -1, -1, -1,  0,  1};
+        static const int Yoff[8] = {0,  1,  1,  1,  0, -1, -1, -1};
+        const int mincos2 = 500;
+
+        int mind2 = Sqr(mindist);
+        int maxd2 = Sqr(maxdist);
+
+        size_t loops = static_cast<size_t>(pertamt) * way.size();
+        for (size_t i = 0; i < loops; ++i) {
+            size_t ri = 1 + Random(static_cast<int>(way.size()) - 2);
+            int rdir = Random(8);
+            int nx = way[ri].x + Xoff[rdir];
+            int ny = way[ri].y + Yoff[rdir];
+
+            if (nx < 1 || nx >= static_cast<int>(level.GetWidth()) - 1 ||
+                ny < 1 || ny >= static_cast<int>(level.GetHeight()) - 1) {
+                continue;
+            }
+
+            int lox = way[ri - 1].x;
+            int loy = way[ri - 1].y;
+            int hix = way[ri + 1].x;
+            int hiy = way[ri + 1].y;
+
+            int lod2 = Sqr(nx - lox) + Sqr(ny - loy);
+            int hid2 = Sqr(nx - hix) + Sqr(ny - hiy);
+
+            if (lod2 < mind2 || lod2 > maxd2 || hid2 < mind2 || hid2 > maxd2) {
+                continue;
+            }
+
+            if (SignCos2(Position(lox, loy), Position(nx, ny), Position(hix, hiy)) < mincos2) {
+                continue;
+            }
+
+            if (ri > 1 && SignCos2(way[ri - 2], Position(lox, loy), Position(nx, ny)) < mincos2) {
+                continue;
+            }
+
+            if (ri < way.size() - 2 && SignCos2(Position(nx, ny), Position(hix, hiy), way[ri + 2]) < mincos2) {
+                continue;
+            }
+
+            way[ri] = Position(nx, ny);
+        }
+    }
+
+    inline void ConnectWaypoints(std::vector<Position>& result, const std::vector<Position>& waypts) {
+        result.clear();
+        if (waypts.size() <= 1) return;
+
+        result.push_back(waypts[0]);
+        std::vector<Position> segment;
+        for (size_t i = 0; i < waypts.size() - 1; ++i) {
+            BuildBresenhamLine(segment, waypts[i], waypts[i + 1]);
+            for (size_t j = 1; j < segment.size(); ++j) {
+                result.push_back(segment[j]);
+            }
+        }
+    }
+}
+
 inline
 void FindOnMapAllRectanglesOfType(CMap &level, const ELevelElement& type, const Size &size, std::vector < Position >& positions)
 {
@@ -667,6 +871,121 @@ void DrawRectangleOnMap(CMap &level, const Position& p1, const Position& p2, int
             level.SetCell(x, y, value);
         }
     }
+}
+
+//////////////////////////////////////////////////////////////////////////
+// Refactored road algorithms from windroad.c
+//////////////////////////////////////////////////////////////////////////
+
+/* Written by Kusigrosz in September 2010 (parts much earlier)
+ * This program is in public domain, with all its bugs etc.
+ * No warranty whatsoever.
+ *
+ * Generating winding roads/corridors for a roguelike game.
+ *
+ * The functions that do road generating are:
+ *
+ * uti_windroad(&road, mpc, x1, y1, x2, y2, pertamt)
+ *     Generates a winding road from x1, y1 to x2, y2 without
+ *     sharp turns. The road winds regardless of the relative location
+ *     of endpoints (unless it is too short). The parameter pertamt
+ *     controls the degree of perturbation the initially straight road
+ *     is subjected to; typical values of 5-50 give decent results.
+ *     mpc is the pointer to the map structure (needed to make sure
+ *     the winding road stays within the map.
+ *
+ * uti_zigzag(&road, x1, y1, x2, y2, turnpct, diagpct)
+ *     Generates a randomly zigzagging road from x1, y1 to x2, y2
+ *     The road zigzags only if the endpoints differ in both coordinates,
+ *     Otherwise it is a straight line. The parameter turnpct is the
+ *     chance of a non-forced turn in percent (so, 100/turnpct is
+ *     approximately the length of a straight segment; diagpct is
+ *     the chance that a diagonal turn is allowed.
+ *
+ * uti_sigsag(&road, x1, y1, x2, y2, turnpct, diagpct)
+ *     The same as zigzag, but without sharp corners.
+ */
+
+
+inline
+bool AddWindingCorridor(CMap &level, const Position& start, const Position& end, int pertamt) {
+    if (!level.OnMap(start.x, start.y) || !level.OnMap(end.x, end.y)) {
+        return false;
+    }
+
+    std::vector<Position> waypts;
+    detail::BuildBresenhamLine(waypts, start, end);
+
+    std::vector<Position> road;
+    if (waypts.size() < 5) {
+        road = waypts;
+    } else {
+        std::vector<Position> sampled_waypts;
+        for (size_t i = 0; i < waypts.size(); ) {
+            sampled_waypts.push_back(waypts[i]);
+            if (i < waypts.size() - 5) {
+                i += 2 + Random(2);
+            } else if (i == waypts.size() - 5) {
+                i += 2;
+            } else {
+                i = waypts.size() - 1;
+            }
+        }
+        waypts = sampled_waypts;
+
+        detail::PerturbPath(waypts, level, 2, 5, pertamt);
+        detail::ConnectWaypoints(road, waypts);
+        detail::CutCorners(road);
+    }
+
+    for (const auto& pos : road) {
+        if (pos.x >= 1 && pos.x < level.GetWidth() - 1 &&
+            pos.y >= 1 && pos.y < level.GetHeight() - 1) {
+            level.SetCell(pos.x, pos.y, LevelElementCorridor_value);
+        }
+    }
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+inline
+bool AddZigzagCorridor(CMap &level, const Position& start, const Position& end, int turnpct, int diagpct) {
+    if (!level.OnMap(start.x, start.y) || !level.OnMap(end.x, end.y)) {
+        return false;
+    }
+
+    std::vector<Position> road;
+    detail::BuildZigzagPath(road, start, end, turnpct, diagpct);
+
+    for (const auto& pos : road) {
+        if (pos.x >= 1 && pos.x < level.GetWidth() - 1 &&
+            pos.y >= 1 && pos.y < level.GetHeight() - 1) {
+            level.SetCell(pos.x, pos.y, LevelElementCorridor_value);
+        }
+    }
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+inline
+bool AddSigsagCorridor(CMap &level, const Position& start, const Position& end, int turnpct, int diagpct) {
+    if (!level.OnMap(start.x, start.y) || !level.OnMap(end.x, end.y)) {
+        return false;
+    }
+
+    std::vector<Position> road;
+    detail::BuildZigzagPath(road, start, end, turnpct, diagpct);
+    detail::CutCorners(road);
+
+    for (const auto& pos : road) {
+        if (pos.x >= 1 && pos.x < level.GetWidth() - 1 &&
+            pos.y >= 1 && pos.y < level.GetHeight() - 1) {
+            level.SetCell(pos.x, pos.y, LevelElementCorridor_value);
+        }
+    }
+    return true;
 }
 
 }
