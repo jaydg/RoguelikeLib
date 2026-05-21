@@ -2,15 +2,16 @@
 // FOV calculation
 //////////////////////////////////////////////////////////////////////////
 
-#pragma once
-#ifndef RL_FOV_H
-#define RL_FOV_H
+module;
 
-#include "map.h"
-#include "position.h"
 #include "extern/permissive-fov-cpp.h"
 
-namespace RL {
+export module rl.fov;
+
+import rl.map;
+import rl.position;
+
+export namespace RL {
 class FOVContext {
     CMap &level;
     CMap blocked;
@@ -74,5 +75,3 @@ void CalculateFOV(CMap &level, Position start_position, int radius, bool round =
 }
 
 } // end of namespace RL
-
-#endif

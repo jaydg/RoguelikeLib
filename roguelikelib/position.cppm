@@ -1,21 +1,21 @@
-#ifndef POSITION_H
-#define POSITION_H
+module;
 
-#include <limits>
-#include <vector>
+export module rl.position;
 
-#include "distance.h"
+import rl.distance;
+import std;
 
-namespace RL {
+export namespace RL {
+
 inline int Sign(int n) {
     return (n > 0) ? 1 : ((n == 0) ? 0 : -1);
 }
 
 struct Position {
-    static constexpr size_t invalid = std::numeric_limits<size_t>::max();
+    static constexpr std::size_t invalid = std::numeric_limits<std::size_t>::max();
 
-    size_t x;
-    size_t y;
+    std::size_t x;
+    std::size_t y;
 
     Position()
     {
@@ -23,7 +23,7 @@ struct Position {
         y = invalid;
     }
 
-    Position(size_t a_x, size_t a_y): x(a_x), y(a_y) {};
+    Position(std::size_t a_x, std::size_t a_y): x(a_x), y(a_y) {};
 
     const Position& operator+=(const Position& r)
     {
@@ -41,19 +41,15 @@ struct Position {
 
     bool operator==(const Position& r) const
     {
-        if(x == r.x && y == r.y) {
-            return true;
-        } else {
-            return false;
-        }
+        return (x == r.x && y == r.y);
     }
 
     bool operator!=(const Position& r) const
     {
-        return !operator==(r);
+        return !(*this == r);
     }
 
-    [[nodiscard]] size_t Distance(const Position &other) const
+    [[nodiscard]] std::size_t Distance(const Position &other) const
     {
         return RL::Distance(x, y, other.x, other.y);
     }
@@ -62,8 +58,8 @@ struct Position {
     {
         std::vector<Position> ret;
 
-        int x1 = x, y1 = y;
-        int x2 = p2.x, y2 = p2.y;
+        int x1 = static_cast<int>(x), y1 = static_cast<int>(y);
+        int x2 = static_cast<int>(p2.x), y2 = static_cast<int>(p2.y);
 
         int xstep = Sign(x2 - x1);
         int ystep = Sign(y2 - y1);
@@ -71,7 +67,7 @@ struct Position {
         int xc = x1;
         int yc = y1;
 
-        ret.emplace_back(xc, yc);
+        ret.emplace_back(static_cast<std::size_t>(xc), static_cast<std::size_t>(yc));
 
         if (x1 == x2 && y1 == y2) {
             return ret;
@@ -87,7 +83,7 @@ struct Position {
                     acc -= 2 * std::abs(x2 - x1);
                     yc += ystep;
                 }
-                ret.emplace_back(xc, yc);
+                ret.emplace_back(static_cast<std::size_t>(xc), static_cast<std::size_t>(yc));
             } while (xc != x2);
         } else {
             int acc = std::abs(y2 - y1);
@@ -99,7 +95,7 @@ struct Position {
                     acc -= 2 * std::abs(y2 - y1);
                     xc += xstep;
                 }
-                ret.emplace_back(xc, yc);
+                ret.emplace_back(static_cast<std::size_t>(xc), static_cast<std::size_t>(yc));
             } while (yc != y2);
         }
 
@@ -107,8 +103,6 @@ struct Position {
     }
 };
 
-typedef Position Size; // alias name
+using Size = Position;
 
 } // namespace RL
-
-#endif // POSITION_H

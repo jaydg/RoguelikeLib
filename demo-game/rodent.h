@@ -1,7 +1,7 @@
 #ifndef DEMO_GAME_RODENT_H
 #define DEMO_GAME_RODENT_H
 
-#include "../roguelikelib/map.h"
+#include "monster.h"
 
 class CRodent : public CMonster {
 private:

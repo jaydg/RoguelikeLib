@@ -1,13 +1,14 @@
-#pragma once
-#ifndef RL_MAZE_H
-#define RL_MAZE_H
+module;
 
-#include "../map.h"
-#include "../randomness.h"
-#include <list>
+export module rl.mapgenerators.maze;
 
-namespace RL {
-inline
+import rl.map;
+import rl.randomness;
+import rl.position;
+import std;
+
+export namespace RL {
+
 void CreateMaze(CMap &level, bool allow_loops = false)
 {
     if(level.GetWidth() == 0 || level.GetHeight() == 0) {
@@ -99,5 +100,3 @@ void CreateMaze(CMap &level, bool allow_loops = false)
 }
 
 } // end of namespace RL
-
-#endif

@@ -1,9 +1,8 @@
 #ifndef DEMO_GAME_SIMPLE_GAME_H
 #define DEMO_GAME_SIMPLE_GAME_H
 
-#include <set>
-#include <list>
 #include "player.h"
+import std;
 
 constexpr int LEVEL_SIZE_X = 80;
 constexpr int LEVEL_SIZE_Y = 24;

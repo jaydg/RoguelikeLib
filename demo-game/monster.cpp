@@ -1,7 +1,8 @@
 #include "simple-game.h"
 #include "io.h"
-#include "../roguelikelib/randomness.h"
-#include "../roguelikelib/fov.h"
+
+import rl.fov;
+import rl.randomness;
 
 extern CSimpleGame game;
 

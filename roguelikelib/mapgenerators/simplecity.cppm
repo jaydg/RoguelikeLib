@@ -1,13 +1,15 @@
-#pragma once
-#ifndef RL_SIMPLECITY_H
-#define RL_SIMPLECITY_H
+module;
 
-#include "../map.h"
-#include "../randomness.h"
-#include "../maputils.h"
+export module rl.mapgenerators.simplecity;
 
-namespace RL {
-inline
+import rl.map;
+import rl.maputils;
+import rl.position;
+import rl.randomness;
+import std;
+
+export namespace RL {
+
 void CreateSimpleCity(CMap &level, const int& a_number_of_buildings)
 {
     const int min_building_width = 5;
@@ -95,9 +97,9 @@ void CreateSimpleCity(CMap &level, const int& a_number_of_buildings)
 
         if(tries < 100) {
             // plant some trees
-            for(size_t index = 0; index < level.GetWidth() * static_cast<size_t>(static_cast<float>(level.GetHeight()) * 0.3); index++) {
-                size_t x = Random(level.GetWidth());
-                size_t y = Random(level.GetHeight());
+            for(std::size_t index = 0; index < level.GetWidth() * static_cast<std::size_t>(static_cast<float>(level.GetHeight()) * 0.3); index++) {
+                std::size_t x = Random(level.GetWidth());
+                std::size_t y = Random(level.GetHeight());
 
                 if(level.GetCell(x, y) == LevelElementGrass && CountNeighboursOfType(level, LevelElementWall, Position(x, y), true) == 0) {
                     level.SetCell(x, y, LevelElementPlant);
@@ -110,5 +112,3 @@ void CreateSimpleCity(CMap &level, const int& a_number_of_buildings)
 }
 
 } // end of namespace RL
-
-#endif

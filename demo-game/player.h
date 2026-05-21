@@ -3,6 +3,8 @@
 
 #include "monster.h"
 
+import rl.map;
+
 class CPlayer final : public CMonster {
 private:
     int experience;

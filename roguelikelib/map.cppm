@@ -2,17 +2,14 @@
 // Randomness
 //////////////////////////////////////////////////////////////////////////
 
-#pragma once
-#ifndef RL_MAP_H
-#define RL_MAP_H
+module;
 
-#include <limits>
-#include <vector>
-#include <iostream>
+export module rl.map;
 
-#include "position.h"
+import rl.position;
+import std;
 
-namespace RL {
+export namespace RL {
 
 constexpr int LevelElementMax = std::numeric_limits<int>::max();
 
@@ -35,7 +32,7 @@ private:
     std::vector <int> m_map;
     Size size;
 public:
-    void Resize(size_t width, size_t height)
+    void Resize(std::size_t width, std::size_t height)
     {
         if(width == 0 || height == 0) {
             return;
@@ -52,12 +49,12 @@ public:
         return Resize(new_size.x, new_size.y);
     }
 
-    [[nodiscard]] size_t GetWidth() const
+    [[nodiscard]] std::size_t GetWidth() const
     {
         return size.x;
     }
 
-    [[nodiscard]] size_t GetHeight() const
+    [[nodiscard]] std::size_t GetHeight() const
     {
         return size.y;
     }
@@ -68,8 +65,8 @@ public:
             return;
         }
 
-        for(size_t x = 0; x < size.x; ++x)
-            for(size_t y = 0; y < size.y; ++y) {
+        for (std::size_t x = 0; x < size.x; ++x)
+            for (std::size_t y = 0; y < size.y; ++y) {
                 m_map[x * size.y + y] = filler;
             }
     }
@@ -80,13 +77,13 @@ public:
             return;
         }
 
-        for(size_t x = 0; x < size.x; ++x)
-            for(size_t y = 0; y < size.y; ++y) {
+        for (std::size_t x = 0; x < size.x; ++x)
+            for (std::size_t y = 0; y < size.y; ++y) {
                 m_map[x * size.y + y] = filler;
             }
     }
 
-    [[nodiscard]] bool OnMap(const size_t& x, const size_t& y) const
+    [[nodiscard]] bool OnMap(const std::size_t& x, const std::size_t& y) const
     {
         return (x < size.x && y < size.y);
     }
@@ -96,16 +93,16 @@ public:
         return OnMap(pos.x, pos.y);
     }
 
-    void SetCell(const size_t& x, const size_t& y, ELevelElement element)
+    void SetCell(const std::size_t& x, const std::size_t& y, ELevelElement element)
     {
-        if(OnMap(x, y)) {
+        if (OnMap(x, y)) {
             m_map[x * size.y + y] = element;
         }
     }
 
-    void SetCell(const size_t& x, const size_t& y, int element)
+    void SetCell(const std::size_t& x, const std::size_t& y, int element)
     {
-        if(OnMap(x, y)) {
+        if (OnMap(x, y)) {
             m_map[x * size.y + y] = element;
         }
     }
@@ -115,8 +112,8 @@ public:
         return SetCell(pos.x, pos.y, element);
     }
 
-    [[nodiscard]] int GetCell(const size_t& x, const size_t& y) const {
-        if(OnMap(x, y)) {
+    [[nodiscard]] int GetCell(const std::size_t& x, const std::size_t& y) const {
+        if (OnMap(x, y)) {
             return m_map[x * size.y + y];
         } else {
             return -1;
@@ -130,8 +127,8 @@ public:
 
     void PrintMap() const
     {
-        for(size_t y = 0; y < size.y; ++y) {
-            for(size_t x = 0; x < size.x; ++x) {
+        for (std::size_t y = 0; y < size.y; ++y) {
+            for (std::size_t x = 0; x < size.x; ++x) {
                 std::cout << static_cast <char> ((int) GetCell(x, y));
             }
 
@@ -149,12 +146,10 @@ struct SRoom {
         return (pos.x >= corner1.x && pos.x <= corner2.x && pos.y >= corner1.y && pos.y <= corner2.y);
     }
 
-    [[nodiscard]] bool IsInRoom(const size_t x, const size_t y) const
+    [[nodiscard]] bool IsInRoom(const std::size_t x, const std::size_t y) const
     {
         return (x >= corner1.x && x <= corner2.x && y >= corner1.y && y <= corner2.y);
     }
 };
 
 } // end of namespace RL
-
-#endif

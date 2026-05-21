@@ -1,7 +1,8 @@
 #ifndef DEMO_GAME_MONSTER_H
 #define DEMO_GAME_MONSTER_H
 
-#include "../roguelikelib/map.h"
+import rl.map;
+import rl.position;
 
 class CMonster {
 protected:

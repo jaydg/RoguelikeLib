@@ -1,7 +1,11 @@
-#include "../roguelikelib/randomness.h"
-#include "../roguelikelib/mapgenerators.h"
-#include "../roguelikelib/fov.h"
-#include "../roguelikelib/pathfinding.h"
+import rl.fov;
+import rl.map;
+import rl.mapgenerators;
+import rl.maputils;
+import rl.pathfinding;
+import rl.position;
+import rl.randomness;
+import std;
 
 using namespace std;
 
@@ -161,7 +165,7 @@ int main(void)
 
     // print maze with path
 
-    for(size_t index = 0; index < path.size(); index++) {
+    for (std::size_t index = 0; index < path.size(); index++) {
         level.SetCell(path[index].x, path[index].y, '+');
     }
 

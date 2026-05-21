@@ -1,6 +1,8 @@
 #include "simple-game.h"
 #include "rodent.h"
-#include "../roguelikelib/pathfinding.h"
+
+import rl.pathfinding;
+import std;
 
 extern CSimpleGame game;
 

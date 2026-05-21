@@ -2,13 +2,12 @@
 // Directions
 //////////////////////////////////////////////////////////////////////////
 
-#pragma once
-#ifndef RL_DIRECTIONS_H
-#define RL_DIRECTIONS_H
+export module rl.directions;
 
-#include "randomness.h"
+import rl.randomness;
 
-namespace RL {
+export namespace RL {
+
 enum EDirection {
     EDirectionMin = 0,
     North = EDirectionMin,
@@ -25,11 +24,11 @@ enum EDirection {
 class Direction {
     EDirection direction;
 public:
-    Direction(): direction(North) {};
+    Direction() : direction(North) {}
 
-    explicit Direction(const EDirection start): direction(start) {};
+    explicit Direction(const EDirection start) : direction(start) {}
 
-    EDirection Get() const
+    [[nodiscard]] EDirection Get() const
     {
         return direction;
     }
@@ -40,26 +39,21 @@ public:
     }
 };
 
-inline
-EDirection operator++(EDirection & e, int)
+EDirection operator++(EDirection& e, int)
 {
     e = (e < EDirectionMax) ? static_cast<EDirection>(e + 1) : EDirectionMin;
     return e;
 }
 
-inline
-EDirection operator--(EDirection & e, int)
+EDirection operator--(EDirection& e, int)
 {
     e = (e > EDirectionMin) ? static_cast<EDirection>(e - 1) : EDirectionMax;
     return e;
 }
 
-inline
 EDirection RandomDirection()
 {
     return static_cast<EDirection>(Random(EDirectionMax));
 }
 
 } // end of namespace RL
-
-#endif

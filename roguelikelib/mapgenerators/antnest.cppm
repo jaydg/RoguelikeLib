@@ -1,42 +1,48 @@
-#pragma once
-#ifndef RL_ANTNEST_H
-#define RL_ANTNEST_H
+module;
 
-#include "../map.h"
-#include "../randomness.h"
+export module rl.mapgenerators.antnest;
 
-namespace RL {
-inline
+import rl.map;
+import rl.maputils;
+import rl.position;
+import rl.randomness;
+import std;
+
+export namespace RL {
+
 void CreateAntNest(CMap &level, bool with_rooms = false)
 {
     if(level.GetWidth() == 0 || level.GetHeight() == 0) {
         return;
     }
 
-    level.Clear();
+    level.Clear(LevelElementWall);
 
     level.SetCell(level.GetWidth() / 2, level.GetHeight() / 2, LevelElementCorridor);
 
     double dx, dy;
     int px, py;
 
-    for(size_t object = 0; object < level.GetWidth() * level.GetHeight() / 3; ++object) {
+    const std::size_t max_objects = level.GetWidth() * level.GetHeight() / 3;
+
+    for(std::size_t object = 0; object < max_objects; ++object) {
         // degree
-        double k = Random(360) * 3.1419532 / 180;
+        double k = static_cast<double>(Random(360)) * std::numbers::pi / 180.0;
+
         // position on ellipse by degree
-        double x1 = static_cast<double>(level.GetWidth()) / 2 + (static_cast<double>(level.GetWidth()) / 2) * sin(k);
-        double y1 = static_cast<double>(level.GetHeight()) / 2 + (static_cast<double>(level.GetHeight()) / 2) * cos(k);
+        double x1 = static_cast<double>(level.GetWidth()) / 2.0 + (static_cast<double>(level.GetWidth()) / 2.0) * std::sin(k);
+        double y1 = static_cast<double>(level.GetHeight()) / 2.0 + (static_cast<double>(level.GetHeight()) / 2.0) * std::cos(k);
 
         // object will move not too horizontal and not too vertical
         do {
-            dx = Random(100);
-            dy = Random(100);
-        } while(dx < 10 && dy < 10);
+            dx = static_cast<double>(Random(100));
+            dy = static_cast<double>(Random(100));
+        } while(dx < 10.0 && dy < 10.0);
 
-        dx -= 50;
-        dy -= 50;
-        dx /= 100;
-        dy /= 100;
+        dx -= 50.0;
+        dy -= 50.0;
+        dx /= 100.0;
+        dy /= 100.0;
 
         int counter = 0;
 
@@ -58,29 +64,30 @@ void CreateAntNest(CMap &level, bool with_rooms = false)
             // go through the border to the other side
             if(px < 0) {
                 px = static_cast<int>(level.GetWidth()) - 1;
-                x1 = px;
+                x1 = static_cast<double>(px);
             }
 
             if(px > static_cast<int>(level.GetWidth()) - 1) {
                 px = 0;
-                x1 = px;
+                x1 = static_cast<double>(px);
             }
 
             if(py < 0) {
                 py = static_cast<int>(level.GetHeight()) - 1;
-                y1 = py;
+                y1 = static_cast<double>(py);
             }
 
             if(py > static_cast<int>(level.GetHeight()) - 1) {
                 py = 0;
-                y1 = py;
+                y1 = static_cast<double>(py);
             }
 
             // if object has something to catch, then catch it
             if((px > 0 && level.GetCell(px - 1, py) == LevelElementCorridor) ||
-                    (py > 0 && level.GetCell(px, py - 1) == LevelElementCorridor) ||
-                    (px < static_cast<int>(level.GetWidth()) - 1 && level.GetCell(px + 1, py) == LevelElementCorridor) ||
-                    (py < static_cast<int>(level.GetHeight()) - 1 && level.GetCell(px, py + 1) == LevelElementCorridor)) {
+               (py > 0 && level.GetCell(px, py - 1) == LevelElementCorridor) ||
+               (px < static_cast<int>(level.GetWidth()) - 1 && level.GetCell(px + 1, py) == LevelElementCorridor) ||
+               (py < static_cast<int>(level.GetHeight()) - 1 && level.GetCell(px, py + 1) == LevelElementCorridor)) {
+
                 level.SetCell(px, py, LevelElementCorridor);
                 break;
             }
@@ -89,19 +96,23 @@ void CreateAntNest(CMap &level, bool with_rooms = false)
 
     if(with_rooms) {
         // add halls at the end of corridors
-        for(size_t y = 1; y < level.GetHeight() - 1; y++) {
-            for(size_t x = 1; x < level.GetWidth() - 1; x++) {
-                if((x > level.GetWidth() / 2 - 10 && x < level.GetWidth() / 2 + 10 && y > level.GetHeight() / 2 - 5 && y < level.GetHeight() / 2 + 5) || level.GetCell(x, y) == LevelElementWall) {
+        for(std::size_t y = 1; y < level.GetHeight() - 1; y++) {
+            for(std::size_t x = 1; x < level.GetWidth() - 1; x++) {
+
+                if((x > level.GetWidth() / 2 - 10 && x < level.GetWidth() / 2 + 10 &&
+                    y > level.GetHeight() / 2 - 5 && y < level.GetHeight() / 2 + 5) ||
+                    level.GetCell(x, y) == LevelElementWall) {
                     continue;
                 }
 
                 int neighbours = CountNeighboursOfType(level, LevelElementCorridor, Position(x, y));
 
                 if(neighbours == 1) {
-                    for(px = -1; px <= 1; px++)
+                    for(px = -1; px <= 1; px++) {
                         for(py = -1; py <= 1; py++) {
                             level.SetCell(x + px, y + py, LevelElementRoom);
                         }
+                    }
                 }
             }
         }
@@ -109,5 +120,3 @@ void CreateAntNest(CMap &level, bool with_rooms = false)
 }
 
 } // end of namespace RL
-
-#endif

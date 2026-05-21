@@ -1,14 +1,5 @@
-demo-features/demo-features
-demo-features/Release/
-demo-game/cmake-build-debug/
-demo-game/simple-game
-demo-game/Release/
-
-CMakeFiles
-Makefile
-cmake_install.cmake
-CMakeCache.txt
-
 # IDE and tool generated files
+.xmake/
+build/
 .gdb_history
 .idea/

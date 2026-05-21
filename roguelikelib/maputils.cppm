@@ -2,36 +2,32 @@
 // Map generation helpers
 //////////////////////////////////////////////////////////////////////////
 
-#pragma once
-#ifndef RL_MAPUTILS_H
-#define RL_MAPUTILS_H
+module;
 
-#include "map.h"
-#include "randomness.h"
-#include "distance.h"
+export module rl.maputils;
 
-#include <algorithm>
-#include <climits>
-#include <list>
-#include <vector>
-#include <cmath>
+import rl.distance;
+import rl.map;
+import rl.position;
+import rl.randomness;
+import std;
 
 namespace RL {
 
 // Internal Math and Path Helpers
 namespace detail {
-    inline int Sqr(int x) {
+    int Sqr(int x) {
         return x * x;
     }
 
-    inline void CutCorners(std::vector<Position>& seq) {
+    void CutCorners(std::vector<Position>& seq) {
         if (seq.size() < 3) return;
 
-        size_t j = 1;
-        for (size_t i = 1; i < seq.size() - 1; ++i) {
+        std::size_t j = 1;
+        for (std::size_t i = 1; i < seq.size() - 1; ++i) {
             seq[j] = seq[i];
-            int dx = std::abs(int(seq[j - 1].x - seq[i + 1].x));
-            int dy = std::abs(int(seq[j - 1].y - seq[i + 1].y));
+            int dx = std::abs(static_cast<int>(seq[j - 1].x - seq[i + 1].x));
+            int dy = std::abs(static_cast<int>(seq[j - 1].y - seq[i + 1].y));
             if (std::max(dx, dy) > 1) {
                 j++;
             }
@@ -41,12 +37,12 @@ namespace detail {
         seq.resize(j);
     }
 
-    inline void BuildZigzagPath(std::vector<Position>& ret, const Position& p1, const Position& p2, unsigned turnpct, unsigned diagpct) {
+    void BuildZigzagPath(std::vector<Position>& ret, const Position& p1, const Position& p2, unsigned turnpct, unsigned diagpct) {
         ret.clear();
-        int xc = p1.x;
-        int yc = p1.y;
-        int x2 = p2.x;
-        int y2 = p2.y;
+        int xc = static_cast<int>(p1.x);
+        int yc = static_cast<int>(p1.y);
+        int x2 = static_cast<int>(p2.x);
+        int y2 = static_cast<int>(p2.y);
 
         int deltax = 0, deltay = 0;
         ret.emplace_back(xc, yc);
@@ -65,16 +61,16 @@ namespace detail {
 
                 if (Random(100) < diagpct) {
                     if (xremain > yremain) {
-                        if (int(Random(xremain)) < (xremain - yremain)) {
+                        if (static_cast<int>(Random(xremain)) < (xremain - yremain)) {
                             deltay = 0;
                         }
                     } else if (xremain < yremain) {
-                        if (int(Random(yremain)) < (yremain - xremain)) {
+                        if (static_cast<int>(Random(yremain)) < (yremain - xremain)) {
                             deltax = 0;
                         }
                     }
                 } else {
-                    if (int(Random(xremain + yremain)) < xremain) {
+                    if (static_cast<int>(Random(xremain + yremain)) < xremain) {
                         if (deltax != 0) {
                             deltay = 0;
                         }
@@ -92,12 +88,12 @@ namespace detail {
         }
     }
 
-    inline int SignCos2(const Position& p0, const Position& p1, const Position& p2) {
-        int sqlen01 = Sqr(p1.x - p0.x) + Sqr(p1.y - p0.y);
-        int sqlen12 = Sqr(p2.x - p1.x) + Sqr(p2.y - p1.y);
+    int SignCos2(const Position& p0, const Position& p1, const Position& p2) {
+        int sqlen01 = Sqr(static_cast<int>(p1.x - p0.x)) + Sqr(static_cast<int>(p1.y - p0.y));
+        int sqlen12 = Sqr(static_cast<int>(p2.x - p1.x)) + Sqr(static_cast<int>(p2.y - p1.y));
         if (sqlen01 == 0 || sqlen12 == 0) return 0;
 
-        int prod = (p1.x - p0.x) * (p2.x - p1.x) + (p1.y - p0.y) * (p2.y - p1.y);
+        int prod = static_cast<int>((p1.x - p0.x) * (p2.x - p1.x) + (p1.y - p0.y) * (p2.y - p1.y));
         long long prod_ll = prod; // Prevent overflow
         long long val = 1000LL * (prod_ll * prod_ll / sqlen01) / sqlen12;
         if (prod < 0) {
@@ -106,7 +102,7 @@ namespace detail {
         return static_cast<int>(val);
     }
 
-    inline void PerturbPath(std::vector<Position>& way, const CMap& level, int mindist, int maxdist, int pertamt) {
+    void PerturbPath(std::vector<Position>& way, const CMap& level, int mindist, int maxdist, int pertamt) {
         if (way.size() < 3) return;
 
         static const int Xoff[8] = {1,  1,  0, -1, -1, -1,  0,  1};
@@ -116,22 +112,22 @@ namespace detail {
         int mind2 = Sqr(mindist);
         int maxd2 = Sqr(maxdist);
 
-        size_t loops = static_cast<size_t>(pertamt) * way.size();
-        for (size_t i = 0; i < loops; ++i) {
-            size_t ri = 1 + Random(static_cast<int>(way.size()) - 2);
+        std::size_t loops = static_cast<std::size_t>(pertamt) * way.size();
+        for (std::size_t i = 0; i < loops; ++i) {
+            std::size_t ri = 1 + Random(static_cast<int>(way.size()) - 2);
             int rdir = Random(8);
-            int nx = way[ri].x + Xoff[rdir];
-            int ny = way[ri].y + Yoff[rdir];
+            int nx = static_cast<int>(way[ri].x) + Xoff[rdir];
+            int ny = static_cast<int>(way[ri].y) + Yoff[rdir];
 
             if (nx < 1 || nx >= static_cast<int>(level.GetWidth()) - 1 ||
                 ny < 1 || ny >= static_cast<int>(level.GetHeight()) - 1) {
                 continue;
             }
 
-            int lox = way[ri - 1].x;
-            int loy = way[ri - 1].y;
-            int hix = way[ri + 1].x;
-            int hiy = way[ri + 1].y;
+            int lox = static_cast<int>(way[ri - 1].x);
+            int loy = static_cast<int>(way[ri - 1].y);
+            int hix = static_cast<int>(way[ri + 1].x);
+            int hiy = static_cast<int>(way[ri + 1].y);
 
             int lod2 = Sqr(nx - lox) + Sqr(ny - loy);
             int hid2 = Sqr(nx - hix) + Sqr(ny - hiy);
@@ -156,35 +152,39 @@ namespace detail {
         }
     }
 
-    inline void ConnectWaypoints(std::vector<Position>& result, const std::vector<Position>& waypts) {
+    void ConnectWaypoints(std::vector<Position>& result, const std::vector<Position>& waypts) {
         result.clear();
         if (waypts.size() <= 1) return;
 
         result.push_back(waypts[0]);
 
-        for (size_t i = 0; i < waypts.size() - 1; ++i) {
+        for (std::size_t i = 0; i < waypts.size() - 1; ++i) {
             std::vector<Position> segment = waypts[i].BuildBresenhamLine(waypts[i + 1]);
-            for (size_t j = 1; j < segment.size(); ++j) {
+            for (std::size_t j = 1; j < segment.size(); ++j) {
                 result.push_back(segment[j]);
             }
         }
     }
-}
+} // end of detail
 
-inline
+} // end of RL namespace (internal)
+
+// Public API (exported)
+export namespace RL {
+
 void FindOnMapAllRectanglesOfType(CMap &level, const ELevelElement& type, const Size &size, std::vector < Position >& positions)
 {
     CMap good_points = level;
 
-    for(size_t y = 0; y < level.GetHeight(); ++y)
-        for(size_t x = 0; x < level.GetWidth(); ++x) {
+    for(std::size_t y = 0; y < level.GetHeight(); ++y)
+        for(std::size_t x = 0; x < level.GetWidth(); ++x) {
             good_points.SetCell(x, y, 0);
         }
 
-    for(size_t y = 0; y < level.GetHeight(); ++y) {
-        size_t horizontal_count = 0;
+    for(std::size_t y = 0; y < level.GetHeight(); ++y) {
+        std::size_t horizontal_count = 0;
 
-        for(size_t x = 0; x < level.GetWidth(); ++x) {
+        for(std::size_t x = 0; x < level.GetWidth(); ++x) {
             if(level.GetCell(x, y) == type) {
                 horizontal_count++;
             } else {
@@ -199,10 +199,10 @@ void FindOnMapAllRectanglesOfType(CMap &level, const ELevelElement& type, const 
     }
 
     // count verticals
-    for(size_t x = 0; x < level.GetWidth(); ++x) {
-        size_t vertical_count = 0;
+    for(std::size_t x = 0; x < level.GetWidth(); ++x) {
+        std::size_t vertical_count = 0;
 
-        for(size_t y = 0; y < level.GetHeight(); ++y) {
+        for(std::size_t y = 0; y < level.GetHeight(); ++y) {
             if(good_points.GetCell(x, y) == 1) {
                 vertical_count++;
             } else {
@@ -219,7 +219,6 @@ void FindOnMapAllRectanglesOfType(CMap &level, const ELevelElement& type, const 
 
 //////////////////////////////////////////////////////////////////////////
 
-inline
 bool FloodFill(CMap &level, Position position, int value, bool diagonal = true, int gradient = 0, Position end = Position(-1, -1))
 {
     // flood fill room
@@ -238,8 +237,8 @@ bool FloodFill(CMap &level, Position position, int value, bool diagonal = true, 
             break;
         }
 
-        size_t pos_x = m->x;
-        size_t pos_y = m->y;
+        std::size_t pos_x = m->x;
+        std::size_t pos_y = m->y;
 
         int this_value = level.GetCell(pos_x, pos_y);
 
@@ -310,7 +309,6 @@ bool FloodFill(CMap &level, Position position, int value, bool diagonal = true, 
 
 //////////////////////////////////////////////////////////////////////////
 
-inline
 bool FindOnMapRandomRectangleOfType(CMap &level, const ELevelElement& type, Position& pos, const Size &size)
 {
     std::vector < Position > positions;
@@ -321,13 +319,12 @@ bool FindOnMapRandomRectangleOfType(CMap &level, const ELevelElement& type, Posi
     }
 
     // get position of Random rectangle
-    pos = positions[Random((int) positions.size())];
+    pos = positions[Random(static_cast<std::size_t>(positions.size()))];
     return true;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-inline
 int CountNeighboursOfType(CMap &level, ELevelElement type, const Position& pos, bool diagonal = true)
 {
     int neighbours = 0;
@@ -380,11 +377,10 @@ int CountNeighboursOfType(CMap &level, ELevelElement type, const Position& pos, 
 
 //////////////////////////////////////////////////////////////////////////
 
-inline
 void AddDoors(CMap &level, float door_probability, float open_probability)
 {
-    for(size_t x = 0; x < level.GetWidth(); ++x) {
-        for(size_t y = 0; y < level.GetHeight(); ++y) {
+    for(std::size_t x = 0; x < level.GetWidth(); ++x) {
+        for(std::size_t y = 0; y < level.GetHeight(); ++y) {
             Position pos(x, y);
             int room_cells = CountNeighboursOfType(level, LevelElementRoom, pos);
             int corridor_cells = CountNeighboursOfType(level, LevelElementCorridor, pos);
@@ -395,10 +391,10 @@ void AddDoors(CMap &level, float door_probability, float open_probability)
             if(level.GetCell(x, y) == LevelElementCorridor) {
                 if((corridor_cells == 1 && door_cells == 0 && room_cells > 0 && room_cells < 4) ||
                         (corridor_cells == 0 && door_cells == 0)) {
-                    float exist = ((float) Random(1000)) / 1000;
+                    float exist = (static_cast<float>(Random(1000))) / 1000.0f;
 
                     if(exist < door_probability) {
-                        float is_open = ((float) Random(1000)) / 1000;
+                        float is_open = (static_cast<float>(Random(1000))) / 1000.0f;
 
                         if(is_open < open_probability) {
                             level.SetCell(x, y, LevelElementDoorOpen);
@@ -414,18 +410,17 @@ void AddDoors(CMap &level, float door_probability, float open_probability)
 
 //////////////////////////////////////////////////////////////////////////
 
-inline
-bool AddCorridor(CMap &level, const size_t &start_x1, const size_t &start_y1, const size_t &start_x2, const size_t &start_y2, bool straight = false)
+bool AddCorridor(CMap &level, const std::size_t &start_x1, const std::size_t &start_y1, const std::size_t &start_x2, const std::size_t &start_y2, bool straight = false)
 {
     if(!level.OnMap(start_x1, start_y1) || !level.OnMap(start_x2, start_y2)) {
         return false;
     }
 
     // we start from both sides
-    size_t x1 = start_x1;
-    size_t y1 = start_y1;
-    size_t x2 = start_x2;
-    size_t y2 = start_y2;
+    std::size_t x1 = start_x1;
+    std::size_t y1 = start_y1;
+    std::size_t x2 = start_x2;
+    std::size_t y2 = start_y2;
 
     int dir_x;
     int dir_y;
@@ -514,11 +509,10 @@ bool AddCorridor(CMap &level, const size_t &start_x1, const size_t &start_y1, co
 
 //////////////////////////////////////////////////////////////////////////
 
-inline
 int FillDisconnectedRoomsWithDifferentValues(CMap &level)
 {
-    for(size_t y = 0; y < level.GetHeight(); ++y) {
-        for(size_t x = 0; x < level.GetWidth(); ++x) {
+    for(std::size_t y = 0; y < level.GetHeight(); ++y) {
+        for(std::size_t x = 0; x < level.GetWidth(); ++x) {
             if(level.GetCell(x, y) == LevelElementRoom) {
                 level.SetCell(x, y, LevelElementRoom_value);
             } else if(level.GetCell(x, y) == LevelElementWall) {
@@ -529,8 +523,8 @@ int FillDisconnectedRoomsWithDifferentValues(CMap &level)
 
     int room_number = 0;
 
-    for(size_t y = 0; y < level.GetHeight(); ++y) {
-        for(size_t x = 0; x < level.GetWidth(); ++x) {
+    for(std::size_t y = 0; y < level.GetHeight(); ++y) {
+        for(std::size_t x = 0; x < level.GetWidth(); ++x) {
             if(level.GetCell(x, y) == LevelElementRoom_value) {
                 FloodFill(level, Position(x, y), room_number++);
             }
@@ -543,22 +537,21 @@ int FillDisconnectedRoomsWithDifferentValues(CMap &level)
 //////////////////////////////////////////////////////////////////////////
 
 // TODO: with_doors is not implemented, as doors are not implemented
-inline
 void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool straight_connections = false)
 {
     FillDisconnectedRoomsWithDifferentValues(level);
 
     std::vector < std::list < Position > > rooms;
 
-    for(size_t y = 0; y < level.GetHeight(); ++y) {
-        for(size_t x = 0; x < level.GetWidth(); ++x) {
+    for(std::size_t y = 0; y < level.GetHeight(); ++y) {
+        for(std::size_t x = 0; x < level.GetWidth(); ++x) {
             if(level.GetCell(x, y) != LevelElementWall_value) {
                 if(level.GetCell(x, y) >= static_cast<int>(rooms.size())) {
                     rooms.resize(level.GetCell(x, y) +1);
                 }
 
                 // only border cells without diagonals
-                if(CountNeighboursOfType(level, LevelElementWall_value, Position(x, y), false) > 0) {
+                if(CountNeighboursOfType(level, static_cast<ELevelElement>(LevelElementWall_value), Position(x, y), false) > 0) {
                     rooms[level.GetCell(x, y)].emplace_back(x, y);
                 }
             } // if no wall at position
@@ -576,7 +569,7 @@ void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool str
 
     std::vector < std::vector < bool > > room_connections;
     std::vector < std::vector < bool > > transitive_closure;
-    std::vector < std::vector < size_t > > distance_matrix;
+    std::vector < std::vector < std::size_t > > distance_matrix;
     std::vector < std::vector < std::pair < Position, Position > > > closest_cells_matrix;
 
     room_connections.resize(rooms.size());
@@ -584,23 +577,23 @@ void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool str
     distance_matrix.resize(rooms.size());
     closest_cells_matrix.resize(rooms.size());
 
-    for(size_t a = 0; a < rooms.size(); ++a) {
+    for(std::size_t a = 0; a < rooms.size(); ++a) {
         room_connections[a].resize(rooms.size());
         transitive_closure[a].resize(rooms.size());
         distance_matrix[a].resize(rooms.size());
         closest_cells_matrix[a].resize(rooms.size());
 
-        for(size_t b = 0; b < rooms.size(); ++b) {
+        for(std::size_t b = 0; b < rooms.size(); ++b) {
             room_connections[a][b] = false;
-            distance_matrix[a][b] = INT_MAX;
+            distance_matrix[a][b] = std::numeric_limits<int>::max();
         }
     }
 
     // find the closest cells for each room - random closest cell
     std::list < Position >::iterator m, _m, k, _k;
 
-    for(size_t room_a = 0; room_a < rooms.size(); ++room_a) {
-        for(size_t room_b = 0; room_b < rooms.size(); ++room_b) {
+    for(std::size_t room_a = 0; room_a < rooms.size(); ++room_a) {
+        for(std::size_t room_b = 0; room_b < rooms.size(); ++room_b) {
             if(room_a == room_b) {
                 continue;
             }
@@ -609,14 +602,14 @@ void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool str
 
             for(m = rooms[room_a].begin(), _m = rooms[room_a].end(); m != _m; ++m) {
                 // for each border cell in room_a try each border cell of room_b
-                size_t x1 = m->x;
-                size_t y1 = m->y;
+                std::size_t x1 = m->x;
+                std::size_t y1 = m->y;
 
                 for(k = rooms[room_b].begin(), _k = rooms[room_b].end(); k != _k; ++k) {
-                    size_t x2 = k->x;
-                    size_t y2 = k->y;
+                    std::size_t x2 = k->x;
+                    std::size_t y2 = k->y;
 
-                    size_t dist_ab = Distance(x1, y1, x2, y2);
+                    std::size_t dist_ab = Distance(x1, y1, x2, y2);
 
                     if(dist_ab < distance_matrix[room_a][room_b] || (dist_ab == distance_matrix[room_a][room_b] && CoinToss())) {
                         closest_cells = std::make_pair(Position(x1, y1), Position(x2, y2));
@@ -630,16 +623,16 @@ void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool str
     }
 
     // Now connect the rooms to the closest ones
-    for(size_t room_a = 0; room_a < rooms.size(); ++room_a) {
-        size_t min_distance = std::numeric_limits<size_t>::max();
-        size_t closest_room;
+    for(std::size_t room_a = 0; room_a < rooms.size(); ++room_a) {
+        std::size_t min_distance = std::numeric_limits<std::size_t>::max();
+        std::size_t closest_room = 0;
 
-        for(size_t room_b = 0; room_b < rooms.size(); ++room_b) {
+        for(std::size_t room_b = 0; room_b < rooms.size(); ++room_b) {
             if(room_a == room_b) {
                 continue;
             }
 
-            size_t distance = distance_matrix[room_a][room_b];
+            std::size_t distance = distance_matrix[room_a][room_b];
 
             if(distance < min_distance) {
                 min_distance = distance;
@@ -651,12 +644,12 @@ void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool str
         std::pair < Position, Position > closest_cells;
         closest_cells = closest_cells_matrix[room_a][closest_room];
 
-        size_t x1 = closest_cells.first.x;
-        size_t y1 = closest_cells.first.y;
-        size_t x2 = closest_cells.second.x;
-        size_t y2 = closest_cells.second.y;
+        std::size_t x1 = closest_cells.first.x;
+        std::size_t y1 = closest_cells.first.y;
+        std::size_t x2 = closest_cells.second.x;
+        std::size_t y2 = closest_cells.second.y;
 
-        if(room_connections[room_a][closest_room] == false && AddCorridor(level, x1, y1, x2, y2, straight_connections)) {
+        if(!room_connections[room_a][closest_room] && AddCorridor(level, x1, y1, x2, y2, straight_connections)) {
             room_connections[room_a][closest_room] = true;
             room_connections[closest_room][room_a] = true;
         }
@@ -664,7 +657,7 @@ void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool str
 
     // The closest rooms connected. Connect the rest until all areas are connected
     for(int to_connect_a = 0; to_connect_a != -1;) {
-        size_t a, b, c;
+        std::size_t a, b, c;
 
         for(a = 0; a < rooms.size(); a++) {
             for(b = 0; b < rooms.size(); b++) {
@@ -674,9 +667,9 @@ void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool str
 
         for(a = 0; a < rooms.size(); a++) {
             for(b = 0; b < rooms.size(); b++) {
-                if(transitive_closure[a][b] == true && a != b) {
+                if(transitive_closure[a][b] && a != b) {
                     for(c = 0; c < rooms.size(); c++) {
-                        if(transitive_closure[b][c] == true) {
+                        if(transitive_closure[b][c]) {
                             transitive_closure[a][c] = true;
                             transitive_closure[c][a] = true;
                         }
@@ -690,7 +683,7 @@ void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool str
 
         for(a = 0; a < rooms.size() && to_connect_a == -1; ++a) {
             for(b = 0; b < rooms.size(); b++) {
-                if(a != b && transitive_closure[a][b] == false) {
+                if(a != b && !transitive_closure[a][b]) {
                     to_connect_a = static_cast<int>(a);
                     break;
                 }
@@ -708,10 +701,10 @@ void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool str
             std::pair < Position, Position > closest_cells;
             closest_cells = closest_cells_matrix[to_connect_a][to_connect_b];
 
-            size_t x1 = closest_cells.first.x;
-            size_t y1 = closest_cells.first.y;
-            size_t x2 = closest_cells.second.x;
-            size_t y2 = closest_cells.second.y;
+            std::size_t x1 = closest_cells.first.x;
+            std::size_t y1 = closest_cells.first.y;
+            std::size_t x2 = closest_cells.second.x;
+            std::size_t y2 = closest_cells.second.y;
 
             AddCorridor(level, x1, y1, x2, y2, straight_connections);
 
@@ -723,16 +716,15 @@ void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool str
 
 //////////////////////////////////////////////////////////////////////////
 
-inline
-void AddRecursiveRooms(CMap &level, const ELevelElement& type, size_t min_size_x, size_t min_size_y, const SRoom& room, bool with_doors = true)
+void AddRecursiveRooms(CMap &level, const ELevelElement& type, std::size_t min_size_x, std::size_t min_size_y, const SRoom& room, bool with_doors = true)
 {
-    size_t size_x = room.corner2.x - room.corner1.x;
+    std::size_t size_x = room.corner2.x - room.corner1.x;
 
     if(size_x % 2 != 0) {
         size_x -= CoinToss();
     }
 
-    size_t size_y = room.corner2.y - room.corner1.y;
+    std::size_t size_y = room.corner2.y - room.corner1.y;
 
     if(size_y % 2 != 0) {
         size_y -= CoinToss();
@@ -753,14 +745,14 @@ void AddRecursiveRooms(CMap &level, const ELevelElement& type, size_t min_size_x
             return;
         }
 
-        const size_t split = size_y / 2 + Random(size_y / 2 - min_size_y);
+        const std::size_t split = size_y / 2 + Random(size_y / 2 - min_size_y);
 
-        for(size_t x = room.corner1.x; x < room.corner2.x; x++) {
+        for(std::size_t x = room.corner1.x; x < room.corner2.x; x++) {
             level.SetCell(x, room.corner1.y + split, type);
         }
 
         if(with_doors) {
-            level.SetCell(room.corner1.x + Random(size_x - 1) +1, room.corner1.y + split, LevelElementDoorClose);
+            level.SetCell(room.corner1.x + Random(size_x - 1) + 1, room.corner1.y + split, LevelElementDoorClose);
         }
 
         SRoom new_room = room;
@@ -775,14 +767,14 @@ void AddRecursiveRooms(CMap &level, const ELevelElement& type, size_t min_size_x
             return;
         }
 
-        const size_t split = size_x / 2 + Random(size_x / 2 - min_size_x);
+        const std::size_t split = size_x / 2 + Random(size_x / 2 - min_size_x);
 
-        for(size_t y = room.corner1.y; y < room.corner2.y; y++) {
+        for(std::size_t y = room.corner1.y; y < room.corner2.y; y++) {
             level.SetCell(room.corner1.x + split, y, type);
         }
 
         if(with_doors) {
-            level.SetCell(room.corner1.x + split, room.corner1.y + Random(size_y - 1) +1, LevelElementDoorClose);
+            level.SetCell(room.corner1.x + split, room.corner1.y + Random(size_y - 1) + 1, LevelElementDoorClose);
         }
 
         SRoom new_room = room;
@@ -797,11 +789,10 @@ void AddRecursiveRooms(CMap &level, const ELevelElement& type, size_t min_size_x
 
 //////////////////////////////////////////////////////////////////////////
 
-inline
 void ConvertValuesToTiles(CMap &level)
 {
-    for(size_t y = 0; y < level.GetHeight(); ++y) {
-        for(size_t x = 0; x < level.GetWidth(); ++x) {
+    for(std::size_t y = 0; y < level.GetHeight(); ++y) {
+        for(std::size_t x = 0; x < level.GetWidth(); ++x) {
             if(level.GetCell(x, y) == LevelElementCorridor_value) {
                 level.SetCell(x, y, LevelElementCorridor);
             } else if(level.GetCell(x, y) == LevelElementWall_value) {
@@ -815,11 +806,10 @@ void ConvertValuesToTiles(CMap &level)
 
 //////////////////////////////////////////////////////////////////////////
 
-inline
 void DrawRectangleOnMap(CMap &level, const Position& p1, const Position& p2, int value)
 {
-    for(size_t y = p1.y; y < p2.y; ++y) {
-        for(size_t x = p1.x; x < p2.x; ++x) {
+    for(std::size_t y = p1.y; y < p2.y; ++y) {
+        for(std::size_t x = p1.x; x < p2.x; ++x) {
             level.SetCell(x, y, value);
         }
     }
@@ -859,7 +849,6 @@ void DrawRectangleOnMap(CMap &level, const Position& p1, const Position& p2, int
  */
 
 
-inline
 bool AddWindingCorridor(CMap &level, const Position& start, const Position& end, int pertamt) {
     if (!level.OnMap(start.x, start.y) || !level.OnMap(end.x, end.y)) {
         return false;
@@ -872,7 +861,7 @@ bool AddWindingCorridor(CMap &level, const Position& start, const Position& end,
         road = waypts;
     } else {
         std::vector<Position> sampled_waypts;
-        for (size_t i = 0; i < waypts.size(); ) {
+        for (std::size_t i = 0; i < waypts.size(); ) {
             sampled_waypts.push_back(waypts[i]);
             if (i < waypts.size() - 5) {
                 i += 2 + Random(2);
@@ -900,7 +889,6 @@ bool AddWindingCorridor(CMap &level, const Position& start, const Position& end,
 
 //////////////////////////////////////////////////////////////////////////
 
-inline
 bool AddZigzagCorridor(CMap &level, const Position& start, const Position& end, int turnpct, int diagpct) {
     if (!level.OnMap(start.x, start.y) || !level.OnMap(end.x, end.y)) {
         return false;
@@ -920,7 +908,6 @@ bool AddZigzagCorridor(CMap &level, const Position& start, const Position& end, 
 
 //////////////////////////////////////////////////////////////////////////
 
-inline
 bool AddSigsagCorridor(CMap &level, const Position& start, const Position& end, int turnpct, int diagpct) {
     if (!level.OnMap(start.x, start.y) || !level.OnMap(end.x, end.y)) {
         return false;
@@ -939,6 +926,4 @@ bool AddSigsagCorridor(CMap &level, const Position& start, const Position& end, 
     return true;
 }
 
-}
-
-#endif
+} // end of export namespace RL

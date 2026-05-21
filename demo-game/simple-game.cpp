@@ -14,14 +14,14 @@
  *
  */
 
-#include <list>
-#include <set>
-#include "../roguelikelib/randomness.h"
-#include "../roguelikelib/mapgenerators.h"
-
 #include "simple-game.h"
 #include "io.h"
 #include "rodent.h"
+
+import rl.maputils;
+import rl.mapgenerators;
+import rl.randomness;
+import std;
 
 // game is a global singleton
 CSimpleGame game;
