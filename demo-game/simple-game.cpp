@@ -9,8 +9,9 @@
  * This game can be a base for your roguelike.
  * The source code is very unoptimized, however "Premature optimization is the root of all evil".
  *
- * To compile you need a PDCurses library (for standard project placed in pdcurses subdirectory)
- * http://pdcurses.sourceforge.net
+ * To compile you need the notcurses library,
+ * https://github.com/dankamongmen/notcurses/
+ *
  */
 
 #include <list>
