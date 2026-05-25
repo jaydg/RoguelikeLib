@@ -4,11 +4,13 @@ export module demo_game.monster;
 
 import rl.map;
 import rl.position;
+import std;
 
 export class CMonster
 {
 protected:
     char tile{};
+    std::uint32_t rgb_color{0xFFFFFF};
     RL::CMap fov;
     int hit_points{};
     int strength{};

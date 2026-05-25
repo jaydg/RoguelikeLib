@@ -9,10 +9,12 @@ import demo_game.player;
 import rl.map;
 import rl.position;
 import rl.randomness;
+import std;
 
 CPlayer::CPlayer()
 {
     tile = '@';
+    rgb_color = 0xFFFF00;
     hit_points = 20;
     experience = 0;
     strength = 5;
@@ -89,7 +91,7 @@ void CPlayer::DoAction() {
 
 void CPlayer::Death()
 {
-    IOPrintString(30, 24, "You are dead!");
+    IOPrintString(30, 24, "You are dead!", 0xFF0000);
 }
 
 void CPlayer::Print() const
@@ -102,37 +104,63 @@ void CPlayer::Print() const
     IOPrintValue(15, 24, experience);
 }
 
-void CPlayer::LookAround() {
+void CPlayer::LookAround()
+{
     CMonster::LookAround();
 
     // Print map
     RL::Position pos;
 
-    for (pos.x = 0; pos.x < CSimpleGame::LEVEL_SIZE_X; ++pos.x) {
-        for (pos.y = 0; pos.y < CSimpleGame::LEVEL_SIZE_Y; ++pos.y) {
-            if (fov.GetCell(pos)) { // if visible
-                int cell = game.level.GetCell(pos);
+    for (pos.x = 0; pos.x < CSimpleGame::LEVEL_SIZE_X; ++pos.x)
+    {
+        for (pos.y = 0; pos.y < CSimpleGame::LEVEL_SIZE_Y; ++pos.y)
+        {
+            int cell = game.level.GetCell(pos);
+
+            // Define colors for map elements
+            // default: white
+            std::uint32_t base_color = 0xFFFFFF;
+            if (cell == RL::LevelElementWall)
+            {
+                // walls
+                base_color = 0x8B4513;
+            }
+            else if (cell == RL::LevelElementRoom || cell == RL::LevelElementCorridor)
+            {
+                // floor
+                cell = '.';
+                base_color = 0xAAAAAA;
+            }
+
+            if (fov.GetCell(pos))
+            {
+                // currently visible
                 seen_map.SetCell(pos, cell);
 
-                if(cell != '#') {
-                    cell = '.';
-                }
+                // print with normal intensity
+                IOPrintChar(pos.x, pos.y, cell, base_color);
 
-                IOPrintChar(pos.x, pos.y, cell);
+                // paint visible monsters
                 const CMonster* monster = game.GetMonsterFromCell(pos);
 
                 if(monster != nullptr) {
                     monster->Print();
                 }
-            } else if(seen_map.GetCell(pos)) {
-                int seen_cell = seen_map.GetCell(pos);
+            }
+            else if(seen_map.GetCell(pos))
+            {
+                // known, but currently not visible
+                // print the same character ('cell') with dimmed color
+                std::uint8_t r = ((base_color >> 16) & 0xFF) * 0.35;
+                std::uint8_t g = ((base_color >> 8) & 0xFF) * 0.35;
+                std::uint8_t b = (base_color & 0xFF) * 0.35;
+                std::uint32_t dark_color = (r << 16) | (g << 8) | b;
 
-                if(seen_cell == '#') {
-                    IOPrintChar(pos.x, pos.y, '%');
-                } else {
-                    IOPrintChar(pos.x, pos.y, ' ');
-                }
-            } else {
+                IOPrintChar(pos.x, pos.y, cell, dark_color);
+            }
+            else
+            {
+                // unknown
                 IOPrintChar(pos.x, pos.y, ' ');
             }
         }

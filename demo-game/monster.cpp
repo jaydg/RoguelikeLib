@@ -72,7 +72,7 @@ void CMonster::Death()
 
 void CMonster::Print() const
 {
-    IOPrintChar(position.x, position.y, tile);
+    IOPrintChar(position.x, position.y, tile, rgb_color);
 }
 
 RL::Position CMonster::GetPosition() const
