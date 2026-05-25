@@ -1,11 +1,11 @@
-#ifndef DEMO_GAME_PLAYER_H
-#define DEMO_GAME_PLAYER_H
+module;
 
-#include "monster.h"
+export module demo_game.player;
 
+import demo_game.monster;
 import rl.map;
 
-class CPlayer final : public CMonster {
+export class CPlayer final : public CMonster {
 private:
     int experience;
     RL::CMap seen_map;
@@ -19,5 +19,3 @@ public:
     void Print() const override;
     void LookAround() override;
 };
-
-#endif

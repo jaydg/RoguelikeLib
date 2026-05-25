@@ -1,9 +1,14 @@
+module;
+
+export module demo_game.player:impl;
+
+import demo_game.game;
+import demo_game.io;
+import demo_game.monster;
+import demo_game.player;
+import rl.map;
+import rl.position;
 import rl.randomness;
-
-#include "simple-game.h"
-#include "io.h"
-
-extern CSimpleGame game;
 
 CPlayer::CPlayer()
 {
@@ -11,15 +16,8 @@ CPlayer::CPlayer()
     hit_points = 20;
     experience = 0;
     strength = 5;
-    seen_map.Resize(LEVEL_SIZE_X, LEVEL_SIZE_Y);
+    seen_map.Resize(CSimpleGame::LEVEL_SIZE_X, CSimpleGame::LEVEL_SIZE_Y);
     seen_map.Clear(0);
-}
-
-void CPlayer::Regenerate()
-{
-    if(RL::Random(8) == 0 && hit_points < 20) {
-        hit_points++;
-    }
 }
 
 bool CPlayer::Attack(CMonster *monster)
@@ -33,13 +31,19 @@ bool CPlayer::Attack(CMonster *monster)
     return is_dead;
 }
 
+void CPlayer::Regenerate()
+{
+    if(RL::Random(8) == 0 && hit_points < 20) {
+        hit_points++;
+    }
+}
+
 void CPlayer::GainExperience()
 {
     experience++;
 }
 
-void CPlayer::DoAction()
-{
+void CPlayer::DoAction() {
     LookAround();
 
     switch(IOGetKey()) {
@@ -98,16 +102,15 @@ void CPlayer::Print() const
     IOPrintValue(15, 24, experience);
 }
 
-void CPlayer::LookAround()
-{
+void CPlayer::LookAround() {
     CMonster::LookAround();
 
     // Print map
     RL::Position pos;
 
-    for(pos.x = 0; pos.x < LEVEL_SIZE_X; ++pos.x) {
-        for(pos.y = 0; pos.y < LEVEL_SIZE_Y; ++pos.y) {
-            if(fov.GetCell(pos)) { // if visible
+    for (pos.x = 0; pos.x < CSimpleGame::LEVEL_SIZE_X; ++pos.x) {
+        for (pos.y = 0; pos.y < CSimpleGame::LEVEL_SIZE_Y; ++pos.y) {
+            if (fov.GetCell(pos)) { // if visible
                 int cell = game.level.GetCell(pos);
                 seen_map.SetCell(pos, cell);
 

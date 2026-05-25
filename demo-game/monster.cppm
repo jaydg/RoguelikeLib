@@ -1,10 +1,12 @@
-#ifndef DEMO_GAME_MONSTER_H
-#define DEMO_GAME_MONSTER_H
+module;
+
+export module demo_game.monster;
 
 import rl.map;
 import rl.position;
 
-class CMonster {
+export class CMonster
+{
 protected:
     char tile{};
     RL::CMap fov;
@@ -18,10 +20,11 @@ public:
     virtual bool Attack(CMonster *monster);
     virtual void LookAround();
     virtual bool MoveTo(const RL::Position &new_pos);
-    virtual bool Damage(int damage); // return true if enemy died
+
+    // return true if enemy died
+    virtual bool Damage(int damage);
+
     virtual void Death();
     virtual void Print() const;
     RL::Position GetPosition() const;
 };
-
-#endif

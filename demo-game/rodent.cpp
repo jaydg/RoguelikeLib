@@ -1,10 +1,14 @@
-#include "simple-game.h"
-#include "rodent.h"
+module;
 
+export module demo_game.rodent:impl;
+
+import demo_game.game;
+import demo_game.monster;
+import demo_game.rodent;
+import rl.map;
 import rl.pathfinding;
+import rl.position;
 import std;
-
-extern CSimpleGame game;
 
 CRodent::CRodent()
 {
@@ -22,8 +26,7 @@ void CRodent::LookAround()
     }
 }
 
-void CRodent::DoAction()
-{
+void CRodent::DoAction() {
     LookAround();
 
     if(position != enemy_pos && game.level.OnMap(enemy_pos)) {
@@ -33,8 +36,8 @@ void CRodent::DoAction()
         RL::CMap temp_map = game.level;
         RL::Position pos;
 
-        for(pos.x = 0; pos.x < LEVEL_SIZE_X; ++pos.x)
-            for(pos.y = 0; pos.y < LEVEL_SIZE_Y; ++pos.y) {
+        for(pos.x = 0; pos.x < CSimpleGame::LEVEL_SIZE_X; ++pos.x)
+            for(pos.y = 0; pos.y < CSimpleGame::LEVEL_SIZE_Y; ++pos.y) {
                 if(temp_map.GetCell(pos) != '#') {
                     const CMonster *monster = game.GetMonsterFromCell(pos);
 

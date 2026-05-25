@@ -1,30 +1,18 @@
-/*!
- * Simple game using RoguelikeLib
- * This example shows all the main features of the RoguelikeLib in a simple real game
- * - Map management and generation
- * - Randomness
- * - FOV calculation
- * - Path finding
- *
- * This game can be a base for your roguelike.
- * The source code is very unoptimized, however "Premature optimization is the root of all evil".
- *
- * To compile you need the notcurses library,
- * https://github.com/dankamongmen/notcurses/
- *
- */
+module;
 
-#include "simple-game.h"
-#include "io.h"
-#include "rodent.h"
+export module demo_game.game:impl;
 
+import demo_game.game;
+import demo_game.io;
+import demo_game.monster;
+import demo_game.player;
+import demo_game.rodent;
+import rl.map;
 import rl.maputils;
 import rl.mapgenerators;
+import rl.position;
 import rl.randomness;
 import std;
-
-// game is a global singleton
-CSimpleGame game;
 
 void CSimpleGame::PlacePlayer()
 {
@@ -80,6 +68,21 @@ void CSimpleGame::MoveAllMonsters()
     monsters_to_remove.clear();
 }
 
+CMonster* CSimpleGame::GetMonsterFromCell(const RL::Position& cell)
+{
+    std::list <CMonster*>::iterator it, _it;
+
+    for(it = monsters.begin(), _it = monsters.end(); it != _it; ++it) {
+        CMonster *monster = *it;
+
+        if(monster->GetPosition() == cell) {
+            return monster;
+        }
+    }
+
+    return nullptr;
+}
+
 void CSimpleGame::CreateLevel()
 {
     level.Resize(LEVEL_SIZE_X, LEVEL_SIZE_Y);
@@ -117,7 +120,6 @@ void CSimpleGame::CreateLevel()
         RL::CreateSpaceShuttle(level);
         IOPrintString(60, 24, "Space Shuttle");
         break;
-
     }
 
     PlacePlayer();
@@ -137,27 +139,4 @@ void CSimpleGame::CreateLevel()
         player.Regenerate();
         MoveAllMonsters();
     }
-}
-
-CMonster *CSimpleGame::GetMonsterFromCell(const RL::Position &cell)
-{
-    std::list < CMonster * >::iterator it, _it;
-
-    for(it = game.monsters.begin(), _it = game.monsters.end(); it != _it; ++it) {
-        CMonster *monster = *it;
-
-        if(monster->GetPosition() == cell) {
-            return monster;
-        }
-    }
-
-    return nullptr;
-}
-
-int main()
-{
-    IOInit();
-    RL::InitRandomness();
-    game.CreateLevel();
-    game.MainLoop();
 }

@@ -1,13 +1,16 @@
 // Simple IO using Notcurses
 
-#include "io.h"
+module;
+
 #include <notcurses/notcurses.h>
-#include <cstdio>
-#include <cstdlib>
+
+export module demo_game.io;
 
 // internal state variables for notcurses
 static struct notcurses* nc_ctx = nullptr;
 static struct ncplane* std_plane = nullptr;
+
+export {
 
 void IOInit()
 {
@@ -64,3 +67,5 @@ int IOGetKey()
     // Return the character code. When missing, notcurses returns (uint32_t)-1
     return static_cast<int>(id);
 }
+
+} // export
