@@ -27,6 +27,20 @@ enum ELevelElement {
     LevelElementWall_value = LevelElementMax
 };
 
+class EOutOfBoundException : public std::exception {
+private:
+    std::string message;
+public:
+    EOutOfBoundException(const Position pos, const Size size) {
+        message = "Given position " + pos.toString() + " is out of bounds " +
+            "for map with dimensions " + size.toString();
+    }
+
+    const char* what() const noexcept {
+        return message.c_str();
+    }
+};
+
 class CMap {
 private:
     std::vector <int> m_map;
@@ -95,16 +109,20 @@ public:
 
     void SetCell(const std::size_t& x, const std::size_t& y, ELevelElement element)
     {
-        if (OnMap(x, y)) {
-            m_map[x * size.y + y] = element;
+        if (!OnMap(x, y)) {
+            throw EOutOfBoundException(Position(x, y), size);
         }
+
+        m_map[x * size.y + y] = element;
     }
 
     void SetCell(const std::size_t& x, const std::size_t& y, int element)
     {
-        if (OnMap(x, y)) {
-            m_map[x * size.y + y] = element;
+        if (!OnMap(x, y)) {
+            throw EOutOfBoundException(Position(x, y), size);
         }
+
+        m_map[x * size.y + y] = element;
     }
 
     void SetCell(const Position &pos, int element)
@@ -113,11 +131,11 @@ public:
     }
 
     [[nodiscard]] int GetCell(const std::size_t& x, const std::size_t& y) const {
-        if (OnMap(x, y)) {
-            return m_map[x * size.y + y];
-        } else {
-            return -1;
+        if (!OnMap(x, y)) {
+            throw EOutOfBoundException(Position(x, y), size);
         }
+
+        return m_map[x * size.y + y];
     }
 
     [[nodiscard]] int GetCell(const Position &pos) const

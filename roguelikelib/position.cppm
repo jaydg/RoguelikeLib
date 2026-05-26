@@ -49,6 +49,10 @@ struct Position {
         return !(*this == r);
     }
 
+    [[nodiscard]] std::string toString() const {
+        return std::format("(x: {}, y: {})", x, y);
+    }
+
     [[nodiscard]] std::size_t Distance(const Position &other) const
     {
         return RL::Distance(x, y, other.x, other.y);
