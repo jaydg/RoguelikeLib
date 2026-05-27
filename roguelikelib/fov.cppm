@@ -25,12 +25,18 @@ public:
 
     [[nodiscard]] bool isBlocked(short destX, short destY) const
     {
+        if (!blocked.OnMap(destX, destY)) {
+            return true;
+        }
+
         return blocked.GetCell(destX, destY) != false;
     }
 
     void visit(short destX, short destY) const
     {
-        level.SetCell(destX, destY, true);
+        if (level.OnMap(destX, destY)) {
+            level.SetCell(destX, destY, true);
+        }
     }
 };
 
@@ -49,7 +55,11 @@ public:
 
     [[nodiscard]] bool isBlocked(short destX, short destY) const
     {
-        if(start.Distance(Position(destX, destY)) >= radius) {
+        if (start.Distance(Position(destX, destY)) >= radius) {
+            return true;
+        }
+
+        if (!blocked.OnMap(destX, destY)) {
             return true;
         }
 
@@ -58,7 +68,9 @@ public:
 
     void visit(short destX, short destY) const
     {
-        level.SetCell(destX, destY, true);
+        if (level.OnMap(destX, destY)) {
+            level.SetCell(destX, destY, true);
+        }
     }
 };
 
