@@ -5,11 +5,12 @@ export module rl.mapgenerators.spaceshuttle;
 import rl.map;
 import rl.randomness;
 import rl.maputils;
+import rl.matrix;
 import std;
 
 export namespace RL {
 
-void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool mirror_vertical = false)
+void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15)
 {
     constexpr int room_max_size = 15;
     constexpr int room_min_size = 3;
@@ -21,15 +22,11 @@ void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool m
 
     // create until shuttle looks good
     while (true) {
+        // drafting board - contains 0 for solid matter and the room ID of each room
+        CMatrix<int> id_matrix(level.getSize(), 0);
         list_of_rooms.clear();
 
-        // fill with walls
-        for (std::size_t x = 0; x < level.GetWidth(); ++x) {
-            for (std::size_t y = 0; y < level.GetHeight(); ++y) {
-                level.SetCell(x, y, LevelElementWall_value);
-            }
-        }
-
+        // Create rooms (upper half)
         for (number_of_rooms = 0; number_of_rooms < max_number_of_rooms;) {
             std::size_t x1, y1, x2, y2;
             std::size_t rx, ry;
@@ -89,72 +86,72 @@ void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool m
             }
 
             // Create room
+            number_of_rooms++;
             SRoom new_room;
             new_room.corner1.x = x1;
             new_room.corner1.y = y1;
             new_room.corner2.x = x2;
             new_room.corner2.y = y2;
-
-            if (number_of_rooms == 0) {
-                new_room.type = 0;
-            }
+            new_room.type = number_of_rooms;
 
             list_of_rooms.push_back(new_room);
-            number_of_rooms++;
         }
 
-        // create mirror
-        m = list_of_rooms.begin();
-
-        for (int index = 0; index < number_of_rooms; index++, ++m) {
-            SRoom room = *m;
-
-            if (mirror_vertical) {
-                room.corner1.x = level.GetWidth() - room.corner1.x - 1;
-                room.corner2.x = level.GetWidth() - room.corner2.x - 1;
-                std::size_t orig_x = room.corner1.x;
-                room.corner1.x = room.corner2.x;
-                room.corner2.x = orig_x;
-            } else {
-                room.corner1.y = level.GetHeight() - room.corner1.y - 1;
-                room.corner2.y = level.GetHeight() - room.corner2.y - 1;
-                std::size_t orig_y = room.corner1.y;
-                room.corner1.y = room.corner2.y;
-                room.corner2.y = orig_y;
-            }
-
-            list_of_rooms.insert(m, room);
-        }
-
+        // paint rooms on drafting board
         for (m = list_of_rooms.begin(); m != list_of_rooms.end(); ++m) {
             const SRoom &room = *m;
 
-            for (std::size_t x = room.corner1.x; x <= room.corner2.x; x++)
+            for (std::size_t x = room.corner1.x; x <= room.corner2.x; x++) {
                 for (std::size_t y = room.corner1.y; y <= room.corner2.y; y++) {
-                    if (level.GetCell(x, y) == LevelElementWall_value) {
-                        level.SetCell(x, y, room.type);
+                    if (id_matrix(x, y) == 0) {
+                        id_matrix.set(x, y, room.type);
                     }
                 }
+            }
         }
 
-        // Create walls on connections
         std::size_t free_cells = 0;
+
+        //////////////////////////
+        // Draw on the real map //
+        //////////////////////////
+
+        // fill map with walls
+        for (std::size_t x = 0; x < level.GetWidth(); ++x) {
+            for (std::size_t y = 0; y < level.GetHeight(); ++y) {
+                level.SetCell(x, y, LevelElementWall);
+            }
+        }
 
         for (std::size_t x = 0; x < level.GetWidth() - 1; x++) {
             for (std::size_t y = 0; y < level.GetHeight() / 2; y++) {
-                if (level.GetCell(x, y) != level.GetCell(x + 1, y) && level.GetCell(x + 1, y) != LevelElementWall_value) {
-                    level.SetCell(x, y, LevelElementWall_value);
-                } else if(level.GetCell(x, y) != level.GetCell(x, y + 1) && level.GetCell(x, y + 1) != LevelElementWall_value) {
-                    level.SetCell(x, y, LevelElementWall_value);
-                } else if(level.GetCell(x, y) != level.GetCell(x + 1, y + 1) && level.GetCell(x + 1, y + 1) != LevelElementWall_value) {
-                    level.SetCell(x, y, LevelElementWall_value);
+
+                int current_id = id_matrix.get(x, y);
+                int right_id   = id_matrix.get(x + 1, y);
+                int bottom_id  = id_matrix.get(x, y + 1);
+                int diag_id    = id_matrix.get(x + 1, y + 1);
+
+                if (current_id != 0) {
+                    if ((current_id != right_id  && right_id != 0) ||
+                        (current_id != bottom_id && bottom_id != 0) ||
+                        (current_id != diag_id   && diag_id != 0))
+                    {
+                        // Two adjacent rooms - place wall
+                        level.SetCell(x, y, LevelElementWall);
+                    } else {
+                        // No adjacent room, this is the inside of the room
+                        level.SetCell(x, y, LevelElementRoom);
+                    }
+                } else {
+                    // solid matter
+                    level.SetCell(x, y, LevelElementWall);
                 }
 
-                if (level.GetCell(x, y) != LevelElementWall_value) {
-                    free_cells += 2; // +2 for mirror
+                if (level.GetCell(x, y) != LevelElementWall) {
+                    free_cells += 2;
                 }
 
-                // and mirror image
+                // Mirror the new cell
                 level.SetCell(x, level.GetHeight() - y - 1, level.GetCell(x, y));
             }
         }
@@ -164,12 +161,10 @@ void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool m
             continue;
         }
 
-        ConvertValuesToTiles(level);
         ConnectClosestRooms(level, true);
         break;
     }
 
-    ConvertValuesToTiles(level);
     AddDoors(level, 1, 0);
 }
 

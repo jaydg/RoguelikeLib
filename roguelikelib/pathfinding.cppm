@@ -7,6 +7,7 @@ export module rl.pathfinding;
 
 import rl.map;
 import rl.maputils;
+import rl.matrix;
 import rl.position;
 import std;
 
@@ -24,8 +25,17 @@ export namespace RL {
         std::vector<Position>& path,
         const bool& diagonals = true)
     {
+        auto pathmap = CMatrix<int>(level.getSize(), false);
+        for (auto x = 0; x <  level.GetWidth(); x++) {
+            for (auto y = 0; y < level.GetHeight(); y++) {
+                bool passable = level.GetCell(x, y) != LevelElementWall && level.GetCell(x, y) != LevelElementDoorClose;
+                pathmap.set(x, y,
+                    passable ? LevelElementCorridor_value : LevelElementWall_value);
+            }
+        }
+
         // fill from end to start
-        if (!FloodFill(level, end, 0, false, 1, start)) {
+        if (!pathmap.FloodFill(end, 0, false, 1, start)) {
             return false;
         }
 
@@ -44,32 +54,32 @@ export namespace RL {
                 path.push_back(pos);
             }
 
-            int current_value = level.GetCell(pos.x, pos.y);
+            int current_value = pathmap(pos.x, pos.y);
 
             if (diagonals) {
                 if (pos.x > 0 && pos.y > 0)
-                    if (level.GetCell(pos.x - 1, pos.y - 1) < current_value) { // NW
+                    if (pathmap(pos.x - 1, pos.y - 1) < current_value) { // NW
                         new_pos.x--;
                         new_pos.y--;
                         continue;
                     }
 
-                if (pos.x < level.GetWidth() - 1 && pos.y > 0)
-                    if (level.GetCell(pos.x + 1, pos.y - 1) < current_value) { // NE
+                if (pos.x < pathmap.getWidth() - 1 && pos.y > 0)
+                    if (pathmap(pos.x + 1, pos.y - 1) < current_value) { // NE
                         new_pos.x++;
                         new_pos.y--;
                         continue;
                     }
 
-                if (pos.x < level.GetWidth() - 1 && pos.y < level.GetHeight() - 1)
-                    if (level.GetCell(pos.x + 1, pos.y + 1) < current_value) { // SE
+                if (pos.x < pathmap.getWidth() - 1 && pos.y < pathmap.getHeight() - 1)
+                    if (pathmap(pos.x + 1, pos.y + 1) < current_value) { // SE
                         new_pos.x++;
                         new_pos.y++;
                         continue;
                     }
 
-                if (pos.x > 0 && pos.y < level.GetHeight() - 1)
-                    if (level.GetCell(pos.x - 1, pos.y + 1) < current_value) { // SW
+                if (pos.x > 0 && pos.y < pathmap.getHeight() - 1)
+                    if (pathmap(pos.x - 1, pos.y + 1) < current_value) { // SW
                         new_pos.x--;
                         new_pos.y++;
                         continue;
@@ -77,25 +87,25 @@ export namespace RL {
             }
 
             if (pos.y > 0)
-                if (level.GetCell(pos.x, pos.y - 1) < current_value) { // N
+                if (pathmap(pos.x, pos.y - 1) < current_value) { // N
                     new_pos.y--;
                     continue;
                 }
 
-            if (pos.x < level.GetWidth() - 1)
-                if (level.GetCell(pos.x + 1, pos.y) < current_value) { // E
+            if (pos.x < pathmap.getWidth() - 1)
+                if (pathmap(pos.x + 1, pos.y) < current_value) { // E
                     new_pos.x++;
                     continue;
                 }
 
-            if (pos.x > 0 && pos.y < level.GetHeight() - 1)
-                if (level.GetCell(pos.x, pos.y + 1) < current_value) { // S
+            if (pos.x > 0 && pos.y < pathmap.getHeight() - 1)
+                if (pathmap(pos.x, pos.y + 1) < current_value) { // S
                     new_pos.y++;
                     continue;
                 }
 
             if (pos.x > 0 && pos.y > 0)
-                if (level.GetCell(pos.x - 1, pos.y) < current_value) { // W
+                if (pathmap(pos.x - 1, pos.y) < current_value) { // W
                     new_pos.x--;
                     continue;
                 }

@@ -61,7 +61,7 @@ int main(void)
     level.PrintMap();
 
     cout << endl << "Castle" << endl << endl;
-    RL::CreateSpaceShuttle(level, 25, true);
+    RL::CreateSpaceShuttle(level, 25);
     level.PrintMap();
 
     cout << endl << "Simple City with 15 buildings" << endl << endl;

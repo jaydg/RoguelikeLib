@@ -63,6 +63,11 @@ public:
         return Resize(new_size.x, new_size.y);
     }
 
+    [[nodiscard]] Size getSize() const
+    {
+        return size;
+    }
+
     [[nodiscard]] std::size_t GetWidth() const
     {
         return size.x;

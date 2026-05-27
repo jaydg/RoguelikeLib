@@ -8,6 +8,7 @@ export module rl.maputils;
 
 import rl.distance;
 import rl.map;
+import rl.matrix;
 import rl.position;
 import rl.randomness;
 import std;
@@ -219,96 +220,6 @@ void FindOnMapAllRectanglesOfType(CMap &level, const ELevelElement& type, const 
 
 //////////////////////////////////////////////////////////////////////////
 
-bool FloodFill(CMap &level, Position position, int value, bool diagonal = true, int gradient = 0, Position end = Position(-1, -1))
-{
-    // flood fill room
-    int area_value = level.GetCell(position.x, position.y);
-    level.SetCell(position.x, position.y, value);
-
-    std::list < Position > positions;
-    positions.emplace_back(position);
-
-    auto m = positions.begin();
-
-    while(m != positions.end()) {
-
-        // Fill only to the end?
-        if(end.x != Position::invalid && end == (*m)) {
-            break;
-        }
-
-        std::size_t pos_x = m->x;
-        std::size_t pos_y = m->y;
-
-        int this_value = level.GetCell(pos_x, pos_y);
-
-        if(pos_x > 0)
-            if(level.GetCell(pos_x - 1, pos_y) == area_value) {
-                level.SetCell(pos_x - 1, pos_y, this_value + gradient);
-                positions.emplace_back(pos_x - 1, pos_y);
-            }
-
-        if(pos_x < level.GetWidth() - 1)
-            if(level.GetCell(pos_x + 1, pos_y) == area_value) {
-                level.SetCell(pos_x + 1, pos_y, this_value + gradient);
-                positions.emplace_back(pos_x + 1, pos_y);
-            }
-
-        if(pos_y > 0)
-            if(level.GetCell(pos_x, pos_y - 1) == area_value) {
-                level.SetCell(pos_x, pos_y - 1, this_value + gradient);
-                positions.emplace_back(pos_x, pos_y - 1);
-            }
-
-        if(pos_y < level.GetHeight() - 1)
-            if(level.GetCell(pos_x, pos_y + 1) == area_value) {
-                level.SetCell(pos_x, pos_y + 1, this_value + gradient);
-                positions.emplace_back(pos_x, pos_y + 1);
-            }
-
-        if(diagonal) {
-            if(pos_x > 0 && pos_y > 0)
-                if(level.GetCell(pos_x - 1, pos_y - 1) == area_value) {
-                    level.SetCell(pos_x - 1, pos_y - 1, this_value + gradient);
-                    positions.emplace_back(pos_x - 1, pos_y - 1);
-                }
-
-            if(pos_x < level.GetWidth() - 1 && pos_y < level.GetHeight() - 1)
-                if(level.GetCell(pos_x + 1, pos_y + 1) == area_value) {
-                    level.SetCell(pos_x + 1, pos_y + 1, this_value + gradient);
-                    positions.emplace_back(pos_x + 1, pos_y + 1);
-                }
-
-            if(pos_x < level.GetWidth() - 1 && pos_y > 0)
-                if(level.GetCell(pos_x + 1, pos_y - 1) == area_value) {
-                    level.SetCell(pos_x + 1, pos_y - 1, this_value + gradient);
-                    positions.emplace_back(pos_x + 1, pos_y - 1);
-                }
-
-            if(pos_x > 0 && pos_y < level.GetHeight() - 1)
-                if(level.GetCell(pos_x - 1, pos_y + 1) == area_value) {
-                    level.SetCell(pos_x - 1, pos_y + 1, this_value + gradient);
-                    positions.emplace_back(pos_x - 1, pos_y + 1);
-                }
-        }
-
-        m = positions.erase(m);
-    }
-
-    // filling to the end cell without success
-    if(m == positions.end()) {
-        return false;
-    }
-
-    if(end.x != Position::invalid && end != (*m)) {
-        return false;
-    }
-
-    return true;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
 bool FindOnMapRandomRectangleOfType(CMap &level, const ELevelElement& type, Position& pos, const Size &size)
 {
     std::vector < Position > positions;
@@ -464,42 +375,42 @@ bool AddCorridor(CMap &level, const std::size_t &start_x1, const std::size_t &st
             }
         }
 
-        if(level.GetCell(x1, y1) == LevelElementWall_value) {
-            level.SetCell(x1, y1, LevelElementCorridor_value);
+        if (level.GetCell(x1, y1) == LevelElementWall) {
+            level.SetCell(x1, y1, LevelElementCorridor);
         }
 
-        if(level.GetCell(x2, y2) == LevelElementWall_value) {
-            level.SetCell(x2, y2, LevelElementCorridor_value);
+        if (level.GetCell(x2, y2) == LevelElementWall) {
+            level.SetCell(x2, y2, LevelElementCorridor);
         }
 
         // connect corridors if on the same level
-        if(x1 == x2) {
-            while(y1 != y2) {
+        if (x1 == x2) {
+            while (y1 != y2) {
                 y1 += dir_y;
 
-                if(level.GetCell(x1, y1) == LevelElementWall_value) {
-                    level.SetCell(x1, y1, LevelElementCorridor_value);
+                if (level.GetCell(x1, y1) == LevelElementWall) {
+                    level.SetCell(x1, y1, LevelElementCorridor);
                 }
             }
 
-            if(level.GetCell(x1, y1) == LevelElementWall_value) {
-                level.SetCell(x1, y1, LevelElementCorridor_value);
+            if (level.GetCell(x1, y1) == LevelElementWall) {
+                level.SetCell(x1, y1, LevelElementCorridor);
             }
 
             return true;
         }
 
-        if(y1 == y2) {
-            while(x1 != x2) {
+        if (y1 == y2) {
+            while (x1 != x2) {
                 x1 += dir_x;
 
-                if(level.GetCell(x1, y1) == LevelElementWall_value) {
-                    level.SetCell(x1, y1, LevelElementCorridor_value);
+                if (level.GetCell(x1, y1) == LevelElementWall) {
+                    level.SetCell(x1, y1, LevelElementCorridor);
                 }
             }
 
-            if(level.GetCell(x1, y1) == LevelElementWall_value) {
-                level.SetCell(x1, y1, LevelElementCorridor_value);
+            if (level.GetCell(x1, y1) == LevelElementWall) {
+                level.SetCell(x1, y1, LevelElementCorridor);
             }
 
             return true;
@@ -509,29 +420,28 @@ bool AddCorridor(CMap &level, const std::size_t &start_x1, const std::size_t &st
 
 //////////////////////////////////////////////////////////////////////////
 
-int FillDisconnectedRoomsWithDifferentValues(CMap &level)
-{
-    for(std::size_t y = 0; y < level.GetHeight(); ++y) {
-        for(std::size_t x = 0; x < level.GetWidth(); ++x) {
-            if(level.GetCell(x, y) == LevelElementRoom) {
-                level.SetCell(x, y, LevelElementRoom_value);
-            } else if(level.GetCell(x, y) == LevelElementWall) {
-                level.SetCell(x, y, LevelElementWall_value);
+CMatrix<int> FillDisconnectedRoomsWithDifferentValues(const CMap &level) {
+    auto flood_map = CMatrix<int>(level.getSize(), LevelElementWall_value);
+
+    for (std::size_t y = 0; y < level.GetHeight(); ++y) {
+        for (std::size_t x = 0; x < level.GetWidth(); ++x) {
+            if (level.GetCell(x, y) == LevelElementRoom) {
+                flood_map.set(x, y, LevelElementRoom_value);
             }
         }
     }
 
     int room_number = 0;
 
-    for(std::size_t y = 0; y < level.GetHeight(); ++y) {
-        for(std::size_t x = 0; x < level.GetWidth(); ++x) {
-            if(level.GetCell(x, y) == LevelElementRoom_value) {
-                FloodFill(level, Position(x, y), room_number++);
+    for (std::size_t y = 0; y < level.GetHeight(); ++y) {
+        for (std::size_t x = 0; x < level.GetWidth(); ++x) {
+            if (flood_map(x, y) == LevelElementRoom_value) {
+                flood_map.FloodFill(Position(x, y), room_number++);
             }
         }
     }
 
-    return room_number;
+    return flood_map;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -539,79 +449,88 @@ int FillDisconnectedRoomsWithDifferentValues(CMap &level)
 // TODO: with_doors is not implemented, as doors are not implemented
 void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool straight_connections = false)
 {
-    FillDisconnectedRoomsWithDifferentValues(level);
+    // fill each room on the map with an individual number
+    auto floodmap = FillDisconnectedRoomsWithDifferentValues(level);
 
-    std::vector < std::list < Position > > rooms;
+    // This vector keeps a list of border cells that are not at a corner
+    // for each room. These cells are candidates as starting points for
+    // corridors to the other rooms.
+    std::vector<std::list<Position>> rooms;
 
-    for(std::size_t y = 0; y < level.GetHeight(); ++y) {
-        for(std::size_t x = 0; x < level.GetWidth(); ++x) {
-            if(level.GetCell(x, y) != LevelElementWall_value) {
-                if(level.GetCell(x, y) >= static_cast<int>(rooms.size())) {
-                    rooms.resize(level.GetCell(x, y) +1);
+    // build the vector of rooms
+    for (std::size_t y = 0; y < floodmap.getHeight(); ++y) {
+        for (std::size_t x = 0; x < floodmap.getWidth(); ++x) {
+            if (floodmap(x, y) != LevelElementWall_value) {
+                // grow room list when required
+                if (floodmap(x, y) >= static_cast<int>(rooms.size())) {
+                    rooms.resize(floodmap(x, y) + 1);
                 }
 
                 // only border cells without diagonals
-                if(CountNeighboursOfType(level, static_cast<ELevelElement>(LevelElementWall_value), Position(x, y), false) > 0) {
-                    rooms[level.GetCell(x, y)].emplace_back(x, y);
+                if (floodmap.CountNeighbors(Position(x, y),
+                                            LevelElementWall_value,
+                                            Neighbors::Cardinal4) > 0)
+                {
+                    rooms[floodmap(x, y)].emplace_back(x, y);
                 }
             } // if no wall at position
         } // for x
     } // for y
 
-    Shuffle(rooms.begin(), rooms.end());
-
     if(rooms.size() < 2) {
         return;
     }
 
+    Shuffle(rooms.begin(), rooms.end());
+
     // for warshall algorithm
     // set the connection matrix
 
-    std::vector < std::vector < bool > > room_connections;
-    std::vector < std::vector < bool > > transitive_closure;
-    std::vector < std::vector < std::size_t > > distance_matrix;
-    std::vector < std::vector < std::pair < Position, Position > > > closest_cells_matrix;
+    std::vector<std::vector<bool>> room_connections;
+    std::vector<std::vector<bool>> transitive_closure;
+    std::vector<std::vector<std::size_t>> distance_matrix;
+    std::vector<std::vector<std::pair<Position, Position>>> closest_cells_matrix;
 
     room_connections.resize(rooms.size());
     transitive_closure.resize(rooms.size());
     distance_matrix.resize(rooms.size());
     closest_cells_matrix.resize(rooms.size());
 
-    for(std::size_t a = 0; a < rooms.size(); ++a) {
+    for (std::size_t a = 0; a < rooms.size(); ++a) {
         room_connections[a].resize(rooms.size());
         transitive_closure[a].resize(rooms.size());
         distance_matrix[a].resize(rooms.size());
         closest_cells_matrix[a].resize(rooms.size());
 
-        for(std::size_t b = 0; b < rooms.size(); ++b) {
+        for (std::size_t b = 0; b < rooms.size(); ++b) {
             room_connections[a][b] = false;
             distance_matrix[a][b] = std::numeric_limits<int>::max();
         }
     }
 
     // find the closest cells for each room - random closest cell
-    std::list < Position >::iterator m, _m, k, _k;
+    std::list<Position>::iterator m, _m, k, _k;
 
-    for(std::size_t room_a = 0; room_a < rooms.size(); ++room_a) {
-        for(std::size_t room_b = 0; room_b < rooms.size(); ++room_b) {
-            if(room_a == room_b) {
+    for (std::size_t room_a = 0; room_a < rooms.size(); ++room_a) {
+        for (std::size_t room_b = 0; room_b < rooms.size(); ++room_b) {
+            if (room_a == room_b) {
                 continue;
             }
 
-            std::pair < Position, Position > closest_cells;
+            std::pair<Position, Position> closest_cells;
 
-            for(m = rooms[room_a].begin(), _m = rooms[room_a].end(); m != _m; ++m) {
+            for (m = rooms[room_a].begin(), _m = rooms[room_a].end(); m != _m; ++m) {
                 // for each border cell in room_a try each border cell of room_b
                 std::size_t x1 = m->x;
                 std::size_t y1 = m->y;
 
-                for(k = rooms[room_b].begin(), _k = rooms[room_b].end(); k != _k; ++k) {
+                for (k = rooms[room_b].begin(), _k = rooms[room_b].end(); k != _k; ++k) {
                     std::size_t x2 = k->x;
                     std::size_t y2 = k->y;
 
                     std::size_t dist_ab = Distance(x1, y1, x2, y2);
 
-                    if(dist_ab < distance_matrix[room_a][room_b] || (dist_ab == distance_matrix[room_a][room_b] && CoinToss())) {
+                    if (dist_ab < distance_matrix[room_a][room_b] || (dist_ab == distance_matrix[room_a][room_b] && CoinToss())) {
                         closest_cells = std::make_pair(Position(x1, y1), Position(x2, y2));
                         distance_matrix[room_a][room_b] = dist_ab;
                     }
@@ -623,12 +542,12 @@ void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool str
     }
 
     // Now connect the rooms to the closest ones
-    for(std::size_t room_a = 0; room_a < rooms.size(); ++room_a) {
+    for (std::size_t room_a = 0; room_a < rooms.size(); ++room_a) {
         std::size_t min_distance = std::numeric_limits<std::size_t>::max();
         std::size_t closest_room = 0;
 
-        for(std::size_t room_b = 0; room_b < rooms.size(); ++room_b) {
-            if(room_a == room_b) {
+        for (std::size_t room_b = 0; room_b < rooms.size(); ++room_b) {
+            if (room_a == room_b) {
                 continue;
             }
 
@@ -641,7 +560,7 @@ void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool str
         }
 
         // connect room_a to closest one
-        std::pair < Position, Position > closest_cells;
+        std::pair<Position, Position> closest_cells;
         closest_cells = closest_cells_matrix[room_a][closest_room];
 
         std::size_t x1 = closest_cells.first.x;
@@ -649,27 +568,27 @@ void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool str
         std::size_t x2 = closest_cells.second.x;
         std::size_t y2 = closest_cells.second.y;
 
-        if(!room_connections[room_a][closest_room] && AddCorridor(level, x1, y1, x2, y2, straight_connections)) {
+        if (!room_connections[room_a][closest_room] && AddCorridor(level, x1, y1, x2, y2, straight_connections)) {
             room_connections[room_a][closest_room] = true;
             room_connections[closest_room][room_a] = true;
         }
     }
 
     // The closest rooms connected. Connect the rest until all areas are connected
-    for(int to_connect_a = 0; to_connect_a != -1;) {
+    for (int to_connect_a = 0; to_connect_a != -1;) {
         std::size_t a, b, c;
 
-        for(a = 0; a < rooms.size(); a++) {
-            for(b = 0; b < rooms.size(); b++) {
+        for (a = 0; a < rooms.size(); a++) {
+            for (b = 0; b < rooms.size(); b++) {
                 transitive_closure[a][b] = room_connections[a][b];
             }
         }
 
-        for(a = 0; a < rooms.size(); a++) {
-            for(b = 0; b < rooms.size(); b++) {
-                if(transitive_closure[a][b] && a != b) {
-                    for(c = 0; c < rooms.size(); c++) {
-                        if(transitive_closure[b][c]) {
+        for (a = 0; a < rooms.size(); a++) {
+            for (b = 0; b < rooms.size(); b++) {
+                if (transitive_closure[a][b] && a != b) {
+                    for (c = 0; c < rooms.size(); c++) {
+                        if (transitive_closure[b][c]) {
                             transitive_closure[a][c] = true;
                             transitive_closure[c][a] = true;
                         }
@@ -681,22 +600,22 @@ void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool str
         // Check if all rooms are connected
         to_connect_a = -1;
 
-        for(a = 0; a < rooms.size() && to_connect_a == -1; ++a) {
-            for(b = 0; b < rooms.size(); b++) {
-                if(a != b && !transitive_closure[a][b]) {
+        for (a = 0; a < rooms.size() && to_connect_a == -1; ++a) {
+            for (b = 0; b < rooms.size(); b++) {
+                if (a != b && !transitive_closure[a][b]) {
                     to_connect_a = static_cast<int>(a);
                     break;
                 }
             }
         }
 
-        if(to_connect_a != -1) {
+        if (to_connect_a != -1) {
             int to_connect_b;
 
             // connect rooms a & b
             do {
                 to_connect_b = static_cast<int>(Random(rooms.size()));
-            } while(to_connect_b == to_connect_a);
+            } while (to_connect_b == to_connect_a);
 
             std::pair < Position, Position > closest_cells;
             closest_cells = closest_cells_matrix[to_connect_a][to_connect_b];
@@ -784,23 +703,6 @@ void AddRecursiveRooms(CMap &level, const ELevelElement& type, std::size_t min_s
         new_room = room;
         new_room.corner1.x = room.corner1.x + split;
         AddRecursiveRooms(level, type, min_size_x, min_size_y, new_room, with_doors);
-    }
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void ConvertValuesToTiles(CMap &level)
-{
-    for(std::size_t y = 0; y < level.GetHeight(); ++y) {
-        for(std::size_t x = 0; x < level.GetWidth(); ++x) {
-            if(level.GetCell(x, y) == LevelElementCorridor_value) {
-                level.SetCell(x, y, LevelElementCorridor);
-            } else if(level.GetCell(x, y) == LevelElementWall_value) {
-                level.SetCell(x, y, LevelElementWall);
-            } else {
-                level.SetCell(x, y, LevelElementRoom);
-            }
-        }
     }
 }
 
