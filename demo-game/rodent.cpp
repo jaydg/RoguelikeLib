@@ -26,7 +26,7 @@ void CRodent::LookAround()
 {
     CMonster::LookAround();
 
-    if(fov.GetCell(game.player.GetPosition())) {
+    if(fov(game.player.GetPosition())) {
         enemy_pos = game.player.GetPosition();
     }
 }

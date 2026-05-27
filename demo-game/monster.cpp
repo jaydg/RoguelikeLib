@@ -17,14 +17,8 @@ bool CMonster::Attack(CMonster *monster)
 
 void CMonster::LookAround()
 {
-    fov = game.level;
-
-    for(int x = 0; x < CSimpleGame::LEVEL_SIZE_X; ++x)
-        for(int y = 0; y < CSimpleGame::LEVEL_SIZE_Y; ++y) {
-            fov.SetCell(x, y, fov.GetCell(x, y) == RL::LevelElementWall); // blocked only if Wall
-        }
-
-    RL::CalculateFOV(fov, position, 5);
+    fov = RL::CFOV(&game.level);
+    fov.Calculate(position, 5);
 }
 
 bool CMonster::MoveTo(const RL::Position &new_pos)

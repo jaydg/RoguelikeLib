@@ -132,7 +132,7 @@ void CPlayer::LookAround()
                 base_color = 0xAAAAAA;
             }
 
-            if (fov.GetCell(pos))
+            if (fov(pos))
             {
                 // currently visible
                 seen_map.SetCell(pos, cell);

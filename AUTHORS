@@ -1,4 +1,5 @@
 # Authors
   * Jakub Debski <jakunek@gmail.com> - original author
   * Kusigrosz - wrote the delve map and winding path generator
+  * Adam Milazzo <adam@adammil.net> - FOV algorithm
   * Joachim de Groot <jdegroot@web.de> - modernisation

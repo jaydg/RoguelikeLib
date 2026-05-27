@@ -82,36 +82,22 @@ int main(void)
 
     // Define the FOV
 
-    RL::CMap fov;
-    fov.Resize(level_size);
-
-    // Only walls block the FOV
-
-    RL::Position pos;
-
-    for(pos.x = 0; pos.x < level_size.x; ++pos.x) {
-        for(pos.y = 0; pos.y < level_size.y; ++pos.y) {
-            if(level.GetCell(pos) == RL::LevelElementWall || level.GetCell(pos) == RL::LevelElementDoorClose) {
-                fov.SetCell(pos, 1); // blocks
-            } else {
-                fov.SetCell(pos, 0); // doesn't block
-            }
-        }
-    }
+    RL::CFOV fov(&level);
 
     // FOV prepared, calculate it
 
-    RL::CalculateFOV(fov, observer, 9);
+    fov.Calculate(observer, 9);
 
     // Print calculated FOV
 
-    for(pos.y = 0; pos.y < level_size.y; ++pos.y) {
-        for(pos.x = 0; pos.x < level_size.x; ++pos.x) {
-            if(pos == observer) {
+    RL::Position pos;
+    for (pos.y = 0; pos.y < level_size.y; ++pos.y) {
+        for (pos.x = 0; pos.x < level_size.x; ++pos.x) {
+            if (pos == observer) {
                 cout << '@';
-            } else if(fov.GetCell(pos) == 1) { // visible cells take from the map
-                cout << (char) level.GetCell(pos);
-            } else if(level.GetCell(pos) == '#') { // not visible walls as '%'
+            } else if (fov(pos)) { // visible cells take from the map
+                cout << (char)level.GetCell(pos);
+            } else if (level.GetCell(pos) == '#') { // not visible walls as '%'
                 cout << '%';
             } else { // others are empty
                 cout << ' ';
