@@ -8,6 +8,7 @@ export module rl.fov;
 import rl.map;
 import rl.matrix;
 import rl.position;
+import rl.tile;
 import std;
 
 export namespace RL {
@@ -31,15 +32,6 @@ private:
         return static_cast<int>(std::round(std::sqrt(x * x + y * y)));
     }
 
-    // Helper to determine if a map cell blocks the line of sight based on its value.
-    [[nodiscard]] inline bool grid_is_blocked(const RL::CMap *map, int x, int y)
-    {
-        int cell = map->GetCell(static_cast<std::size_t>(x), static_cast<std::size_t>(y));
-        return cell == RL::LevelElementWall_value ||
-               cell == RL::LevelElementWall ||
-               cell == RL::LevelElementDoorClose;
-    }
-
     [[nodiscard]] bool BlocksLight(unsigned int x, unsigned int y, unsigned int octant, Position origin) {
         int nx = static_cast<int>(origin.x);
         int ny = static_cast<int>(origin.y);
@@ -59,7 +51,7 @@ private:
             return true;
         }
 
-        return grid_is_blocked(map, nx, ny);
+        return !map->GetCell(nx, ny).isTransparent();
     }
 
     void SetVisible(unsigned int x, unsigned int y, unsigned int octant, Position origin) {

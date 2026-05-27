@@ -119,7 +119,7 @@ void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15)
         // fill map with walls
         for (std::size_t x = 0; x < level.GetWidth(); ++x) {
             for (std::size_t y = 0; y < level.GetHeight(); ++y) {
-                level.SetCell(x, y, LevelElementWall);
+                level.SetCell(x, y, "wall");
             }
         }
 
@@ -137,22 +137,22 @@ void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15)
                         (current_id != diag_id   && diag_id != 0))
                     {
                         // Two adjacent rooms - place wall
-                        level.SetCell(x, y, LevelElementWall);
+                        level.SetCell(x, y, "wall");
                     } else {
                         // No adjacent room, this is the inside of the room
-                        level.SetCell(x, y, LevelElementRoom);
+                        level.SetCell(x, y, "room");
                     }
                 } else {
                     // solid matter
-                    level.SetCell(x, y, LevelElementWall);
+                    level.SetCell(x, y, "wall");
                 }
 
-                if (level.GetCell(x, y) != LevelElementWall) {
+                if (level.GetCell(x, y).getType() != "wall") {
                     free_cells += 2;
                 }
 
                 // Mirror the new cell
-                level.SetCell(x, level.GetHeight() - y - 1, level.GetCell(x, y));
+                level.SetCell(x, level.GetHeight() - y - 1, level.GetCell(x, y).getType());
             }
         }
 

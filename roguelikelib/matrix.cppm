@@ -19,6 +19,8 @@ enum class Neighbors {
 template <typename T>
 class CMatrix {
 public:
+    CMatrix() {};
+
     CMatrix(Size size_, T defval)
     {
         size = size_;
@@ -67,6 +69,10 @@ public:
 
     void set(std::size_t x, std::size_t y, T val) {
         data[x * size.y + y] = val;
+    }
+
+    void set(const Position pos, T val) {
+        data[pos.x * size.y + pos.y] = val;
     }
 
     [[nodiscard]] std::size_t getWidth() const {

@@ -22,7 +22,7 @@ void CreateSimpleCity(CMap &level, const int& a_number_of_buildings)
     }
 
     for(;;) { // until created with proper # of buildings
-        level.Clear(LevelElementGrass);
+        level.Clear("grass");
 
         SRoom main;
         main.corner1.x = 0;
@@ -30,7 +30,7 @@ void CreateSimpleCity(CMap &level, const int& a_number_of_buildings)
         main.corner2.x = level.GetWidth();
         main.corner2.y = level.GetHeight();
 
-        AddRecursiveRooms(level, LevelElementCorridor, max_building_width, max_building_height, main, false);
+        AddRecursiveRooms(level, "corridor", max_building_width, max_building_height, main, false);
 
         int build_count = 0;
 
@@ -43,7 +43,7 @@ void CreateSimpleCity(CMap &level, const int& a_number_of_buildings)
             while(true) {
                 Position pos;
 
-                if(FindOnMapRandomRectangleOfType(level, LevelElementGrass, pos, Size(size_x + 2, size_y + 2))) {
+                if (FindOnMapRandomRectangleOfType(level, "grass", pos, Size(size_x + 2, size_y + 2))) {
                     SRoom building, smaller;
                     pos.x++;
                     pos.y++;
@@ -56,22 +56,22 @@ void CreateSimpleCity(CMap &level, const int& a_number_of_buildings)
                     smaller.corner1.y++;
                     smaller.corner2.x--;
                     smaller.corner2.y--;
-                    DrawRectangleOnMap(level, building.corner1, building.corner2, LevelElementWall);
-                    DrawRectangleOnMap(level, smaller.corner1, smaller.corner2, LevelElementRoom);
-                    AddRecursiveRooms(level, LevelElementWall, 3, 3, smaller);
+                    DrawRectangleOnMap(level, building.corner1, building.corner2, "wall");
+                    DrawRectangleOnMap(level, smaller.corner1, smaller.corner2, "room");
+                    AddRecursiveRooms(level, "wall", 3, 3, smaller);
 
                     // add a doors leading out (improve to lead to nearest road)
                     if(CoinToss()) {
                         if(CoinToss()) {
-                            level.SetCell(building.corner1.x + Random(size_x - 2) +1, building.corner1.y, LevelElementDoorClose);
+                            level.SetCell(building.corner1.x + Random(size_x - 2) +1, building.corner1.y, "door_closed");
                         } else {
-                            level.SetCell(building.corner1.x + Random(size_x - 2) +1, building.corner2.y - 1, LevelElementDoorClose);
+                            level.SetCell(building.corner1.x + Random(size_x - 2) +1, building.corner2.y - 1, "door_closed");
                         }
                     } else {
                         if(CoinToss()) {
-                            level.SetCell(building.corner1.x, building.corner1.y + Random(size_y - 2) +1, LevelElementDoorClose);
+                            level.SetCell(building.corner1.x, building.corner1.y + Random(size_y - 2) +1, "door_closed");
                         } else {
-                            level.SetCell(building.corner2.x - 1, building.corner1.y + Random(size_y - 2) +1, LevelElementDoorClose);
+                            level.SetCell(building.corner2.x - 1, building.corner1.y + Random(size_y - 2) +1, "door_closed");
                         }
                     }
 
@@ -101,8 +101,10 @@ void CreateSimpleCity(CMap &level, const int& a_number_of_buildings)
                 std::size_t x = Random(level.GetWidth());
                 std::size_t y = Random(level.GetHeight());
 
-                if(level.GetCell(x, y) == LevelElementGrass && CountNeighboursOfType(level, LevelElementWall, Position(x, y), true) == 0) {
-                    level.SetCell(x, y, LevelElementPlant);
+                if(level.GetCell(x, y).getType() == "grass"
+                    && CountNeighboursOfType(level, "wall", Position(x, y), true) == 0)
+                {
+                    level.SetCell(x, y, "plant");
                 }
             }
 

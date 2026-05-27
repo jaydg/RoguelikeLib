@@ -4,8 +4,8 @@ export module demo_game.game;
 
 import demo_game.monster;
 import demo_game.player;
-import rl.map;
-import rl.position;
+export import rl.map;
+export import rl.position;
 import std;
 
 export class CSimpleGame {

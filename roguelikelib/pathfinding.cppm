@@ -25,12 +25,11 @@ export namespace RL {
         std::vector<Position>& path,
         const bool& diagonals = true)
     {
-        auto pathmap = CMatrix<int>(level.getSize(), false);
-        for (auto x = 0; x <  level.GetWidth(); x++) {
-            for (auto y = 0; y < level.GetHeight(); y++) {
-                bool passable = level.GetCell(x, y) != LevelElementWall && level.GetCell(x, y) != LevelElementDoorClose;
-                pathmap.set(x, y,
-                    passable ? LevelElementCorridor_value : LevelElementWall_value);
+        auto pathmap = CMatrix<int>(level.getSize(), std::numeric_limits<int>::max());
+        for (auto y = 0; y <  level.GetHeight(); y++) {
+            for (auto x = 0; x < level.GetWidth(); x++) {
+                if (level.GetCell(x, y).isPassable())
+                    pathmap.set(x, y,std::numeric_limits<int>::max() - 1);
             }
         }
 

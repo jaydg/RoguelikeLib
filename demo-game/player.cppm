@@ -3,13 +3,17 @@ module;
 export module demo_game.player;
 
 import demo_game.monster;
-import rl.map;
+export import rl.matrix;
 
 export class CPlayer final : public CMonster {
+
 private:
+
     int experience;
-    RL::CMap seen_map;
+    RL::CMatrix<bool> seen_map;
+
 public:
+
     CPlayer();
     bool Attack(CMonster *monster) override;
     void Regenerate();

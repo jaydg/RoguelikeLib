@@ -36,29 +36,8 @@ void CRodent::DoAction() {
 
     if(position != enemy_pos && game.level.OnMap(enemy_pos)) {
         std::vector<RL::Position> path;
-
-        // Convert map to values for pathfinding
-        RL::CMap temp_map = game.level;
-        RL::Position pos;
-
-        for(pos.x = 0; pos.x < CSimpleGame::LEVEL_SIZE_X; ++pos.x)
-            for(pos.y = 0; pos.y < CSimpleGame::LEVEL_SIZE_Y; ++pos.y) {
-                if(temp_map.GetCell(pos) != '#') {
-                    const CMonster *monster = game.GetMonsterFromCell(pos);
-
-                    // go around other monsters, don't go around player
-                    if(monster && monster != &game.player && monster != this) {
-                        temp_map.SetCell(pos, RL::LevelElementWall_value);
-                    } else {
-                        temp_map.SetCell(pos, RL::LevelElementCorridor_value);
-                    }
-                } else {
-                    temp_map.SetCell(pos, RL::LevelElementWall_value);
-                }
-            }
-
-        if(RL::FindPath(temp_map, position, enemy_pos, path)) {
-            if(MoveTo(path[0])) {
+        if (RL::FindPath(game.level, position, enemy_pos, path)) {
+            if (MoveTo(path[0])) {
                 return;
             }
         }

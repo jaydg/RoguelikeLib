@@ -18,8 +18,7 @@ CPlayer::CPlayer()
     hit_points = 20;
     experience = 0;
     strength = 5;
-    seen_map.Resize(CSimpleGame::LEVEL_SIZE_X, CSimpleGame::LEVEL_SIZE_Y);
-    seen_map.Clear(0);
+    seen_map = RL::CMatrix(RL::Size(CSimpleGame::LEVEL_SIZE_X, CSimpleGame::LEVEL_SIZE_Y), false);
 }
 
 bool CPlayer::Attack(CMonster *monster)
@@ -115,30 +114,16 @@ void CPlayer::LookAround()
     {
         for (pos.y = 0; pos.y < CSimpleGame::LEVEL_SIZE_Y; ++pos.y)
         {
-            int cell = game.level.GetCell(pos);
-
-            // Define colors for map elements
-            // default: white
-            std::uint32_t base_color = 0xFFFFFF;
-            if (cell == RL::LevelElementWall)
-            {
-                // walls
-                base_color = 0x8B4513;
-            }
-            else if (cell == RL::LevelElementRoom || cell == RL::LevelElementCorridor)
-            {
-                // floor
-                cell = '.';
-                base_color = 0xAAAAAA;
-            }
+            auto cell = game.level.GetCell(pos);
 
             if (fov(pos))
             {
                 // currently visible
-                seen_map.SetCell(pos, cell);
+                seen_map.set(pos, true);
+
 
                 // print with normal intensity
-                IOPrintChar(pos.x, pos.y, cell, RL::GetJitteredColor(base_color));
+                IOPrintChar(pos.x, pos.y, cell.getGlyph(), cell.getColor());
 
                 // paint visible monsters
                 const CMonster* monster = game.GetMonsterFromCell(pos);
@@ -147,8 +132,10 @@ void CPlayer::LookAround()
                     monster->Print();
                 }
             }
-            else if(seen_map.GetCell(pos))
+            else if(seen_map(pos))
             {
+                std::uint32_t base_color = cell.getColor();
+
                 // known, but currently not visible
                 // print the same character ('cell') with dimmed color
                 std::uint8_t r = ((base_color >> 16) & 0xFF) * 0.35;
@@ -156,7 +143,7 @@ void CPlayer::LookAround()
                 std::uint8_t b = (base_color & 0xFF) * 0.35;
                 std::uint32_t dark_color = (r << 16) | (g << 8) | b;
 
-                IOPrintChar(pos.x, pos.y, cell, dark_color);
+                IOPrintChar(pos.x, pos.y, cell.getGlyph(), dark_color);
             }
             else
             {

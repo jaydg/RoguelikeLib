@@ -173,44 +173,39 @@ namespace detail {
 // Public API (exported)
 export namespace RL {
 
-void FindOnMapAllRectanglesOfType(CMap &level, const ELevelElement& type, const Size &size, std::vector < Position >& positions)
+void FindOnMapAllRectanglesOfType(CMap &level, const std::string_view type, const Size &size, std::vector <Position>& positions)
 {
-    CMap good_points = level;
+    auto good_points = CMatrix<bool>(level.getSize(), false);
 
-    for(std::size_t y = 0; y < level.GetHeight(); ++y)
-        for(std::size_t x = 0; x < level.GetWidth(); ++x) {
-            good_points.SetCell(x, y, 0);
-        }
-
-    for(std::size_t y = 0; y < level.GetHeight(); ++y) {
+    for (std::size_t y = 0; y < level.GetHeight(); ++y) {
         std::size_t horizontal_count = 0;
 
-        for(std::size_t x = 0; x < level.GetWidth(); ++x) {
-            if(level.GetCell(x, y) == type) {
+        for (std::size_t x = 0; x < level.GetWidth(); ++x) {
+            if (level.GetCell(x, y).getType() == type) {
                 horizontal_count++;
             } else {
                 horizontal_count = 0;
             }
 
-            if(horizontal_count == size.x) {
-                good_points.SetCell(x - size.x + 1, y, 1);
+            if (horizontal_count == size.x) {
+                good_points.set(x - size.x + 1, y, 1);
                 horizontal_count--;
             }
         }
     }
 
     // count verticals
-    for(std::size_t x = 0; x < level.GetWidth(); ++x) {
+    for (std::size_t x = 0; x < level.GetWidth(); ++x) {
         std::size_t vertical_count = 0;
 
-        for(std::size_t y = 0; y < level.GetHeight(); ++y) {
-            if(good_points.GetCell(x, y) == 1) {
+        for (std::size_t y = 0; y < level.GetHeight(); ++y) {
+            if (good_points(x, y)) {
                 vertical_count++;
             } else {
                 vertical_count = 0;
             }
 
-            if(vertical_count == size.y) {
+            if (vertical_count == size.y) {
                 positions.emplace_back(x, y - size.y + 1);
                 vertical_count--;
             }
@@ -220,9 +215,9 @@ void FindOnMapAllRectanglesOfType(CMap &level, const ELevelElement& type, const 
 
 //////////////////////////////////////////////////////////////////////////
 
-bool FindOnMapRandomRectangleOfType(CMap &level, const ELevelElement& type, Position& pos, const Size &size)
+bool FindOnMapRandomRectangleOfType(CMap &level, std::string_view type, Position& pos, const Size &size)
 {
-    std::vector < Position > positions;
+    std::vector<Position> positions;
     FindOnMapAllRectanglesOfType(level, type, size, positions);
 
     if(positions.empty()) {
@@ -236,49 +231,49 @@ bool FindOnMapRandomRectangleOfType(CMap &level, const ELevelElement& type, Posi
 
 //////////////////////////////////////////////////////////////////////////
 
-int CountNeighboursOfType(CMap &level, ELevelElement type, const Position& pos, bool diagonal = true)
+int CountNeighboursOfType(CMap &level, std::string_view type, const Position& pos, bool diagonal = true)
 {
     int neighbours = 0;
 
     if(pos.y > 0)
-        if(level.GetCell(pos.x, pos.y - 1) == type) { // N
+        if(level.GetCell(pos.x, pos.y - 1).getType() == type) { // N
             neighbours++;
         }
 
     if(pos.x < level.GetWidth() - 1)
-        if(level.GetCell(pos.x + 1, pos.y) == type) { // E
+        if(level.GetCell(pos.x + 1, pos.y).getType() == type) { // E
             neighbours++;
         }
 
     if(pos.x > 0 && pos.y < level.GetHeight() - 1)
-        if(level.GetCell(pos.x, pos.y + 1) == type) { // S
+        if(level.GetCell(pos.x, pos.y + 1).getType() == type) { // S
             neighbours++;
         }
 
     if(pos.x > 0 && pos.y > 0)
-        if(level.GetCell(pos.x - 1, pos.y) == type) { // W
+        if(level.GetCell(pos.x - 1, pos.y).getType() == type) { // W
             neighbours++;
         }
 
     if(diagonal) {
         if(pos.x > 0 && pos.y > 0)
-            if(level.GetCell(pos.x - 1, pos.y - 1) == type) { // NW
+            if(level.GetCell(pos.x - 1, pos.y - 1).getType() == type) { // NW
                 neighbours++;
             }
 
         if(pos.x < level.GetWidth() - 1 && pos.y > 0)
-            if(level.GetCell(pos.x + 1, pos.y - 1) == type) { // NE
+            if(level.GetCell(pos.x + 1, pos.y - 1).getType() == type) { // NE
                 neighbours++;
             }
 
         if(pos.x < level.GetWidth() - 1 && pos.y < level.GetHeight() - 1) // SE
-            if(level.GetCell(pos.x + 1, pos.y + 1) == type) {
+            if(level.GetCell(pos.x + 1, pos.y + 1).getType() == type) {
                 neighbours++;
             }
 
 
         if(pos.x > 0 && pos.y < level.GetHeight() - 1)
-            if(level.GetCell(pos.x - 1, pos.y + 1) == type) { // SW
+            if(level.GetCell(pos.x - 1, pos.y + 1).getType() == type) { // SW
                 neighbours++;
             }
     }
@@ -287,19 +282,20 @@ int CountNeighboursOfType(CMap &level, ELevelElement type, const Position& pos, 
 }
 
 //////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
 
 void AddDoors(CMap &level, float door_probability, float open_probability)
 {
     for(std::size_t x = 0; x < level.GetWidth(); ++x) {
         for(std::size_t y = 0; y < level.GetHeight(); ++y) {
             Position pos(x, y);
-            int room_cells = CountNeighboursOfType(level, LevelElementRoom, pos);
-            int corridor_cells = CountNeighboursOfType(level, LevelElementCorridor, pos);
-            int open_door_cells = CountNeighboursOfType(level, LevelElementDoorOpen, pos);
-            int close_door_cells = CountNeighboursOfType(level, LevelElementDoorClose, pos);
+            int room_cells = CountNeighboursOfType(level, "room", pos);
+            int corridor_cells = CountNeighboursOfType(level, "corridor", pos);
+            int open_door_cells = CountNeighboursOfType(level, "door_open", pos);
+            int close_door_cells = CountNeighboursOfType(level, "door_closed", pos);
             int door_cells = open_door_cells + close_door_cells;
 
-            if(level.GetCell(x, y) == LevelElementCorridor) {
+            if(level.GetCell(x, y).getType() == "corridor") {
                 if((corridor_cells == 1 && door_cells == 0 && room_cells > 0 && room_cells < 4) ||
                         (corridor_cells == 0 && door_cells == 0)) {
                     float exist = (static_cast<float>(Random(1000))) / 1000.0f;
@@ -308,9 +304,9 @@ void AddDoors(CMap &level, float door_probability, float open_probability)
                         float is_open = (static_cast<float>(Random(1000))) / 1000.0f;
 
                         if(is_open < open_probability) {
-                            level.SetCell(x, y, LevelElementDoorOpen);
+                            level.SetCell(x, y, "door_open");
                         } else {
-                            level.SetCell(x, y, LevelElementDoorClose);
+                            level.SetCell(x, y, "door_closed");
                         }
                     }
                 }
@@ -375,12 +371,12 @@ bool AddCorridor(CMap &level, const std::size_t &start_x1, const std::size_t &st
             }
         }
 
-        if (level.GetCell(x1, y1) == LevelElementWall) {
-            level.SetCell(x1, y1, LevelElementCorridor);
+        if(!level.GetCell(x1, y1).isPassable()) {
+            level.SetCell(x1, y1, "corridor");
         }
 
-        if (level.GetCell(x2, y2) == LevelElementWall) {
-            level.SetCell(x2, y2, LevelElementCorridor);
+        if(!level.GetCell(x2, y2).isPassable()) {
+            level.SetCell(x2, y2, "corridor");
         }
 
         // connect corridors if on the same level
@@ -388,13 +384,13 @@ bool AddCorridor(CMap &level, const std::size_t &start_x1, const std::size_t &st
             while (y1 != y2) {
                 y1 += dir_y;
 
-                if (level.GetCell(x1, y1) == LevelElementWall) {
-                    level.SetCell(x1, y1, LevelElementCorridor);
+                if(!level.GetCell(x1, y1).isPassable()) {
+                    level.SetCell(x1, y1, "corridor");
                 }
             }
 
-            if (level.GetCell(x1, y1) == LevelElementWall) {
-                level.SetCell(x1, y1, LevelElementCorridor);
+            if(!level.GetCell(x1, y1) .isPassable()) {
+                level.SetCell(x1, y1, "corridor");
             }
 
             return true;
@@ -404,13 +400,13 @@ bool AddCorridor(CMap &level, const std::size_t &start_x1, const std::size_t &st
             while (x1 != x2) {
                 x1 += dir_x;
 
-                if (level.GetCell(x1, y1) == LevelElementWall) {
-                    level.SetCell(x1, y1, LevelElementCorridor);
+                if(!level.GetCell(x1, y1).isPassable()) {
+                    level.SetCell(x1, y1, "corridor");
                 }
             }
 
-            if (level.GetCell(x1, y1) == LevelElementWall) {
-                level.SetCell(x1, y1, LevelElementCorridor);
+            if(!level.GetCell(x1, y1).isPassable()) {
+                level.SetCell(x1, y1, "corridor");
             }
 
             return true;
@@ -421,21 +417,23 @@ bool AddCorridor(CMap &level, const std::size_t &start_x1, const std::size_t &st
 //////////////////////////////////////////////////////////////////////////
 
 CMatrix<int> FillDisconnectedRoomsWithDifferentValues(const CMap &level) {
-    auto flood_map = CMatrix<int>(level.getSize(), LevelElementWall_value);
+    constexpr int any_room = -1;
+
+    auto flood_map = CMatrix<int>(level.getSize(), 0);
 
     for (std::size_t y = 0; y < level.GetHeight(); ++y) {
         for (std::size_t x = 0; x < level.GetWidth(); ++x) {
-            if (level.GetCell(x, y) == LevelElementRoom) {
-                flood_map.set(x, y, LevelElementRoom_value);
+            if (level.GetCell(x, y).getType() == "room") {
+                flood_map.set(x, y, any_room);
             }
         }
     }
 
-    int room_number = 0;
+    int room_number = 1;
 
     for (std::size_t y = 0; y < level.GetHeight(); ++y) {
         for (std::size_t x = 0; x < level.GetWidth(); ++x) {
-            if (flood_map(x, y) == LevelElementRoom_value) {
+            if (flood_map(x, y) == any_room) {
                 flood_map.FloodFill(Position(x, y), room_number++);
             }
         }
@@ -460,16 +458,14 @@ void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool str
     // build the vector of rooms
     for (std::size_t y = 0; y < floodmap.getHeight(); ++y) {
         for (std::size_t x = 0; x < floodmap.getWidth(); ++x) {
-            if (floodmap(x, y) != LevelElementWall_value) {
+            if (floodmap(x, y) > 0) {
                 // grow room list when required
                 if (floodmap(x, y) >= static_cast<int>(rooms.size())) {
                     rooms.resize(floodmap(x, y) + 1);
                 }
 
                 // only border cells without diagonals
-                if (floodmap.CountNeighbors(Position(x, y),
-                                            LevelElementWall_value,
-                                            Neighbors::Cardinal4) > 0)
+                if (floodmap.CountNeighbors(Position(x, y),0, Neighbors::Cardinal4) > 0)
                 {
                     rooms[floodmap(x, y)].emplace_back(x, y);
                 }
@@ -635,7 +631,7 @@ void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool str
 
 //////////////////////////////////////////////////////////////////////////
 
-void AddRecursiveRooms(CMap &level, const ELevelElement& type, std::size_t min_size_x, std::size_t min_size_y, const SRoom& room, bool with_doors = true)
+void AddRecursiveRooms(CMap &level, std::string_view type, std::size_t min_size_x, std::size_t min_size_y, const SRoom& room, bool with_doors = true)
 {
     std::size_t size_x = room.corner2.x - room.corner1.x;
 
@@ -671,7 +667,7 @@ void AddRecursiveRooms(CMap &level, const ELevelElement& type, std::size_t min_s
         }
 
         if(with_doors) {
-            level.SetCell(room.corner1.x + Random(size_x - 1) + 1, room.corner1.y + split, LevelElementDoorClose);
+            level.SetCell(room.corner1.x + Random(size_x - 1) + 1, room.corner1.y + split, "door_closed");
         }
 
         SRoom new_room = room;
@@ -693,7 +689,10 @@ void AddRecursiveRooms(CMap &level, const ELevelElement& type, std::size_t min_s
         }
 
         if(with_doors) {
-            level.SetCell(room.corner1.x + split, room.corner1.y + Random(size_y - 1) + 1, LevelElementDoorClose);
+            level.SetCell(
+                room.corner1.x + split,
+                room.corner1.y + Random(size_y - 1) + 1,
+                "door_closed");
         }
 
         SRoom new_room = room;
@@ -708,7 +707,7 @@ void AddRecursiveRooms(CMap &level, const ELevelElement& type, std::size_t min_s
 
 //////////////////////////////////////////////////////////////////////////
 
-void DrawRectangleOnMap(CMap &level, const Position& p1, const Position& p2, int value)
+void DrawRectangleOnMap(CMap &level, const Position& p1, const Position& p2, std::string_view value)
 {
     for(std::size_t y = p1.y; y < p2.y; ++y) {
         for(std::size_t x = p1.x; x < p2.x; ++x) {
@@ -783,7 +782,7 @@ bool AddWindingCorridor(CMap &level, const Position& start, const Position& end,
     for (const auto& pos : road) {
         if (pos.x >= 1 && pos.x < level.GetWidth() - 1 &&
             pos.y >= 1 && pos.y < level.GetHeight() - 1) {
-            level.SetCell(pos.x, pos.y, LevelElementCorridor_value);
+            level.SetCell(pos.x, pos.y, "corridor");
         }
     }
     return true;
@@ -802,7 +801,7 @@ bool AddZigzagCorridor(CMap &level, const Position& start, const Position& end, 
     for (const auto& pos : road) {
         if (pos.x >= 1 && pos.x < level.GetWidth() - 1 &&
             pos.y >= 1 && pos.y < level.GetHeight() - 1) {
-            level.SetCell(pos.x, pos.y, LevelElementCorridor_value);
+            level.SetCell(pos.x, pos.y, "corridor");
         }
     }
     return true;
@@ -822,7 +821,7 @@ bool AddSigsagCorridor(CMap &level, const Position& start, const Position& end, 
     for (const auto& pos : road) {
         if (pos.x >= 1 && pos.x < level.GetWidth() - 1 &&
             pos.y >= 1 && pos.y < level.GetHeight() - 1) {
-            level.SetCell(pos.x, pos.y, LevelElementCorridor_value);
+            level.SetCell(pos.x, pos.y, "corridor");
         }
     }
     return true;

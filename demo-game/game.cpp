@@ -7,10 +7,8 @@ import demo_game.io;
 import demo_game.monster;
 import demo_game.player;
 import demo_game.rodent;
-import rl.map;
 import rl.maputils;
 import rl.mapgenerators;
-import rl.position;
 import rl.randomness;
 import std;
 
@@ -18,9 +16,9 @@ void CSimpleGame::PlacePlayer()
 {
     RL::Position pos(0, 0);
 
-    if(RL::FindOnMapRandomRectangleOfType(level, RL::LevelElementRoom, pos, RL::Size(1, 1))) {
+    if(RL::FindOnMapRandomRectangleOfType(level, "room", pos, RL::Size(1, 1))) {
         player.MoveTo(pos);
-    } else if(RL::FindOnMapRandomRectangleOfType(level, RL::LevelElementCorridor, pos, RL::Size(1, 1))) {
+    } else if(RL::FindOnMapRandomRectangleOfType(level, "corridor", pos, RL::Size(1, 1))) {
         player.MoveTo(pos);
     }
 
@@ -32,9 +30,9 @@ void CSimpleGame::AddMonster()
     auto *new_one = new CRodent;
     RL::Position pos(0, 0);
 
-    if(RL::FindOnMapRandomRectangleOfType(level, RL::LevelElementRoom, pos, RL::Size(1, 1))) {
+    if(RL::FindOnMapRandomRectangleOfType(level, "room", pos, RL::Size(1, 1))) {
         new_one->MoveTo(pos);
-    } else if(RL::FindOnMapRandomRectangleOfType(level, RL::LevelElementCorridor, pos, RL::Size(1, 1))) {
+    } else if(RL::FindOnMapRandomRectangleOfType(level, "corridor", pos, RL::Size(1, 1))) {
         new_one->MoveTo(pos);
     }
 

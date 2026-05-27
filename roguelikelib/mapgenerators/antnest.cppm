@@ -16,9 +16,9 @@ void CreateAntNest(CMap &level, bool with_rooms = false)
         return;
     }
 
-    level.Clear(LevelElementWall);
+    level.Clear("wall");
 
-    level.SetCell(level.GetWidth() / 2, level.GetHeight() / 2, LevelElementCorridor);
+    level.SetCell(level.GetWidth() / 2, level.GetHeight() / 2, "corridor");
 
     double dx, dy;
     int px, py;
@@ -83,12 +83,12 @@ void CreateAntNest(CMap &level, bool with_rooms = false)
             }
 
             // if object has something to catch, then catch it
-            if((px > 0 && level.GetCell(px - 1, py) == LevelElementCorridor) ||
-               (py > 0 && level.GetCell(px, py - 1) == LevelElementCorridor) ||
-               (px < static_cast<int>(level.GetWidth()) - 1 && level.GetCell(px + 1, py) == LevelElementCorridor) ||
-               (py < static_cast<int>(level.GetHeight()) - 1 && level.GetCell(px, py + 1) == LevelElementCorridor)) {
+            if((px > 0 && level.GetCell(px - 1, py).getType() == "corridor") ||
+               (py > 0 && level.GetCell(px, py - 1).getType() == "corridor") ||
+               (px < static_cast<int>(level.GetWidth()) - 1 && level.GetCell(px + 1, py).getType() == "corridor") ||
+               (py < static_cast<int>(level.GetHeight()) - 1 && level.GetCell(px, py + 1).getType() == "corridor")) {
 
-                level.SetCell(px, py, LevelElementCorridor);
+                level.SetCell(px, py, "corridor");
                 break;
             }
         }
@@ -101,16 +101,16 @@ void CreateAntNest(CMap &level, bool with_rooms = false)
 
                 if((x > level.GetWidth() / 2 - 10 && x < level.GetWidth() / 2 + 10 &&
                     y > level.GetHeight() / 2 - 5 && y < level.GetHeight() / 2 + 5) ||
-                    level.GetCell(x, y) == LevelElementWall) {
+                    level.GetCell(x, y).getType() == "wall") {
                     continue;
                 }
 
-                int neighbours = CountNeighboursOfType(level, LevelElementCorridor, Position(x, y));
+                int neighbours = CountNeighboursOfType(level, "corridor", Position(x, y));
 
                 if(neighbours == 1) {
                     for(px = -1; px <= 1; px++) {
                         for(py = -1; py <= 1; py++) {
-                            level.SetCell(x + px, y + py, LevelElementRoom);
+                            level.SetCell(x + px, y + py, "room");
                         }
                     }
                 }

@@ -2,9 +2,9 @@ module;
 
 export module demo_game.monster;
 
-import rl.fov;
-import rl.map;
-import rl.position;
+export import rl.fov;
+export import rl.map;
+export import rl.position;
 import std;
 
 export class CMonster

@@ -33,7 +33,7 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
         const std::size_t sx = Random(5) + 6;
         const std::size_t sy = Random(5) + 6;
 
-        if(FindOnMapRandomRectangleOfType(level, LevelElementWall, p, Size(sx + 4, sy + 4))) {
+        if(FindOnMapRandomRectangleOfType(level, "wall", p, Size(sx + 4, sy + 4))) {
             p.x += 2;
             p.y += 2;
 
@@ -84,14 +84,14 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
                     }
 
                     // Check what is on that position
-                    if(level.GetCell(x, y) == LevelElementRoom) {
+                    if(level.GetCell(x, y).getType() == "room") {
                         break;
-                    } else if(level.GetCell(x, y) == LevelElementCorridor)
+                    } else if(level.GetCell(x, y).getType() == "corridor")
                         if(CoinToss()) {
                             break;
                         }
 
-                    level.SetCell(x, y, LevelElementCorridor);
+                    level.SetCell(x, y, "corridor");
                 }
             }
 
@@ -116,13 +116,13 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
                         switch(room_type) {
                         case 0: // rectangle room
                         case 1:
-                            level.SetCell(p.x + x, p.y + y, LevelElementRoom);
+                            level.SetCell(p.x + x, p.y + y, "room");
                             break;
 
                         case 3: // round room
                         default:
                             if(Distance(sx / 2, sx / 2, x, y) < sx / 2) {
-                                level.SetCell(p.x + x, p.y + y, LevelElementRoom);
+                                level.SetCell(p.x + x, p.y + y, "room");
                             }
 
                             break;
@@ -133,10 +133,10 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
                 for(std::size_t y = 0; y <= sy / 2; y++)
                     for(std::size_t x = 0; x <= sx / 2; x++) {
                         if(y >= x) {
-                            level.SetCell(p.x + x + sx / 2, p.y + y, LevelElementRoom);
-                            level.SetCell(p.x + x + sx / 2, p.y + sy - y, LevelElementRoom);
-                            level.SetCell(p.x + sx / 2 - x, p.y + y, LevelElementRoom);
-                            level.SetCell(p.x + sx / 2 - x, p.y + sy - y, LevelElementRoom);
+                            level.SetCell(p.x + x + sx / 2, p.y + y, "room");
+                            level.SetCell(p.x + x + sx / 2, p.y + sy - y, "room");
+                            level.SetCell(p.x + sx / 2 - x, p.y + y, "room");
+                            level.SetCell(p.x + sx / 2 - x, p.y + sy - y, "room");
                         }
                     }
             }

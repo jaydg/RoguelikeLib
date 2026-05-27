@@ -5,10 +5,8 @@ export module demo_game.monster:impl;
 import demo_game.game;
 import demo_game.io;
 import demo_game.monster;
-import rl.fov;
-import rl.map;
-import rl.position;
 import rl.randomness;
+import rl.tile;
 
 bool CMonster::Attack(CMonster *monster)
 {
@@ -23,9 +21,9 @@ void CMonster::LookAround()
 
 bool CMonster::MoveTo(const RL::Position &new_pos)
 {
-    int cell = game.level.GetCell(new_pos);
+    RL::CTile cell = game.level.GetCell(new_pos);
 
-    if(cell != -1 && cell != '#') {
+    if(cell.isPassable()) {
         // if monster there
         CMonster *monster = game.GetMonsterFromCell(new_pos);
 

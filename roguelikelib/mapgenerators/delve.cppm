@@ -476,7 +476,7 @@ namespace delve_detail {
             switch (pullflag) {
                 case PullFlag::CUBEROOT:
                     rind = (index < 125) ? Random(index) :
-                        (index - Random(25 * ICbrt(static_cast<int>(index))) - 1);
+                    (index - Random(25 * ICbrt(static_cast<int>(index))) - 1);
                     break;
                 case PullFlag::ALL:
                     rind = Random(index);
@@ -499,7 +499,7 @@ namespace delve_detail {
         }
     };
 
-    bool IsPermitted(const CMap& level, const std::array<int, 256>& digperm, std::size_t xsize, std::size_t ysize, int x, int y, int flo)
+    bool IsPermitted(const CMap& level, const std::array<int, 256>& digperm, std::size_t xsize, std::size_t ysize, int x, int y)
     {
         int bitmap = 0;
 
@@ -507,20 +507,20 @@ namespace delve_detail {
             bitmap >>= 1;
             int nx = x + Xoff[i];
             int ny = y + Yoff[i];
-            if (InBord(xsize, ysize, nx, ny) && level.GetCell(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny)) == flo) {
+            if (InBord(xsize, ysize, nx, ny) && level.GetCell(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny)).isPassable()) {
                 bitmap |= 0x80;
             }
         }
         return static_cast<int>(Random(1000)) < digperm[bitmap];
     }
 
-    int DigCell(CMap& level, CellStore& cstore, std::size_t xsize, std::size_t ysize, int x, int y, StoreFlag storeflag, int flo, int ava)
+    int DigCell(CMap& level, CellStore& cstore, std::size_t xsize, std::size_t ysize, int x, int y, StoreFlag storeflag, std::string floor)
     {
-        if (!InBord(xsize, ysize, x, y) || level.GetCell(static_cast<std::size_t>(x), static_cast<std::size_t>(y)) != ava) {
+        if (!InBord(xsize, ysize, x, y) || level.GetCell(static_cast<std::size_t>(x), static_cast<std::size_t>(y)).isPassable()) {
             return 0;
         }
 
-        level.SetCell(static_cast<std::size_t>(x), static_cast<std::size_t>(y), flo);
+        level.SetCell(static_cast<std::size_t>(x), static_cast<std::size_t>(y), floor);
 
         std::array<int, 8> order = {0, 1, 2, 3, 4, 5, 6, 7};
 
@@ -547,7 +547,7 @@ namespace delve_detail {
             int nx = x + Xoff[j];
             int ny = y + Yoff[j];
 
-            if (InBord(xsize, ysize, nx, ny) && level.GetCell(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny)) == ava) {
+            if (InBord(xsize, ysize, nx, ny) && !level.GetCell(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny)).isPassable()) {
                 cstore.Store(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny));
             }
         }
@@ -556,20 +556,20 @@ namespace delve_detail {
 
     int DelveOn(CMap& level, CellStore& cstore, std::size_t xsize, std::size_t ysize,
         const std::array<int, 256>& digperm, int cellnum, PullFlag pullflag,
-        StoreFlag storeflag, int flo, int ava)
+        StoreFlag storeflag, std::string floor)
     {
         int count = 0;
         int x, y;
         while (count < cellnum && cstore.Pull(x, y, pullflag)) {
-            if (IsPermitted(level, digperm, xsize, ysize, x, y, flo)) {
-                count += DigCell(level, cstore, xsize, ysize, x, y, storeflag, flo, ava);
+            if (IsPermitted(level, digperm, xsize, ysize, x, y)) {
+                count += DigCell(level, cstore, xsize, ysize, x, y, storeflag, floor);
             }
         }
         return count;
     }
 
     int Cavern(CMap& level, int xorig, int yorig, const std::array<int, 256>& digperm,
-        int cellnum, PullFlag pullflag, StoreFlag storeflag, int flo, int ava)
+        int cellnum, PullFlag pullflag, StoreFlag storeflag, std::string floor)
     {
         std::size_t xsize = level.GetWidth();
         std::size_t ysize = level.GetHeight();
@@ -581,18 +581,18 @@ namespace delve_detail {
         cstore.Init(8 * xsize * ysize);
 
         int count = 0;
-        count += DigCell(level, cstore, xsize, ysize, xorig, yorig, storeflag, flo, ava);
+        count += DigCell(level, cstore, xsize, ysize, xorig, yorig, storeflag, floor);
 
         for (int i = 0; i < 8; i++) {
             int x = xorig + Xoff[i];
             int y = yorig + Yoff[i];
             if (count < cellnum && ((seed >> i) & 0x1)) {
-                count += DigCell(level, cstore, xsize, ysize, x, y, storeflag, flo, ava);
+                count += DigCell(level, cstore, xsize, ysize, x, y, storeflag, floor);
             }
         }
 
         if (count < cellnum) {
-            count += DelveOn(level, cstore, xsize, ysize, digperm, cellnum - count, pullflag, storeflag, flo, ava);
+            count += DelveOn(level, cstore, xsize, ysize, digperm, cellnum - count, pullflag, storeflag, floor);
         }
         return count;
     }
@@ -626,7 +626,7 @@ export {
             cellnum = static_cast<int>(xsize * ysize) / 5;
         }
 
-        level.Clear(LevelElementWall);
+        level.Clear("wall");
 
         std::array<int, 256> digperm{};
         int dugcells = 0;
@@ -642,16 +642,16 @@ export {
                     cellnum,
                     pullflag == delve_detail::PullFlag::DEFAULT ? config.pull_flag : pullflag,
                     storeflag == delve_detail::StoreFlag::DEFAULT ? config.store_flag : storeflag,
-                    LevelElementCorridor, LevelElementWall);
+                    "corridor");
             }
         }
 
         if (use_random) {
             do {
                 delve_detail::RandDigperm(digperm);
-                level.Clear(LevelElementWall);
+                level.Clear("wall");
                 dugcells = delve_detail::Cavern(level, static_cast<int>(xsize) / 2, static_cast<int>(ysize) / 2, digperm,
-                    cellnum, pullflag, storeflag, LevelElementCorridor, LevelElementWall);
+                    cellnum, pullflag, storeflag, "corridor");
             } while (dugcells < cellnum && dugcells < static_cast<int>(xsize * ysize) / 3);
         }
     }

@@ -26,10 +26,10 @@ void CreateStandardDungeon(CMap &level, int max_number_of_rooms, bool with_doors
         room_size.x = Random(5) + 8;
         room_size.y = Random(5) + 5;
 
-        if (FindOnMapRandomRectangleOfType(level, LevelElementWall, p, room_size)) {
+        if (FindOnMapRandomRectangleOfType(level, "wall", p, room_size)) {
             for (std::size_t x = 1; x < room_size.x - 1; x++) {
                 for (std::size_t y = 1; y < room_size.y - 1; y++) {
-                    level.SetCell(p.x + x, p.y + y, LevelElementRoom);
+                    level.SetCell(p.x + x, p.y + y, "room");
                 }
             }
         }

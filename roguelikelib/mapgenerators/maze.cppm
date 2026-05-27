@@ -17,11 +17,11 @@ void CreateMaze(CMap &level, bool allow_loops = false)
 
     level.Clear();
 
-    std::list < Position > drillers;
+    std::list <Position> drillers;
     drillers.emplace_back(level.GetWidth() / 2, level.GetHeight() / 2);
 
     while(!drillers.empty()) {
-        std::list < Position >::iterator m, _m;
+        std::list <Position>::iterator m, _m;
         m = drillers.begin();
         _m = drillers.end();
 
@@ -37,25 +37,25 @@ void CreateMaze(CMap &level, bool allow_loops = false)
 
                 m->y -= 2;
 
-                if(level.GetCell(m->x, m->y) == LevelElementCorridor) {
+                if(level.GetCell(m->x, m->y).isPassable()) {
                     if(!allow_loops || (allow_loops && Random(5))) {
                         remove_driller = true;
                         break;
                     }
                 }
 
-                level.SetCell(m->x, m->y + 1, LevelElementCorridor);
+                level.SetCell(m->x, m->y + 1, "corridor");
                 break;
 
             case 1:
                 m->y += 2;
 
-                if(m->y >= level.GetHeight() || level.GetCell(m->x, m->y) == LevelElementCorridor) {
+                if(m->y >= level.GetHeight() || level.GetCell(m->x, m->y).isPassable()) {
                     remove_driller = true;
                     break;
                 }
 
-                level.SetCell(m->x, m->y - 1, LevelElementCorridor);
+                level.SetCell(m->x, m->y - 1, "corridor");
                 break;
 
             case 2:
@@ -65,24 +65,24 @@ void CreateMaze(CMap &level, bool allow_loops = false)
                 }
                 m->x -= 2;
 
-                if(level.GetCell(m->x, m->y) == LevelElementCorridor) {
+                if(level.GetCell(m->x, m->y).isPassable()) {
                     remove_driller = true;
                     break;
                 }
 
-                level.SetCell(m->x + 1, m->y, LevelElementCorridor);
+                level.SetCell(m->x + 1, m->y, "corridor");
                 break;
 
             case 3:
             default: // make linter happy
                 m->x += 2;
 
-                if(m->x >= level.GetWidth() || level.GetCell(m->x, m->y) == LevelElementCorridor) {
+                if(m->x >= level.GetWidth() || level.GetCell(m->x, m->y).isPassable()) {
                     remove_driller = true;
                     break;
                 }
 
-                level.SetCell(m->x - 1, m->y, LevelElementCorridor);
+                level.SetCell(m->x - 1, m->y, "corridor");
                 break;
             }
 
@@ -92,7 +92,7 @@ void CreateMaze(CMap &level, bool allow_loops = false)
                 drillers.emplace_back(m->x, m->y);
                 drillers.emplace_back(m->x, m->y);
 
-                level.SetCell(m->x, m->y, LevelElementCorridor);
+                level.SetCell(m->x, m->y, "corridor");
                 ++m;
             }
         }

@@ -78,7 +78,7 @@ int main(void)
     // Place observer somewhere on a horizontal road
 
     RL::Position observer;
-    RL::FindOnMapRandomRectangleOfType(level, RL::LevelElementCorridor, observer, RL::Size(2, 1));
+    RL::FindOnMapRandomRectangleOfType(level, "corridor", observer, RL::Size(2, 1));
 
     // Define the FOV
 
@@ -96,8 +96,8 @@ int main(void)
             if (pos == observer) {
                 cout << '@';
             } else if (fov(pos)) { // visible cells take from the map
-                cout << (char)level.GetCell(pos);
-            } else if (level.GetCell(pos) == '#') { // not visible walls as '%'
+                cout << (char)level.GetCell(pos).getGlyph();
+            } else if (level.GetCell(pos).getGlyph() == '#') { // not visible walls as '%'
                 cout << '%';
             } else { // others are empty
                 cout << ' ';
@@ -119,27 +119,20 @@ int main(void)
 
     cout << endl << "Path in this maze '+' (from top-left to bottom-right corner)" << endl << endl;
 
-    // convert tiles to values and find corners at the same time
-    // conversion is needed for pathfinding because it uses flood fill algorithm
-    // and you have to define what is blocking.
+    // Find corners
 
-    RL::CMap temp_level = level; // copy the level to a temporary
     RL::Position start, end;
 
-    for(pos.x = 0; pos.x < level_size.x; ++pos.x) {
-        for(pos.y = 0; pos.y < level_size.y; ++pos.y) {
-            if(temp_level.GetCell(pos) == RL::LevelElementCorridor) {
-                temp_level.SetCell(pos, RL::LevelElementCorridor_value); // conversion
-
+    for (pos.x = 0; pos.x < level_size.x; ++pos.x) {
+        for (pos.y = 0; pos.y < level_size.y; ++pos.y) {
+            if (level.GetCell(pos).getType() == "corridor") {
                 // set top-left corner
-                if(start.x == RL::Position::invalid) {
+                if (start.x == RL::Position::invalid) {
                     start = pos;
                 }
 
                 // set bottom-right corner
                 end = pos;
-            } else {
-                temp_level.SetCell(pos, RL::LevelElementWall_value); // conversion
             }
         }
     }
@@ -147,12 +140,13 @@ int main(void)
     // find path in maze
 
     vector < RL::Position > path;
-    RL::FindPath(temp_level, start, end, path);
+    RL::FindPath(level, start, end, path);
 
     // print maze with path
 
     for (std::size_t index = 0; index < path.size(); index++) {
-        level.SetCell(path[index].x, path[index].y, '+');
+        // this looks bogus, but we get a trail of '+' this way
+        level.GetCell(path[index].x, path[index].y).setType("door_closed");
     }
 
     level.PrintMap();

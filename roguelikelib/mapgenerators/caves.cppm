@@ -17,29 +17,29 @@ void CreateCaves(CMap &level, int iterations = 1, float density = 0.65)
         return;
     }
 
-    level.Clear(LevelElementRoom);
+    level.Clear("room");
 
     for(int fill = 0; fill < static_cast<int>(static_cast<float>(level.GetWidth() * level.GetHeight()) * density); fill++) {
-        level.SetCell(Random(level.GetWidth()), Random(level.GetHeight()), LevelElementWall);
+        level.SetCell(Random(level.GetWidth()), Random(level.GetHeight()), "wall");
     }
 
     for(int iteration = 0; iteration < iterations; iteration++) {
         for (std::size_t x = 0; x < level.GetWidth(); x++) {
             for(std::size_t y = 0; y < level.GetHeight(); y++) {
-                int neighbours = CountNeighboursOfType(level, LevelElementWall, Position(x, y));
+                int neighbours = CountNeighboursOfType(level, "wall", Position(x, y));
 
-                if(level.GetCell(x, y) == LevelElementWall) {
-                    if(neighbours < 4) {
-                        level.SetCell(x, y, LevelElementRoom);
+                if (level.GetCell(x, y).getType() == "wall") {
+                    if (neighbours < 4) {
+                        level.SetCell(x, y, "wall");
                     }
                 } else {
-                    if(neighbours > 4) {
-                        level.SetCell(x, y, LevelElementWall);
+                    if (neighbours > 4) {
+                        level.SetCell(x, y, "wall");
                     }
                 }
 
                 if(x == 0 || x == level.GetWidth() - 1 || y == 0 || y == level.GetHeight() - 1) {
-                    level.SetCell(x, y, LevelElementWall);
+                    level.SetCell(x, y, "wall");
                 }
             }
         }
