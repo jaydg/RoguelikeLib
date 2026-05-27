@@ -138,7 +138,7 @@ void CPlayer::LookAround()
                 seen_map.SetCell(pos, cell);
 
                 // print with normal intensity
-                IOPrintChar(pos.x, pos.y, cell, base_color);
+                IOPrintChar(pos.x, pos.y, cell, RL::GetJitteredColor(base_color));
 
                 // paint visible monsters
                 const CMonster* monster = game.GetMonsterFromCell(pos);
