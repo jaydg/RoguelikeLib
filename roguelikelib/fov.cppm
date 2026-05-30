@@ -47,11 +47,11 @@ private:
             case 7: nx += x; ny += y; break;
         }
 
-        if (nx < 0 || ny < 0 || nx >= static_cast<int>(map->GetWidth()) || ny >= static_cast<int>(map->GetHeight())) {
+        if (nx < 0 || ny < 0 || nx >= static_cast<int>(map->getWidth()) || ny >= static_cast<int>(map->getHeight())) {
             return true;
         }
 
-        return !map->GetCell(nx, ny).isTransparent();
+        return !map->get(nx, ny).isTransparent();
     }
 
     void SetVisible(unsigned int x, unsigned int y, unsigned int octant, Position origin) {
@@ -206,7 +206,7 @@ public:
         int cx = static_cast<int>(start.x);
         int cy = static_cast<int>(start.y);
 
-        if (!map->OnMap(cx, cy)) return;
+        if (!map->inside(cx, cy)) return;
 
         // The starting position is always visible
         set(start.x, start.y, true);

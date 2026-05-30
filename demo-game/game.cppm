@@ -19,7 +19,7 @@ public:
     static constexpr int LEVEL_SIZE_X = 80;
     static constexpr int LEVEL_SIZE_Y = 24;
 
-    RL::CMap level;
+    RL::CMap level = RL::CMap(RL::Size(LEVEL_SIZE_X, LEVEL_SIZE_Y));
     CPlayer player;
     std::list <CMonster*> monsters;
     std::set <CMonster*> monsters_to_remove;

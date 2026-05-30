@@ -4,8 +4,10 @@ export module rl.mapgenerators.simplecity;
 
 import rl.map;
 import rl.maputils;
+import rl.matrix;
 import rl.position;
 import rl.randomness;
+import rl.tile;
 import std;
 
 export namespace RL {
@@ -17,7 +19,7 @@ void CreateSimpleCity(CMap &level, const int& a_number_of_buildings)
     const int min_building_height = 5;
     const int max_building_height = 10;
 
-    if(level.GetWidth() == 0 || level.GetHeight() == 0) {
+    if (level.getWidth() == 0 || level.getHeight() == 0) {
         return;
     }
 
@@ -27,8 +29,8 @@ void CreateSimpleCity(CMap &level, const int& a_number_of_buildings)
         SRoom main;
         main.corner1.x = 0;
         main.corner1.y = 0;
-        main.corner2.x = level.GetWidth();
-        main.corner2.y = level.GetHeight();
+        main.corner2.x = level.getWidth();
+        main.corner2.y = level.getHeight();
 
         AddRecursiveRooms(level, "corridor", max_building_width, max_building_height, main, false);
 
@@ -97,12 +99,12 @@ void CreateSimpleCity(CMap &level, const int& a_number_of_buildings)
 
         if(tries < 100) {
             // plant some trees
-            for(std::size_t index = 0; index < level.GetWidth() * static_cast<std::size_t>(static_cast<float>(level.GetHeight()) * 0.3); index++) {
-                std::size_t x = Random(level.GetWidth());
-                std::size_t y = Random(level.GetHeight());
+            for (std::size_t index = 0; index < level.getWidth() * static_cast<std::size_t>(static_cast<float>(level.getHeight()) * 0.3); index++) {
+                 std::size_t x = Random(level.getWidth());
+                 std::size_t y = Random(level.getHeight());
 
-                if(level.GetCell(x, y).getType() == "grass"
-                    && CountNeighboursOfType(level, "wall", Position(x, y), true) == 0)
+                if (level.get(x, y).getType() == "grass"
+                    && level.CountNeighbors(Position(x, y), CTile::ByType("wall"), Neighbors::All8) == 0)
                 {
                     level.SetCell(x, y, "plant");
                 }

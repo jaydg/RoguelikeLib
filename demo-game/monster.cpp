@@ -21,7 +21,7 @@ void CMonster::LookAround()
 
 bool CMonster::MoveTo(const RL::Position &new_pos)
 {
-    RL::CTile cell = game.level.GetCell(new_pos);
+    RL::CTile cell = game.level.get(new_pos);
 
     if(cell.isPassable()) {
         // if monster there

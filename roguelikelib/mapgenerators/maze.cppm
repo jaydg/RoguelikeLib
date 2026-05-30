@@ -11,14 +11,14 @@ export namespace RL {
 
 void CreateMaze(CMap &level, bool allow_loops = false)
 {
-    if(level.GetWidth() == 0 || level.GetHeight() == 0) {
+    if (level.getWidth() == 0 || level.getHeight() == 0) {
         return;
     }
 
     level.Clear();
 
     std::list <Position> drillers;
-    drillers.emplace_back(level.GetWidth() / 2, level.GetHeight() / 2);
+    drillers.emplace_back(level.getWidth() / 2, level.getHeight() / 2);
 
     while(!drillers.empty()) {
         std::list <Position>::iterator m, _m;
@@ -37,7 +37,7 @@ void CreateMaze(CMap &level, bool allow_loops = false)
 
                 m->y -= 2;
 
-                if(level.GetCell(m->x, m->y).isPassable()) {
+                if (level.get(m->x, m->y).isPassable()) {
                     if(!allow_loops || (allow_loops && Random(5))) {
                         remove_driller = true;
                         break;
@@ -50,7 +50,7 @@ void CreateMaze(CMap &level, bool allow_loops = false)
             case 1:
                 m->y += 2;
 
-                if(m->y >= level.GetHeight() || level.GetCell(m->x, m->y).isPassable()) {
+                if (m->y >= level.getHeight() || level.get(m->x, m->y).isPassable()) {
                     remove_driller = true;
                     break;
                 }
@@ -65,7 +65,7 @@ void CreateMaze(CMap &level, bool allow_loops = false)
                 }
                 m->x -= 2;
 
-                if(level.GetCell(m->x, m->y).isPassable()) {
+                if (level.get(m->x, m->y).isPassable()) {
                     remove_driller = true;
                     break;
                 }
@@ -77,7 +77,7 @@ void CreateMaze(CMap &level, bool allow_loops = false)
             default: // make linter happy
                 m->x += 2;
 
-                if(m->x >= level.GetWidth() || level.GetCell(m->x, m->y).isPassable()) {
+                if (m->x >= level.getWidth() || level.get(m->x, m->y).isPassable()) {
                     remove_driller = true;
                     break;
                 }

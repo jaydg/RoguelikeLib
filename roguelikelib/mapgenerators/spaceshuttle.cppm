@@ -32,25 +32,25 @@ void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15)
             std::size_t rx, ry;
 
             if (number_of_rooms == 0) {
-                x1 = level.GetWidth() / 2 - Random(room_max_size);
-                y1 = level.GetHeight() / 2 - Random(room_max_size) - room_min_size;
+                x1 = level.getWidth() / 2 - Random(room_max_size);
+                y1 = level.getHeight() / 2 - Random(room_max_size) - room_min_size;
                 rx = Random(room_max_size) + room_min_size;
                 ry = Random(room_max_size - room_min_size) + room_min_size;
                 x2 = x1 + rx;
-                y2 = level.GetHeight() / 2;
+                y2 = level.getHeight() / 2;
 
-                if (x2 >= level.GetWidth()) {
+                if (x2 >= level.getWidth()) {
                     continue;
                 }
             } else {
-                x1 = Random(static_cast<int>(level.GetWidth()) - room_min_size) + 1;
-                y1 = Random(static_cast<int>(level.GetHeight()) - room_min_size) / 2 + 1;
+                x1 = Random(static_cast<int>(level.getWidth()) - room_min_size) + 1;
+                y1 = Random(static_cast<int>(level.getHeight()) - room_min_size) / 2 + 1;
                 rx = Random(room_max_size - room_min_size) + room_min_size;
                 ry = Random(room_max_size - room_min_size) + room_min_size;
                 x2 = x1 + rx;
                 y2 = y1 + ry;
 
-                if (x2 >= level.GetWidth() - 1 || y2 >= level.GetHeight() / 2 + 3) {
+                if (x2 >= level.getWidth() - 1 || y2 >= level.getHeight() / 2 + 3) {
                     continue;
                 }
             }
@@ -103,7 +103,7 @@ void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15)
 
             for (std::size_t x = room.corner1.x; x <= room.corner2.x; x++) {
                 for (std::size_t y = room.corner1.y; y <= room.corner2.y; y++) {
-                    if (id_matrix(x, y) == 0) {
+                    if (id_matrix.get(x, y) == 0) {
                         id_matrix.set(x, y, room.type);
                     }
                 }
@@ -117,14 +117,14 @@ void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15)
         //////////////////////////
 
         // fill map with walls
-        for (std::size_t x = 0; x < level.GetWidth(); ++x) {
-            for (std::size_t y = 0; y < level.GetHeight(); ++y) {
+        for (std::size_t x = 0; x < level.getWidth(); ++x) {
+            for (std::size_t y = 0; y < level.getHeight(); ++y) {
                 level.SetCell(x, y, "wall");
             }
         }
 
-        for (std::size_t x = 0; x < level.GetWidth() - 1; x++) {
-            for (std::size_t y = 0; y < level.GetHeight() / 2; y++) {
+        for (std::size_t x = 0; x < level.getWidth() - 1; x++) {
+            for (std::size_t y = 0; y < level.getHeight() / 2; y++) {
 
                 int current_id = id_matrix.get(x, y);
                 int right_id   = id_matrix.get(x + 1, y);
@@ -147,17 +147,17 @@ void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15)
                     level.SetCell(x, y, "wall");
                 }
 
-                if (level.GetCell(x, y).getType() != "wall") {
+                if (level.get(x, y).getType() != "wall") {
                     free_cells += 2;
                 }
 
                 // Mirror the new cell
-                level.SetCell(x, level.GetHeight() - y - 1, level.GetCell(x, y).getType());
+                level.SetCell(x, level.getHeight() - y - 1, level.get(x, y).getType());
             }
         }
 
         // Size of ship
-        if (free_cells < level.GetHeight() * level.GetWidth() / 4) {
+        if (free_cells < level.getHeight() * level.getWidth() / 4) {
             continue;
         }
 

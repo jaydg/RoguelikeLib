@@ -83,8 +83,6 @@ CMonster* CSimpleGame::GetMonsterFromCell(const RL::Position& cell)
 
 void CSimpleGame::CreateLevel()
 {
-    level.Resize(LEVEL_SIZE_X, LEVEL_SIZE_Y);
-
     int level_type = RL::Random(6);
 
     switch(level_type) {

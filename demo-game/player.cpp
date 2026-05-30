@@ -114,13 +114,12 @@ void CPlayer::LookAround()
     {
         for (pos.y = 0; pos.y < CSimpleGame::LEVEL_SIZE_Y; ++pos.y)
         {
-            auto cell = game.level.GetCell(pos);
+            auto cell = game.level.get(pos);
 
-            if (fov(pos))
+            if (fov.get(pos))
             {
                 // currently visible
                 seen_map.set(pos, true);
-
 
                 // print with normal intensity
                 IOPrintChar(pos.x, pos.y, cell.getGlyph(), cell.getColor());
@@ -132,7 +131,7 @@ void CPlayer::LookAround()
                     monster->Print();
                 }
             }
-            else if(seen_map(pos))
+            else if(seen_map.get(pos))
             {
                 std::uint32_t base_color = cell.getColor();
 

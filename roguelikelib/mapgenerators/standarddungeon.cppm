@@ -11,7 +11,7 @@ import std;
 export namespace RL {
 
 void CreateStandardDungeon(CMap &level, int max_number_of_rooms, bool with_doors = true) {
-    if (level.GetWidth() == 0 || level.GetHeight() == 0) {
+    if (level.getWidth() == 0 || level.getHeight() == 0) {
         return;
     }
 

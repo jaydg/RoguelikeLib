@@ -26,7 +26,7 @@ void CRodent::LookAround()
 {
     CMonster::LookAround();
 
-    if(fov(game.player.GetPosition())) {
+    if(fov.get(game.player.GetPosition())) {
         enemy_pos = game.player.GetPosition();
     }
 }
@@ -34,7 +34,7 @@ void CRodent::LookAround()
 void CRodent::DoAction() {
     LookAround();
 
-    if(position != enemy_pos && game.level.OnMap(enemy_pos)) {
+    if(position != enemy_pos && game.level.inside(enemy_pos)) {
         std::vector<RL::Position> path;
         if (RL::FindPath(game.level, position, enemy_pos, path)) {
             if (MoveTo(path[0])) {

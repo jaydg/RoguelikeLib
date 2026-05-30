@@ -26,9 +26,9 @@ export namespace RL {
         const bool& diagonals = true)
     {
         auto pathmap = CMatrix<int>(level.getSize(), std::numeric_limits<int>::max());
-        for (auto y = 0; y <  level.GetHeight(); y++) {
-            for (auto x = 0; x < level.GetWidth(); x++) {
-                if (level.GetCell(x, y).isPassable())
+        for (auto y = 0; y <  level.getHeight(); y++) {
+            for (auto x = 0; x < level.getWidth(); x++) {
+                if (level.get(x, y).isPassable())
                     pathmap.set(x, y,std::numeric_limits<int>::max() - 1);
             }
         }
@@ -53,32 +53,32 @@ export namespace RL {
                 path.push_back(pos);
             }
 
-            int current_value = pathmap(pos.x, pos.y);
+            int current_value = pathmap.get(pos.x, pos.y);
 
             if (diagonals) {
                 if (pos.x > 0 && pos.y > 0)
-                    if (pathmap(pos.x - 1, pos.y - 1) < current_value) { // NW
+                    if (pathmap.get(pos.x - 1, pos.y - 1) < current_value) { // NW
                         new_pos.x--;
                         new_pos.y--;
                         continue;
                     }
 
                 if (pos.x < pathmap.getWidth() - 1 && pos.y > 0)
-                    if (pathmap(pos.x + 1, pos.y - 1) < current_value) { // NE
+                    if (pathmap.get(pos.x + 1, pos.y - 1) < current_value) { // NE
                         new_pos.x++;
                         new_pos.y--;
                         continue;
                     }
 
                 if (pos.x < pathmap.getWidth() - 1 && pos.y < pathmap.getHeight() - 1)
-                    if (pathmap(pos.x + 1, pos.y + 1) < current_value) { // SE
+                    if (pathmap.get(pos.x + 1, pos.y + 1) < current_value) { // SE
                         new_pos.x++;
                         new_pos.y++;
                         continue;
                     }
 
                 if (pos.x > 0 && pos.y < pathmap.getHeight() - 1)
-                    if (pathmap(pos.x - 1, pos.y + 1) < current_value) { // SW
+                    if (pathmap.get(pos.x - 1, pos.y + 1) < current_value) { // SW
                         new_pos.x--;
                         new_pos.y++;
                         continue;
@@ -86,25 +86,25 @@ export namespace RL {
             }
 
             if (pos.y > 0)
-                if (pathmap(pos.x, pos.y - 1) < current_value) { // N
+                if (pathmap.get(pos.x, pos.y - 1) < current_value) { // N
                     new_pos.y--;
                     continue;
                 }
 
             if (pos.x < pathmap.getWidth() - 1)
-                if (pathmap(pos.x + 1, pos.y) < current_value) { // E
+                if (pathmap.get(pos.x + 1, pos.y) < current_value) { // E
                     new_pos.x++;
                     continue;
                 }
 
             if (pos.x > 0 && pos.y < pathmap.getHeight() - 1)
-                if (pathmap(pos.x, pos.y + 1) < current_value) { // S
+                if (pathmap.get(pos.x, pos.y + 1) < current_value) { // S
                     new_pos.y++;
                     continue;
                 }
 
             if (pos.x > 0 && pos.y > 0)
-                if (pathmap(pos.x - 1, pos.y) < current_value) { // W
+                if (pathmap.get(pos.x - 1, pos.y) < current_value) { // W
                     new_pos.x--;
                     continue;
                 }

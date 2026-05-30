@@ -21,9 +21,8 @@ int main(void)
     // Define the map
     //////////////////////////////////////////////////////////////////////////
 
-    RL::CMap level;
     const RL::Size level_size(79, 50);
-    level.Resize(level_size);
+    RL::CMap level = RL::CMap(level_size);
 
     //////////////////////////////////////////////////////////////////////////
     // Generate some levels
@@ -95,9 +94,9 @@ int main(void)
         for (pos.x = 0; pos.x < level_size.x; ++pos.x) {
             if (pos == observer) {
                 cout << '@';
-            } else if (fov(pos)) { // visible cells take from the map
-                cout << (char)level.GetCell(pos).getGlyph();
-            } else if (level.GetCell(pos).getGlyph() == '#') { // not visible walls as '%'
+            } else if (fov.get(pos)) { // visible cells take from the map
+                cout << level.get(pos).getGlyph();
+            } else if (level.get(pos).getGlyph() == '#') { // not visible walls as '%'
                 cout << '%';
             } else { // others are empty
                 cout << ' ';
@@ -125,7 +124,7 @@ int main(void)
 
     for (pos.x = 0; pos.x < level_size.x; ++pos.x) {
         for (pos.y = 0; pos.y < level_size.y; ++pos.y) {
-            if (level.GetCell(pos).getType() == "corridor") {
+            if (level.get(pos).getType() == "corridor") {
                 // set top-left corner
                 if (start.x == RL::Position::invalid) {
                     start = pos;
@@ -146,7 +145,7 @@ int main(void)
 
     for (std::size_t index = 0; index < path.size(); index++) {
         // this looks bogus, but we get a trail of '+' this way
-        level.GetCell(path[index].x, path[index].y).setType("door_closed");
+        level.get(path[index].x, path[index].y).setType("door_closed");
     }
 
     level.PrintMap();

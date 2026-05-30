@@ -13,7 +13,7 @@ export namespace RL {
 
 void CreateMines(CMap &level, int max_number_of_rooms = 10)
 {
-    if(level.GetWidth() == 0 || level.GetHeight() == 0) {
+    if (level.getWidth() == 0 || level.getHeight() == 0) {
         return;
     }
 
@@ -84,9 +84,9 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
                     }
 
                     // Check what is on that position
-                    if(level.GetCell(x, y).getType() == "room") {
+                    if (level.get(x, y).getType() == "room") {
                         break;
-                    } else if(level.GetCell(x, y).getType() == "corridor")
+                    } else if (level.get(x, y).getType() == "corridor")
                         if(CoinToss()) {
                             break;
                         }

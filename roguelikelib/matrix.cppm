@@ -16,6 +16,20 @@ enum class Neighbors {
     Cardinal4   // only the 4 cardinal directions (N, S, W, E)
 };
 
+class EOutOfBoundException : public std::exception {
+private:
+    std::string message;
+public:
+    EOutOfBoundException(const Position pos, const Size size) {
+        message = "Given position " + pos.toString() + " is out of bounds " +
+            "for map with dimensions " + size.toString();
+    }
+
+    const char* what() const noexcept {
+        return message.c_str();
+    }
+};
+
 template <typename T>
 class CMatrix {
 public:
@@ -27,52 +41,71 @@ public:
         data.resize(size.x * size.y, defval);
     }
 
-    [[nodiscard]] decltype(auto) operator()(std::size_t x, std::size_t y)
+    [[nodiscard]] bool inside(const std::size_t& x, const std::size_t& y) const
     {
-        return data[x * size.y + y];
+        return (x < size.x && y < size.y);
     }
 
-    [[nodiscard]] decltype(auto) operator()(std::size_t x, std::size_t y) const
+    [[nodiscard]] bool inside(const Position &pos) const
     {
-        return data[x * size.y + y];
-    }
-
-    [[nodiscard]] decltype(auto) operator()(const Position pos)
-    {
-        return data[pos.x * size.y + pos.y];
-    }
-
-    [[nodiscard]] decltype(auto) operator()(const Position pos) const
-    {
-        return data[pos.x * size.y + pos.y];
+        return inside(pos.x, pos.y);
     }
 
     [[nodiscard]] decltype(auto) get(std::size_t x, std::size_t y)
     {
+        if (!inside(x, y)) {
+            throw EOutOfBoundException(Position(x, y), size);
+        }
+
         return data[x * size.y + y];
     }
 
     [[nodiscard]] decltype(auto) get(std::size_t x, std::size_t y) const
     {
+        if (!inside(x, y)) {
+            throw EOutOfBoundException(Position(x, y), size);
+        }
+
         return data[x * size.y + y];
     }
 
     [[nodiscard]] decltype(auto) get(const Position pos)
     {
+        if (!inside(pos)) {
+            throw EOutOfBoundException(pos, size);
+        }
+
         return data[pos.x * size.y + pos.y];
     }
 
     [[nodiscard]] decltype(auto) get(const Position pos) const
     {
+        if (!inside(pos)) {
+            throw EOutOfBoundException(pos, size);
+        }
+
         return data[pos.x * size.y + pos.y];
     }
 
     void set(std::size_t x, std::size_t y, T val) {
+        if (!inside(x, y)) {
+            throw EOutOfBoundException(Position(x, y), size);
+        }
+
         data[x * size.y + y] = val;
     }
 
     void set(const Position pos, T val) {
+        if (!inside(pos)) {
+            throw EOutOfBoundException(pos, size);
+        }
+
         data[pos.x * size.y + pos.y] = val;
+    }
+
+    [[nodiscard]] Size getSize() const
+    {
+        return size;
     }
 
     [[nodiscard]] std::size_t getWidth() const {
@@ -83,42 +116,24 @@ public:
         return size.y;
     }
 
+    // Original: compare by equality
     [[nodiscard]] int CountNeighbors(
-        const Position& pos,
-        const T&        value,
-        Neighbors       mode = Neighbors::All8)
+        const Position& pos, const T& value,
+        Neighbors mode = Neighbors::Cardinal4)
     {
-        // All directions as (dx, dy) offsets (as int to detect underflow)
-        static constexpr std::array<std::pair<int,int>, 8> all8 = {{
-            {-1, -1}, {0, -1}, {1, -1},
-            {-1,  0},          {1,  0},
-            {-1,  1}, {0,  1}, {1,  1}
-        }};
+        return CountNeighborsImpl(pos,
+            [&value](const T& cell){ return cell == value; }, mode);
+    }
 
-        static constexpr std::array<std::pair<int,int>, 4> cardinal4 = {{
-            {0, -1},
-            {-1, 0}, {1, 0},
-            {0,  1}
-        }};
-
-        const auto& offsets = (mode == Neighbors::All8)
-            ? std::span<const std::pair<int,int>>(all8)
-            : std::span<const std::pair<int,int>>(cardinal4);
-
-        const int px = static_cast<int>(pos.x);
-        const int py = static_cast<int>(pos.y);
-
-        int count = 0;
-        for (auto [dx, dy] : offsets) {
-            const int nx = px + dx;
-            const int ny = py + dy;
-            if (nx >= 0 && nx < size.x && ny >= 0 && ny < size.y) {
-                if (data[nx * size.y + ny] == value) {
-                    ++count;
-                }
-            }
-        }
-        return count;
+    // compare by predicate (e.g. for CTile a lambda calling getType())
+    template <typename Pred>
+        requires std::invocable<Pred, const T&>
+              && std::convertible_to<std::invoke_result_t<Pred, const T&>, bool>
+    [[nodiscard]] int CountNeighbors(
+        const Position& pos, Pred&& predicate,
+        Neighbors mode = Neighbors::Cardinal4)
+    {
+        return CountNeighborsImpl(pos, std::forward<Pred>(predicate), mode);
     }
 
     bool FloodFill(Position start, T value, bool diagonal = true, int gradient = 0, Position end = Position(-1, -1))
@@ -212,6 +227,36 @@ public:
 private:
     Size size;
     std::vector<T> data;
+
+    template <typename Pred>
+    [[nodiscard]] int CountNeighborsImpl(
+    const Position& pos, Pred&& predicate, Neighbors mode) const
+    {
+        static constexpr std::array<std::pair<int,int>, 8> all8 = {{
+            {-1,-1},{0,-1},{1,-1},
+            {-1, 0},       {1, 0},
+            {-1, 1},{0, 1},{1, 1}
+        }};
+        static constexpr std::array<std::pair<int,int>, 4> cardinal4 = {{
+            {0,-1},{-1,0},{1,0},{0,1}
+        }};
+
+        const auto& offsets = (mode == Neighbors::All8)
+            ? std::span<const std::pair<int,int>>(all8)
+            : std::span<const std::pair<int,int>>(cardinal4);
+
+        const int px = static_cast<int>(pos.x);
+        const int py = static_cast<int>(pos.y);
+        int count = 0;
+        for (auto [dx, dy] : offsets) {
+            const int nx = px + dx;
+            const int ny = py + dy;
+            if (nx >= 0 && nx < static_cast<int>(size.x) && ny >= 0 && ny < static_cast<int>(size.y))
+                if (predicate(data[nx * size.y + ny]))
+                    ++count;
+        }
+        return count;
+    }
 };
 
 } // RL

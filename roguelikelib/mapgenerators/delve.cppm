@@ -507,7 +507,7 @@ namespace delve_detail {
             bitmap >>= 1;
             int nx = x + Xoff[i];
             int ny = y + Yoff[i];
-            if (InBord(xsize, ysize, nx, ny) && level.GetCell(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny)).isPassable()) {
+            if (InBord(xsize, ysize, nx, ny) && level.get(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny)).isPassable()) {
                 bitmap |= 0x80;
             }
         }
@@ -516,7 +516,7 @@ namespace delve_detail {
 
     int DigCell(CMap& level, CellStore& cstore, std::size_t xsize, std::size_t ysize, int x, int y, StoreFlag storeflag, std::string floor)
     {
-        if (!InBord(xsize, ysize, x, y) || level.GetCell(static_cast<std::size_t>(x), static_cast<std::size_t>(y)).isPassable()) {
+        if (!InBord(xsize, ysize, x, y) || level.get(static_cast<std::size_t>(x), static_cast<std::size_t>(y)).isPassable()) {
             return 0;
         }
 
@@ -547,7 +547,7 @@ namespace delve_detail {
             int nx = x + Xoff[j];
             int ny = y + Yoff[j];
 
-            if (InBord(xsize, ysize, nx, ny) && !level.GetCell(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny)).isPassable()) {
+            if (InBord(xsize, ysize, nx, ny) && !level.get(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny)).isPassable()) {
                 cstore.Store(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny));
             }
         }
@@ -571,8 +571,8 @@ namespace delve_detail {
     int Cavern(CMap& level, int xorig, int yorig, const std::array<int, 256>& digperm,
         int cellnum, PullFlag pullflag, StoreFlag storeflag, std::string floor)
     {
-        std::size_t xsize = level.GetWidth();
-        std::size_t ysize = level.GetHeight();
+        std::size_t xsize = level.getWidth();
+        std::size_t ysize = level.getHeight();
 
         int seed = FindSeed(digperm, cellnum);
         if (seed < 0) return 0;
@@ -615,12 +615,12 @@ export {
         delve_detail::PullFlag pullflag = delve_detail::PullFlag::DEFAULT,
         delve_detail::StoreFlag storeflag = delve_detail::StoreFlag::DEFAULT)
     {
-        if (level.GetWidth() < 3 || level.GetHeight() < 3) {
+        if (level.getWidth() < 3 || level.getHeight() < 3) {
             return;
         }
 
-        std::size_t xsize = level.GetWidth();
-        std::size_t ysize = level.GetHeight();
+        std::size_t xsize = level.getWidth();
+        std::size_t ysize = level.getHeight();
 
         if (cellnum <= 0) {
             cellnum = static_cast<int>(xsize * ysize) / 5;

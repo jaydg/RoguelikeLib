@@ -120,6 +120,12 @@ public:
         return passable;
     }
 
+    // predicate factory for CountNeighbors
+    static auto ByType(std::string_view type) {
+        return [t = std::string(type)](const CTile& cell) {
+            return cell.getType() == t;
+        };
+    }
 };
 
 } // export
