@@ -39,57 +39,6 @@ namespace detail {
         seq.resize(j);
     }
 
-    void BuildZigzagPath(std::vector<Position>& ret, const Position& p1, const Position& p2, unsigned turnpct, unsigned diagpct) {
-        ret.clear();
-        int xc = static_cast<int>(p1.x);
-        int yc = static_cast<int>(p1.y);
-        int x2 = static_cast<int>(p2.x);
-        int y2 = static_cast<int>(p2.y);
-
-        int deltax = 0, deltay = 0;
-        ret.emplace_back(xc, yc);
-
-        while (xc != x2 || yc != y2) {
-            int xremain = std::abs(x2 - xc);
-            int yremain = std::abs(y2 - yc);
-
-            if (ret.size() == 1 || (Random(100) < turnpct) ||
-                (std::abs(x2 - (xc + deltax)) > xremain) ||
-                (std::abs(y2 - (yc + deltay)) > yremain) ||
-                ((xremain == yremain) && (Random(100) < diagpct))) {
-
-                deltax = Sign(x2 - xc);
-                deltay = Sign(y2 - yc);
-
-                if (Random(100) < diagpct) {
-                    if (xremain > yremain) {
-                        if (static_cast<int>(Random(xremain)) < (xremain - yremain)) {
-                            deltay = 0;
-                        }
-                    } else if (xremain < yremain) {
-                        if (static_cast<int>(Random(yremain)) < (yremain - xremain)) {
-                            deltax = 0;
-                        }
-                    }
-                } else {
-                    if (static_cast<int>(Random(xremain + yremain)) < xremain) {
-                        if (deltax != 0) {
-                            deltay = 0;
-                        }
-                    } else {
-                        if (deltay != 0) {
-                            deltax = 0;
-                        }
-                    }
-                }
-            }
-
-            xc += deltax;
-            yc += deltay;
-            ret.emplace_back(xc, yc);
-        }
-    }
-
     int SignCos2(const Position& p0, const Position& p1, const Position& p2) {
         int sqlen01 = Sqr(static_cast<int>(p1.x - p0.x)) + Sqr(static_cast<int>(p1.y - p0.y));
         int sqlen12 = Sqr(static_cast<int>(p2.x - p1.x)) + Sqr(static_cast<int>(p2.y - p1.y));
@@ -675,31 +624,24 @@ void DrawRectangleOnMap(CMap &level, const Position& p1, const Position& p2, std
  *
  * Generating winding roads/corridors for a roguelike game.
  *
- * The functions that do road generating are:
- *
- * uti_windroad(&road, mpc, x1, y1, x2, y2, pertamt)
- *     Generates a winding road from x1, y1 to x2, y2 without
- *     sharp turns. The road winds regardless of the relative location
- *     of endpoints (unless it is too short). The parameter pertamt
- *     controls the degree of perturbation the initially straight road
- *     is subjected to; typical values of 5-50 give decent results.
- *     mpc is the pointer to the map structure (needed to make sure
- *     the winding road stays within the map.
- *
- * uti_zigzag(&road, x1, y1, x2, y2, turnpct, diagpct)
- *     Generates a randomly zigzagging road from x1, y1 to x2, y2
- *     The road zigzags only if the endpoints differ in both coordinates,
- *     Otherwise it is a straight line. The parameter turnpct is the
- *     chance of a non-forced turn in percent (so, 100/turnpct is
- *     approximately the length of a straight segment; diagpct is
- *     the chance that a diagonal turn is allowed.
- *
- * uti_sigsag(&road, x1, y1, x2, y2, turnpct, diagpct)
- *     The same as zigzag, but without sharp corners.
  */
 
-
-bool AddWindingCorridor(CMap &level, const Position& start, const Position& end, int pertamt) {
+/** Generates a winding road without sharp turns.
+ *
+ * The road winds regardless of the relative location
+ * of endpoints (unless it is too short).
+ *
+ * @param pertamt controls the degree of perturbation the initially straight
+ *        road is subjected to; typical values of 5-50 give decent results.
+ * @param tile_type defines the @ref CTile type.
+ * @return Whether the road generation was successful.
+ */
+bool AddWindingRoad(CMap &level,
+    const Position& start,
+    const Position& end,
+    int pertamt,
+    std::string_view tile_type="corridor")
+{
     if (!level.inside(start) || !level.inside(end)) {
         return false;
     }
@@ -731,49 +673,165 @@ bool AddWindingCorridor(CMap &level, const Position& start, const Position& end,
     for (const auto& pos : road) {
         if (pos.x >= 1 && pos.x < level.getWidth() - 1 &&
             pos.y >= 1 && pos.y < level.getHeight() - 1) {
-            level.SetCell(pos.x, pos.y, "corridor");
+            level.SetCell(pos.x, pos.y, tile_type);
         }
     }
+
     return true;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool AddZigzagCorridor(CMap &level, const Position& start, const Position& end, int turnpct, int diagpct) {
+/** Build a zigzag path between two points.
+ *
+ * This method is not aware of the map and usually only used as internal
+ * helper for the highlevel-functions @ref AddZigzagRoad and @ref AddSigsagRoad
+ * but may be useful for other uses.
+ *
+ * @param[out] ret All @ref Positions that form the road.
+ * @param p1 The starting position.
+ * @param p2 The final position.
+ * @param turnpct The chance of a non-forced turn in percent (so, 100/turnpct
+ *                is approximately the length of a straight segment.
+ * @param diagpct The chance that a diagonal turn is allowed.
+ */
+void BuildZigzagPath(
+    std::vector<Position>& ret,
+    const Position& p1,
+    const Position& p2,
+    unsigned turnpct,
+    unsigned diagpct
+) {
+    ret.clear();
+    int xc = static_cast<int>(p1.x);
+    int yc = static_cast<int>(p1.y);
+    int x2 = static_cast<int>(p2.x);
+    int y2 = static_cast<int>(p2.y);
+
+    int deltax = 0, deltay = 0;
+    ret.emplace_back(xc, yc);
+
+    while (xc != x2 || yc != y2) {
+        int xremain = std::abs(x2 - xc);
+        int yremain = std::abs(y2 - yc);
+
+        if (ret.size() == 1 || (Random(100) < turnpct) ||
+            (std::abs(x2 - (xc + deltax)) > xremain) ||
+            (std::abs(y2 - (yc + deltay)) > yremain) ||
+            ((xremain == yremain) && (Random(100) < diagpct))) {
+
+            deltax = Sign(x2 - xc);
+            deltay = Sign(y2 - yc);
+
+            if (Random(100) < diagpct) {
+                if (xremain > yremain) {
+                    if (static_cast<int>(Random(xremain)) < (xremain - yremain)) {
+                        deltay = 0;
+                    }
+                } else if (xremain < yremain) {
+                    if (static_cast<int>(Random(yremain)) < (yremain - xremain)) {
+                        deltax = 0;
+                    }
+                }
+            } else {
+                if (static_cast<int>(Random(xremain + yremain)) < xremain) {
+                    if (deltax != 0) {
+                        deltay = 0;
+                    }
+                } else {
+                    if (deltay != 0) {
+                        deltax = 0;
+                    }
+                }
+            }
+        }
+
+        xc += deltax;
+        yc += deltay;
+        ret.emplace_back(xc, yc);
+    }
+}
+
+/** The same as @ref BuildZigzagPath, but without sharp corners.
+ */
+void BuildSigsagPath(
+    std::vector<Position>& ret,
+    const Position& p1,
+    const Position& p2,
+    unsigned turnpct,
+    unsigned diagpct
+) {
+    BuildZigzagPath(ret, p1, p2, turnpct, diagpct);
+    detail::CutCorners(ret);
+}
+
+/** Generates a randomly zigzagging road.
+ *
+ *  The road zigzags only if the endpoints differ in both coordinates,
+ *  Otherwise it is a straight line.
+ *
+ * @param turnpct The chance of a non-forced turn in percent (so, 100/turnpct
+ *                is approximately the length of a straight segment.
+ * @param diagpct The chance that a diagonal turn is allowed.
+ * @return Whether the path generation was successful.
+ */
+bool AddZigzagRoad(
+    CMap &level,
+    const Position& start,
+    const Position& end,
+    int turnpct,
+    int diagpct,
+    std::string_view tile_type="corridor"
+) {
     if (!level.inside(start) || !level.inside(end)) {
         return false;
     }
 
     std::vector<Position> road;
-    detail::BuildZigzagPath(road, start, end, turnpct, diagpct);
+    BuildZigzagPath(road, start, end, turnpct, diagpct);
 
     for (const auto& pos : road) {
         if (pos.x >= 1 && pos.x < level.getWidth() - 1 &&
             pos.y >= 1 && pos.y < level.getHeight() - 1) {
-            level.SetCell(pos.x, pos.y, "corridor");
+            level.SetCell(pos.x, pos.y, tile_type);
         }
     }
+
     return true;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool AddSigsagCorridor(CMap &level, const Position& start, const Position& end, int turnpct, int diagpct) {
+/** The same as @ref AddZigzagRoad, but without sharp corners.
+ */
+bool AddSigsagRoad(
+    CMap &level,
+    const Position& start,
+    const Position& end,
+    int turnpct,
+    int diagpct,
+    std::string_view tile_type="corridor"
+) {
     if (!level.inside(start) || !level.inside(end)) {
         return false;
     }
 
     std::vector<Position> road;
-    detail::BuildZigzagPath(road, start, end, turnpct, diagpct);
+    BuildZigzagPath(road, start, end, turnpct, diagpct);
     detail::CutCorners(road);
 
     for (const auto& pos : road) {
         if (pos.x >= 1 && pos.x < level.getWidth() - 1 &&
             pos.y >= 1 && pos.y < level.getHeight() - 1) {
-            level.SetCell(pos.x, pos.y, "corridor");
+            level.SetCell(pos.x, pos.y, tile_type);
         }
     }
+
     return true;
 }
+
+//////////////////////////////////////////////////////////////////////////
+// End of Kusigrosz' road algorithms
+//////////////////////////////////////////////////////////////////////////
 
 } // end of export namespace RL
