@@ -71,7 +71,7 @@ export {
         float factor_g = (100 + (static_cast<int>(Random(21)) - 10)) / 100.0f;
         float factor_b = (100 + (static_cast<int>(Random(21)) - 10)) / 100.0f;
 
-        // 3. Neue Kanäle berechnen und clippen (damit sie nicht über 255 steigen)
+        // Calculate and clip new channels
         auto new_r = static_cast<std::uint32_t>(std::clamp(r * factor_r, 0.0f, 255.0f));
         auto new_g = static_cast<std::uint32_t>(std::clamp(g * factor_g, 0.0f, 255.0f));
         auto new_b = static_cast<std::uint32_t>(std::clamp(b * factor_b, 0.0f, 255.0f));
