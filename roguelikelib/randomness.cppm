@@ -32,6 +32,14 @@ export {
         return static_cast<unsigned>(dist(mt));
     }
 
+    // Generate a random float in the range [min, max)
+    // Default range is [0.0, 1.0)
+    float RandomFloat(float min=0.0, float max=1.0)
+    {
+        std::uniform_real_distribution<float> dist(min, max);
+        return dist(mt);
+    }
+
     bool RandomLowerThatLimit(const std::size_t limit, const std::size_t value)
     {
         if(value == 0) {
