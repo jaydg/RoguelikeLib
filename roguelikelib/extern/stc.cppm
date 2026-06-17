@@ -354,8 +354,8 @@ constexpr int _find_closest_color_code(int r, int g, int b) {
     return _256colors[16].code;
   // we start at index 16, because colors 0 - 16 are system colors (terminal
   // emulators often define custom values for these)
-  size_t best_index = 16;
-  for (size_t i = best_index; i < 256; i++) {
+  std::size_t best_index = 16;
+  for (std::size_t i = best_index; i < 256; i++) {
     if (_color_distance(r, g, b, _256colors[i]) <
         _color_distance(r, g, b, _256colors[best_index]))
       best_index = i;
@@ -402,6 +402,11 @@ constexpr void _clamp_rgb(int &r, int &g, int &b) {
   _clamp(g, 0, 255);
   _clamp(b, 0, 255);
 }
+
+// Helper functions to extract RGB components from uint32_t packed color (0xRRGGBB format)
+constexpr int _get_r(std::uint32_t color) { return (color >> 16) & 0xFF; }
+constexpr int _get_g(std::uint32_t color) { return (color >> 8) & 0xFF; }
+constexpr int _get_b(std::uint32_t color) { return color & 0xFF; }
 
 inline std::ostream &_print_if_color(std::ostream &os, std::string_view text) {
   const auto mode = os.iword(_get_color_mode_index());
@@ -458,6 +463,21 @@ constexpr _color_code<true> rgb_fg(int r, int g, int b) {
 
 constexpr _color_code<false> rgb_bg(int r, int g, int b) {
   _clamp_rgb(r, g, b);
+  return {r, g, b, _find_closest_color_code(r, g, b)};
+}
+
+// uint32_t packed color (0xRRGGBB format) versions
+constexpr _color_code<true> rgb_fg(std::uint32_t packed_color) {
+  const int r = _get_r(packed_color);
+  const int g = _get_g(packed_color);
+  const int b = _get_b(packed_color);
+  return {r, g, b, _find_closest_color_code(r, g, b)};
+}
+
+constexpr _color_code<false> rgb_bg(std::uint32_t packed_color) {
+  const int r = _get_r(packed_color);
+  const int g = _get_g(packed_color);
+  const int b = _get_b(packed_color);
   return {r, g, b, _find_closest_color_code(r, g, b)};
 }
 
