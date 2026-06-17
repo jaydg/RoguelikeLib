@@ -32,6 +32,17 @@ export {
         return static_cast<unsigned>(dist(mt));
     }
 
+    // Generate a random number between min and max
+    unsigned RandomBetween(const std::size_t min, const std::size_t max)
+    {
+        if(min == max) {
+            return min;
+        }
+
+        std::uniform_int_distribution<std::size_t> dist(min, max - 1);
+        return static_cast<unsigned>(dist(mt));
+    }
+
     // Generate a random float in the range [min, max)
     // Default range is [0.0, 1.0)
     float RandomFloat(float min=0.0, float max=1.0)
