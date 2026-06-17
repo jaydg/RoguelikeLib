@@ -6,6 +6,7 @@ import rl.pathfinding;
 import rl.position;
 import rl.randomness;
 import std;
+import stc;
 
 using namespace std;
 
@@ -28,46 +29,46 @@ int main(void)
     // Generate some levels
     //////////////////////////////////////////////////////////////////////////
 
-    cout << endl << "Standard Dungeon" << endl << endl;
+    cout << stc::underline << "Standard Dungeon" << stc::reset << endl << endl;
     RL::CreateStandardDungeon(level, 20);
     level.PrintMap();
 
-    cout << endl << "Ant's Nest" << endl << endl;
+    cout << endl << stc::underline << "Ant's Nest" << stc::reset << endl << endl;
     RL::CreateAntNest(level, true);
     level.PrintMap();
 
-    cout << endl << "Mines" << endl << endl;
+    cout << endl << stc::underline << "Mines" << stc::reset << endl << endl;
     RL::CreateMines(level, 25);
     level.PrintMap();
 
-    cout << endl << "Caves Sharp" << endl << endl;
+    cout << endl << stc::underline << "Caves Sharp" << stc::reset << endl << endl;
     RL::CreateCaves(level, 1, 0.75);
     level.PrintMap();
 
-    cout << endl << "Caves Soft" << endl << endl;
+    cout << endl << stc::underline << "Caves Soft" << stc::reset << endl << endl;
     RL::CreateCaves(level, 3);
     level.PrintMap();
 
     for (const auto& name : RL::GetDelvePresets()) {
-        cout << endl << "Delve - " << name << endl << endl;
+        cout << endl << stc::underline << "Delve - " << name << stc::reset << endl << endl;
 
         RL::CreateDelve(level, name);
         level.PrintMap();
     }
 
-    cout << endl << "Space shuttle" << endl << endl;
+    cout << endl << stc::underline << "Space shuttle" << stc::reset << endl << endl;
     RL::CreateSpaceShuttle(level, 25);
     level.PrintMap();
 
-    cout << endl << "Castle" << endl << endl;
+    cout << endl << stc::underline << "Castle" << stc::reset << endl << endl;
     RL::CreateSpaceShuttle(level, 25);
     level.PrintMap();
 
-    cout << endl << "Forest" << endl << endl;
+    cout << endl << stc::underline << "Forest" << stc::reset << endl << endl;
     RL::GenerateForest(level);
     level.PrintMap();
 
-    cout << endl << "Simple City with 15 buildings" << endl << endl;
+    cout << endl << stc::underline << "Simple City with 15 buildings" << stc::reset << endl << endl;
     RL::CreateSimpleCity(level, 15);
     level.PrintMap();
 
@@ -75,7 +76,7 @@ int main(void)
     // Field of view testing
     //////////////////////////////////////////////////////////////////////////
 
-    cout << endl << "Field of View in Simple City from the road" << endl << endl;
+    cout << endl << stc::underline << "Field of View in Simple City from the road" << stc::reset << endl << endl;
 
 
     // Place observer somewhere on a horizontal road
@@ -96,12 +97,14 @@ int main(void)
     RL::Position pos;
     for (pos.y = 0; pos.y < level_size.y; ++pos.y) {
         for (pos.x = 0; pos.x < level_size.x; ++pos.x) {
+            auto tile = level.get(pos);
+
             if (pos == observer) {
-                cout << '@';
+                cout << stc::rgb_fg(0xF0F000) << '@' << stc::reset;
             } else if (fov.get(pos)) { // visible cells take from the map
-                cout << level.get(pos).getGlyph();
-            } else if (level.get(pos).getGlyph() == '#') { // not visible walls as '%'
-                cout << '%';
+                cout << stc::rgb_fg(tile.getColor()) << tile.getGlyph() << stc::reset;
+            } else if (level.get(pos).getGlyph() == '#') { // not visible
+                cout << stc::rgb_fg(0x202020) << tile.getGlyph() << stc::reset;
             } else { // others are empty
                 cout << ' ';
             }
@@ -116,11 +119,11 @@ int main(void)
 
     // Create maze
 
-    cout << endl << "Maze" << endl << endl;
+    cout << endl << stc::underline << "Maze" << stc::reset << endl << endl;
     RL::CreateMaze(level);
     level.PrintMap();
 
-    cout << endl << "Path in this maze '+' (from top-left to bottom-right corner)" << endl << endl;
+    cout << endl << stc::underline << "Path in this maze" << stc::reset << " '+' (from top-left to bottom-right corner)" << endl << endl;
 
     // Find corners
 

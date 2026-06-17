@@ -10,6 +10,7 @@ import rl.matrix;
 import rl.position;
 import rl.tile;
 import std;
+import stc;
 
 export namespace RL {
 
@@ -45,10 +46,11 @@ public:
     {
         for (std::size_t y = 0; y < getHeight(); ++y) {
             for (std::size_t x = 0; x < getWidth(); ++x) {
-                std::cout << get(x, y).getGlyph();
+                auto tile = get(x, y);
+                std::cout << stc::rgb_fg(tile.getColor()) << tile.getGlyph();
             }
 
-            std::cout << std::endl;
+            std::cout << stc::reset << std::endl;
         }
     }
 };
