@@ -75,6 +75,8 @@ export {
     }
 
     // Jitter each color channel by 10%
+    // For grayscale colors (R == G == B), modify only luminosity by +/- 10%
+    // For colored colors, scramble each channel independently by +/- 10%
     std::uint32_t GetJitteredColor(std::uint32_t base_color)
     {
         // Extract color channels
@@ -82,18 +84,32 @@ export {
         std::uint8_t g = (base_color >> 8) & 0xFF;
         std::uint8_t b = base_color & 0xFF;
 
-        // Calculate random factor 90% und 110% for each color channel
+        // Check if this is a grayscale color (all channels equal)
+        bool is_grayscale = (r == g && g == b);
+
+        // Calculate random factor 90% to 110%
         // Random(21) returns a number between 0 and 20.
         // -10 moves that to -10 to +10.
         // +100 results in 90 to 110. Division by 100.0f yields 0.9 to 1.1.
-        float factor_r = (100 + (static_cast<int>(Random(21)) - 10)) / 100.0f;
-        float factor_g = (100 + (static_cast<int>(Random(21)) - 10)) / 100.0f;
-        float factor_b = (100 + (static_cast<int>(Random(21)) - 10)) / 100.0f;
+        float factor = (100 + (static_cast<int>(Random(21)) - 10)) / 100.0f;
 
-        // Calculate and clip new channels
-        auto new_r = static_cast<std::uint32_t>(std::clamp(r * factor_r, 0.0f, 255.0f));
-        auto new_g = static_cast<std::uint32_t>(std::clamp(g * factor_g, 0.0f, 255.0f));
-        auto new_b = static_cast<std::uint32_t>(std::clamp(b * factor_b, 0.0f, 255.0f));
+        std::uint32_t new_r, new_g, new_b;
+
+        if (is_grayscale) {
+            // For grayscale: apply same factor to all channels (modify luminosity)
+            new_r = static_cast<std::uint32_t>(std::clamp(r * factor, 0.0f, 255.0f));
+            new_g = new_r;
+            new_b = new_r;
+        } else {
+            // For colored: scramble each channel independently
+            float factor_r = (100 + (static_cast<int>(Random(21)) - 10)) / 100.0f;
+            float factor_g = (100 + (static_cast<int>(Random(21)) - 10)) / 100.0f;
+            float factor_b = (100 + (static_cast<int>(Random(21)) - 10)) / 100.0f;
+
+            new_r = static_cast<std::uint32_t>(std::clamp(r * factor_r, 0.0f, 255.0f));
+            new_g = static_cast<std::uint32_t>(std::clamp(g * factor_g, 0.0f, 255.0f));
+            new_b = static_cast<std::uint32_t>(std::clamp(b * factor_b, 0.0f, 255.0f));
+        }
 
         // Pack color channels
         return (new_r << 16) | (new_g << 8) | new_b;
