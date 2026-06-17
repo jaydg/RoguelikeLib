@@ -34,11 +34,14 @@ private:
             { "wall",        { '#', 0x888888, false, false } },
             { "corridor",    { '.', 0xCCCCCC, true,  true  } },
             { "grass",       { '"', 0xA7CC7C, true,  true  } },
-            { "plant",       { '.', 0x8DAD68, false, true  } },
+            { "plant",       { '&', 0x8DAD68, false, true  } },
+            { "tree",        { 'T', 0x4D9157, false, false } },
             { "room",        { '.', 0xCCCCCC, true,  true  } },
             { "door_closed", { '+', 0xAA7744, false, false } },
             { "door_open",   { '+', 0xAA7744, true,  true  } },
-            { "water",       { '~', 0x3399FF, true,  false } }
+            { "water",       { '~', 0x3399FF, true,  false } },
+            { "bridge",      { '=', 0x8B4513, true,  true  } },
+            { "rock",        { '^', 0x555555, false, false } }
         };
 
         return defaults;

@@ -63,6 +63,10 @@ int main(void)
     RL::CreateSpaceShuttle(level, 25);
     level.PrintMap();
 
+    cout << endl << "Forest" << endl << endl;
+    RL::GenerateForest(level);
+    level.PrintMap();
+
     cout << endl << "Simple City with 15 buildings" << endl << endl;
     RL::CreateSimpleCity(level, 15);
     level.PrintMap();

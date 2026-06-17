@@ -106,7 +106,7 @@ void CreateSimpleCity(CMap &level, const int& a_number_of_buildings)
                 if (level.get(x, y).getType() == "grass"
                     && level.CountNeighbors(Position(x, y), CTile::ByType("wall"), Neighbors::All8) == 0)
                 {
-                    level.SetCell(x, y, "plant");
+                    level.SetCell(x, y, CoinToss() ? "plant" : "tree");
                 }
             }
 
