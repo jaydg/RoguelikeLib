@@ -6,7 +6,8 @@ export module rl.directions;
 
 import rl.randomness;
 
-export namespace RL {
+export namespace RL
+{
 
 enum EDirection {
     EDirectionMin = 0,
@@ -21,7 +22,8 @@ enum EDirection {
     EDirectionMax = NorthWest
 };
 
-class Direction {
+class Direction
+{
     EDirection direction;
 public:
     Direction() : direction(North) {}

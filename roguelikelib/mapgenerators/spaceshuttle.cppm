@@ -8,7 +8,8 @@ import rl.maputils;
 import rl.matrix;
 import std;
 
-export namespace RL {
+export namespace RL
+{
 
 void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15)
 {
@@ -127,15 +128,14 @@ void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15)
             for (std::size_t y = 0; y < level.getHeight() / 2; y++) {
 
                 int current_id = id_matrix.get(x, y);
-                int right_id   = id_matrix.get(x + 1, y);
-                int bottom_id  = id_matrix.get(x, y + 1);
-                int diag_id    = id_matrix.get(x + 1, y + 1);
+                int right_id = id_matrix.get(x + 1, y);
+                int bottom_id = id_matrix.get(x, y + 1);
+                int diag_id = id_matrix.get(x + 1, y + 1);
 
                 if (current_id != 0) {
-                    if ((current_id != right_id  && right_id != 0) ||
-                        (current_id != bottom_id && bottom_id != 0) ||
-                        (current_id != diag_id   && diag_id != 0))
-                    {
+                    if ((current_id != right_id && right_id != 0) ||
+                            (current_id != bottom_id && bottom_id != 0) ||
+                            (current_id != diag_id && diag_id != 0)) {
                         // Two adjacent rooms - place wall
                         level.SetCell(x, y, "wall");
                     } else {

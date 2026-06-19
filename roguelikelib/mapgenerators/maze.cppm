@@ -7,7 +7,8 @@ import rl.randomness;
 import rl.position;
 import std;
 
-export namespace RL {
+export namespace RL
+{
 
 void CreateMaze(CMap &level, bool allow_loops = false)
 {
@@ -20,15 +21,15 @@ void CreateMaze(CMap &level, bool allow_loops = false)
     std::list <Position> drillers;
     drillers.emplace_back(level.getWidth() / 2, level.getHeight() / 2);
 
-    while(!drillers.empty()) {
+    while (!drillers.empty()) {
         std::list <Position>::iterator m, _m;
         m = drillers.begin();
         _m = drillers.end();
 
-        while(m != _m) {
+        while (m != _m) {
             bool remove_driller = false;
 
-            switch(Random(4)) {
+            switch (Random(4)) {
             case 0:
                 if (m->y < 2) {
                     remove_driller = true;
@@ -38,7 +39,7 @@ void CreateMaze(CMap &level, bool allow_loops = false)
                 m->y -= 2;
 
                 if (level.get(m->x, m->y).isPassable()) {
-                    if(!allow_loops || (allow_loops && Random(5))) {
+                    if (!allow_loops || (allow_loops && Random(5))) {
                         remove_driller = true;
                         break;
                     }
@@ -63,6 +64,7 @@ void CreateMaze(CMap &level, bool allow_loops = false)
                     remove_driller = true;
                     break;
                 }
+
                 m->x -= 2;
 
                 if (level.get(m->x, m->y).isPassable()) {
@@ -86,7 +88,7 @@ void CreateMaze(CMap &level, bool allow_loops = false)
                 break;
             }
 
-            if(remove_driller) {
+            if (remove_driller) {
                 m = drillers.erase(m);
             } else {
                 drillers.emplace_back(m->x, m->y);

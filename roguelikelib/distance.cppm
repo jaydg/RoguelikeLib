@@ -8,7 +8,8 @@ export module rl.distance;
 
 import std;
 
-namespace RL {
+namespace RL
+{
 
 //////////////////////////////////////////////////////////////////////////
 // To speed up distance calculation
@@ -19,7 +20,7 @@ void InitSquareRoot(std::size_t size)
 {
     const std::size_t old_size = square_root.size();
 
-    if(size < old_size) {
+    if (size < old_size) {
         return;
     }
 
@@ -27,7 +28,7 @@ void InitSquareRoot(std::size_t size)
     square_root.resize(size);
 
     // count square root
-    for(std::size_t a = old_size; a < size; ++a) {
+    for (std::size_t a = old_size; a < size; ++a) {
         square_root[a] = static_cast<std::size_t>(std::ceil(std::sqrt(static_cast<double>(a))));
     }
 }
@@ -36,7 +37,8 @@ void InitSquareRoot(std::size_t size)
 export {
 
     template<typename T>
-    T diff(T a, T b){
+    T diff(T a, T b)
+    {
         return (a > b) ? (a - b) : (b - a);
     }
 
@@ -47,7 +49,7 @@ export {
 
         const std::size_t dist = diff_x * diff_x + diff_y * diff_y;
 
-        if(dist >= square_root.size()) {
+        if (dist >= square_root.size()) {
             InitSquareRoot(dist);
         }
 

@@ -9,7 +9,8 @@ import rl.randomness;
 import rl.tile;
 import std;
 
-export namespace RL {
+export namespace RL
+{
 
 void CreateAntNest(CMap &level, bool with_rooms = false)
 {
@@ -78,16 +79,16 @@ void CreateAntNest(CMap &level, bool with_rooms = false)
                 y1 = static_cast<double>(py);
             }
 
-            if(py > static_cast<int>(level.getHeight()) - 1) {
+            if (py > static_cast<int>(level.getHeight()) - 1) {
                 py = 0;
                 y1 = static_cast<double>(py);
             }
 
             // if object has something to catch, then catch it
             if ((px > 0 && level.get(px - 1, py).getType() == "corridor") ||
-               (py > 0 && level.get(px, py - 1).getType() == "corridor") ||
-               (px < static_cast<int>(level.getWidth()) - 1 && level.get(px + 1, py).getType() == "corridor") ||
-               (py < static_cast<int>(level.getHeight()) - 1 && level.get(px, py + 1).getType() == "corridor")) {
+                    (py > 0 && level.get(px, py - 1).getType() == "corridor") ||
+                    (px < static_cast<int>(level.getWidth()) - 1 && level.get(px + 1, py).getType() == "corridor") ||
+                    (py < static_cast<int>(level.getHeight()) - 1 && level.get(px, py + 1).getType() == "corridor")) {
 
                 level.SetCell(px, py, "corridor");
                 break;
@@ -101,8 +102,8 @@ void CreateAntNest(CMap &level, bool with_rooms = false)
             for (std::size_t x = 1; x < level.getWidth() - 1; x++) {
 
                 if ((x > level.getWidth() / 2 - 10 && x < level.getWidth() / 2 + 10 &&
-                    y > level.getHeight() / 2 - 5 && y < level.getHeight() / 2 + 5) ||
-                    level.get(x, y).getType() == "wall") {
+                        y > level.getHeight() / 2 - 5 && y < level.getHeight() / 2 + 5) ||
+                        level.get(x, y).getType() == "wall") {
                     continue;
                 }
 

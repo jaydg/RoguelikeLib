@@ -8,7 +8,8 @@ export module rl.randomness;
 
 import std;
 
-namespace RL {
+namespace RL
+{
 
 // Internal module state (not exported, has module linkage)
 std::mt19937 mt;
@@ -24,7 +25,7 @@ export {
 
     unsigned Random(const std::size_t limit)
     {
-        if(limit == 0) {
+        if (limit == 0) {
             return 0;
         }
 
@@ -35,7 +36,7 @@ export {
     // Generate a random number between min and max
     unsigned RandomBetween(const std::size_t min, const std::size_t max)
     {
-        if(min == max) {
+        if (min == max) {
             return min;
         }
 
@@ -45,7 +46,7 @@ export {
 
     // Generate a random float in the range [min, max)
     // Default range is [0.0, 1.0)
-    float RandomFloat(float min=0.0, float max=1.0)
+    float RandomFloat(float min = 0.0, float max = 1.0)
     {
         std::uniform_real_distribution<float> dist(min, max);
         return dist(mt);
@@ -53,7 +54,7 @@ export {
 
     bool RandomLowerThatLimit(const std::size_t limit, const std::size_t value)
     {
-        if(value == 0) {
+        if (value == 0) {
             return false;
         }
 
@@ -68,7 +69,7 @@ export {
     template <class RandomAccessIterator>
     void Shuffle(RandomAccessIterator first, RandomAccessIterator last)
     {
-        for(auto i = (last - first) - 1; i > 0; --i) {
+        for (auto i = (last - first) - 1; i > 0; --i) {
             std::uniform_int_distribution<decltype(i)> d(0, i);
             std::swap(first[i], first[d(mt)]);
         }

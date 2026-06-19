@@ -9,7 +9,8 @@ import rl.position;
 import rl.randomness;
 import std;
 
-export namespace RL {
+export namespace RL
+{
 
 void CreateMines(CMap &level, int max_number_of_rooms = 10)
 {
@@ -28,23 +29,24 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
     Position p, p1, p2;
 
     // Place rooms
-    for(int room_number = 0; room_number < max_number_of_rooms; ++room_number) {
+    for (int room_number = 0; room_number < max_number_of_rooms; ++room_number) {
         // size of room
         const std::size_t sx = Random(5) + 6;
         const std::size_t sy = Random(5) + 6;
 
-        if(FindOnMapRandomRectangleOfType(level, "wall", p, Size(sx + 4, sy + 4))) {
+        if (FindOnMapRandomRectangleOfType(level, "wall", p, Size(sx + 4, sy + 4))) {
             p.x += 2;
             p.y += 2;
 
             // Connect the room to existing one
-            if(!rooms.empty()) {
+            if (!rooms.empty()) {
                 std::size_t random_number = Random(rooms.size());
 
-                for(m = rooms.begin(); ; ++m) {
-                    if(random_number == 0) {
+                for (m = rooms.begin(); ; ++m) {
+                    if (random_number == 0) {
                         break;
                     }
+
                     random_number--;
                 }
 
@@ -63,12 +65,12 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
                 std::size_t x = p1.x;
                 std::size_t y = p1.y;
 
-                while(!(diff_x == 0 && diff_y == 0)) {
+                while (!(diff_x == 0 && diff_y == 0)) {
                     // move horizontally
-                    if(RandomLowerThatLimit(diff_x, diff_x + diff_y)) {
+                    if (RandomLowerThatLimit(diff_x, diff_x + diff_y)) {
                         diff_x--;
 
-                        if(x > p2.x) {
+                        if (x > p2.x) {
                             x--;
                         } else {
                             x++;
@@ -76,7 +78,7 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
                     } else {
                         diff_y--;
 
-                        if(y > p2.y) {
+                        if (y > p2.y) {
                             y--;
                         } else {
                             y++;
@@ -87,7 +89,7 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
                     if (level.get(x, y).getType() == "room") {
                         break;
                     } else if (level.get(x, y).getType() == "corridor")
-                        if(CoinToss()) {
+                        if (CoinToss()) {
                             break;
                         }
 
@@ -106,14 +108,14 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
             // draw_room
             int room_type = static_cast<int>(Random(4));
 
-            if(sx == sy) {
+            if (sx == sy) {
                 room_type = 3;
             }
 
-            if(room_type != 2) {
-                for(std::size_t y = 0; y < sy; y++)
-                    for(std::size_t x = 0; x < sx; x++) {
-                        switch(room_type) {
+            if (room_type != 2) {
+                for (std::size_t y = 0; y < sy; y++)
+                    for (std::size_t x = 0; x < sx; x++) {
+                        switch (room_type) {
                         case 0: // rectangle room
                         case 1:
                             level.SetCell(p.x + x, p.y + y, "room");
@@ -121,7 +123,7 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
 
                         case 3: // round room
                         default:
-                            if(Distance(sx / 2, sx / 2, x, y) < sx / 2) {
+                            if (Distance(sx / 2, sx / 2, x, y) < sx / 2) {
                                 level.SetCell(p.x + x, p.y + y, "room");
                             }
 
@@ -130,9 +132,9 @@ void CreateMines(CMap &level, int max_number_of_rooms = 10)
                     }
             } // end if
             else { // typ==2 - Diamond
-                for(std::size_t y = 0; y <= sy / 2; y++)
-                    for(std::size_t x = 0; x <= sx / 2; x++) {
-                        if(y >= x) {
+                for (std::size_t y = 0; y <= sy / 2; y++)
+                    for (std::size_t x = 0; x <= sx / 2; x++) {
+                        if (y >= x) {
                             level.SetCell(p.x + x + sx / 2, p.y + y, "room");
                             level.SetCell(p.x + x + sx / 2, p.y + sy - y, "room");
                             level.SetCell(p.x + sx / 2 - x, p.y + y, "room");

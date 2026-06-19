@@ -1,6 +1,6 @@
 module;
 
-export module demo_game.monster:impl;
+export module demo_game.monster: impl;
 
 import demo_game.game;
 import demo_game.io;
@@ -23,16 +23,16 @@ bool CMonster::MoveTo(const RL::Position &new_pos)
 {
     RL::CTile cell = game.level.get(new_pos);
 
-    if(cell.isPassable()) {
+    if (cell.isPassable()) {
         // if monster there
         CMonster *monster = game.GetMonsterFromCell(new_pos);
 
-        if(monster == nullptr) {
+        if (monster == nullptr) {
             position = new_pos;
             return true;
         }
 
-        if(monster != this) {
+        if (monster != this) {
             Attack(monster);
         }
 
@@ -46,7 +46,7 @@ bool CMonster::Damage(int damage)
 {
     hit_points -= damage;
 
-    if(hit_points <= 0) {
+    if (hit_points <= 0) {
         Death();
         return true;
     }

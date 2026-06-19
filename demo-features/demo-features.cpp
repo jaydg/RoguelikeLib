@@ -95,6 +95,7 @@ int main(void)
     // Print calculated FOV
 
     RL::Position pos;
+
     for (pos.y = 0; pos.y < level_size.y; ++pos.y) {
         for (pos.x = 0; pos.x < level_size.x; ++pos.x) {
             auto tile = level.get(pos);

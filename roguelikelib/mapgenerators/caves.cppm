@@ -9,7 +9,8 @@ import rl.randomness;
 import rl.tile;
 import std;
 
-export namespace RL {
+export namespace RL
+{
 
 // create a game of life cave
 void CreateCaves(CMap &level, int iterations = 1, float density = 0.65)

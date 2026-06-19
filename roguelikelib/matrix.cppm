@@ -9,29 +9,34 @@ export module rl.matrix;
 import rl.position;
 import std;
 
-export namespace RL {
+export namespace RL
+{
 
 enum class Neighbors {
     All8,       // all 8 surrounding directions
     Cardinal4   // only the 4 cardinal directions (N, S, W, E)
 };
 
-class EOutOfBoundException : public std::exception {
+class EOutOfBoundException : public std::exception
+{
 private:
     std::string message;
 public:
-    EOutOfBoundException(const Position pos, const Size size) {
+    EOutOfBoundException(const Position pos, const Size size)
+    {
         message = "Given position " + pos.toString() + " is out of bounds " +
-            "for map with dimensions " + size.toString();
+                  "for map with dimensions " + size.toString();
     }
 
-    const char* what() const noexcept {
+    const char* what() const noexcept
+    {
         return message.c_str();
     }
 };
 
 template <typename T>
-class CMatrix {
+class CMatrix
+{
 public:
     CMatrix() {};
 
@@ -87,7 +92,8 @@ public:
         return data[pos.x * size.y + pos.y];
     }
 
-    void set(std::size_t x, std::size_t y, T val) {
+    void set(std::size_t x, std::size_t y, T val)
+    {
         if (!inside(x, y)) {
             throw EOutOfBoundException(Position(x, y), size);
         }
@@ -95,7 +101,8 @@ public:
         data[x * size.y + y] = val;
     }
 
-    void set(const Position pos, T val) {
+    void set(const Position pos, T val)
+    {
         if (!inside(pos)) {
             throw EOutOfBoundException(pos, size);
         }
@@ -108,11 +115,13 @@ public:
         return size;
     }
 
-    [[nodiscard]] std::size_t getWidth() const {
+    [[nodiscard]] std::size_t getWidth() const
+    {
         return size.x;
     }
 
-    [[nodiscard]] std::size_t getHeight() const {
+    [[nodiscard]] std::size_t getHeight() const
+    {
         return size.y;
     }
 
@@ -122,13 +131,15 @@ public:
         Neighbors mode = Neighbors::Cardinal4)
     {
         return CountNeighborsImpl(pos,
-            [&value](const T& cell){ return cell == value; }, mode);
+        [&value](const T & cell) {
+            return cell == value;
+        }, mode);
     }
 
     // compare by predicate (e.g. for CTile a lambda calling getType())
     template <typename Pred>
-        requires std::invocable<Pred, const T&>
-              && std::convertible_to<std::invoke_result_t<Pred, const T&>, bool>
+    requires std::invocable<Pred, const T&>
+    && std::convertible_to<std::invoke_result_t<Pred, const T&>, bool>
     [[nodiscard]] int CountNeighbors(
         const Position& pos, Pred&& predicate,
         Neighbors mode = Neighbors::Cardinal4)
@@ -160,7 +171,7 @@ public:
             T this_value = get(pos_x, pos_y);
 
             if (pos_x > 0)
-                if(get(pos_x - 1, pos_y) == area_value) {
+                if (get(pos_x - 1, pos_y) == area_value) {
                     set(pos_x - 1, pos_y, this_value + gradient);
                     positions.emplace_back(pos_x - 1, pos_y);
                 }
@@ -230,31 +241,40 @@ private:
 
     template <typename Pred>
     [[nodiscard]] int CountNeighborsImpl(
-    const Position& pos, Pred&& predicate, Neighbors mode) const
+        const Position& pos, Pred&& predicate, Neighbors mode) const
     {
-        static constexpr std::array<std::pair<int,int>, 8> all8 = {{
-            {-1,-1},{0,-1},{1,-1},
-            {-1, 0},       {1, 0},
-            {-1, 1},{0, 1},{1, 1}
-        }};
-        static constexpr std::array<std::pair<int,int>, 4> cardinal4 = {{
-            {0,-1},{-1,0},{1,0},{0,1}
-        }};
+        // *INDENT-OFF* (protect againt astyle)
+        static constexpr std::array<std::pair<int, int>, 8> all8 = {{
+                {-1, -1}, {0, -1}, {1, -1},
+                {-1,  0},          {1,  0},
+                {-1,  1}, {0,  1}, {1,  1}
+            }
+        };
+        // *INDENT-ON*
+
+        static constexpr std::array<std::pair<int, int>, 4> cardinal4 = {{
+                {0, -1}, {-1, 0}, {1, 0}, {0, 1}
+            }
+        };
 
         const auto& offsets = (mode == Neighbors::All8)
-            ? std::span<const std::pair<int,int>>(all8)
-            : std::span<const std::pair<int,int>>(cardinal4);
+                              ? std::span<const std::pair<int, int>>(all8)
+                              : std::span<const std::pair<int, int>>(cardinal4);
 
         const int px = static_cast<int>(pos.x);
         const int py = static_cast<int>(pos.y);
         int count = 0;
-        for (auto [dx, dy] : offsets) {
+
+        for (auto[dx, dy] : offsets) {
             const int nx = px + dx;
             const int ny = py + dy;
+
             if (nx >= 0 && nx < static_cast<int>(size.x) && ny >= 0 && ny < static_cast<int>(size.y))
-                if (predicate(data[nx * size.y + ny]))
+                if (predicate(data[nx * size.y + ny])) {
                     ++count;
+                }
         }
+
         return count;
     }
 };

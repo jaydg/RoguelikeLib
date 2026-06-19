@@ -1,6 +1,6 @@
 module;
 
-export module demo_game.rodent:impl;
+export module demo_game.rodent: impl;
 
 import demo_game.game;
 import demo_game.monster;
@@ -26,16 +26,18 @@ void CRodent::LookAround()
 {
     CMonster::LookAround();
 
-    if(fov.get(game.player.GetPosition())) {
+    if (fov.get(game.player.GetPosition())) {
         enemy_pos = game.player.GetPosition();
     }
 }
 
-void CRodent::DoAction() {
+void CRodent::DoAction()
+{
     LookAround();
 
-    if(position != enemy_pos && game.level.inside(enemy_pos)) {
+    if (position != enemy_pos && game.level.inside(enemy_pos)) {
         std::vector<RL::Position> path;
+
         if (RL::FindPath(game.level, position, enemy_pos, path)) {
             if (MoveTo(path[0])) {
                 return;

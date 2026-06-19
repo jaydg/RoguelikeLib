@@ -1,6 +1,6 @@
 module;
 
-export module demo_game.player:impl;
+export module demo_game.player: impl;
 
 import demo_game.game;
 import demo_game.io;
@@ -25,7 +25,7 @@ bool CPlayer::Attack(CMonster *monster)
 {
     bool is_dead = CMonster::Attack(monster);
 
-    if(is_dead) {
+    if (is_dead) {
         GainExperience();
     }
 
@@ -34,7 +34,7 @@ bool CPlayer::Attack(CMonster *monster)
 
 void CPlayer::Regenerate()
 {
-    if(RL::Random(8) == 0 && hit_points < 20) {
+    if (RL::Random(8) == 0 && hit_points < 20) {
         hit_points++;
     }
 }
@@ -44,10 +44,11 @@ void CPlayer::GainExperience()
     experience++;
 }
 
-void CPlayer::DoAction() {
+void CPlayer::DoAction()
+{
     LookAround();
 
-    switch(IOGetKey()) {
+    switch (IOGetKey()) {
     case '1':
         MoveTo(RL::Position(position.x - 1, position.y + 1));
         break;
@@ -110,14 +111,11 @@ void CPlayer::LookAround()
     // Print map
     RL::Position pos;
 
-    for (pos.x = 0; pos.x < CSimpleGame::LEVEL_SIZE_X; ++pos.x)
-    {
-        for (pos.y = 0; pos.y < CSimpleGame::LEVEL_SIZE_Y; ++pos.y)
-        {
+    for (pos.x = 0; pos.x < CSimpleGame::LEVEL_SIZE_X; ++pos.x) {
+        for (pos.y = 0; pos.y < CSimpleGame::LEVEL_SIZE_Y; ++pos.y) {
             auto cell = game.level.get(pos);
 
-            if (fov.get(pos))
-            {
+            if (fov.get(pos)) {
                 // currently visible
                 seen_map.set(pos, true);
 
@@ -127,12 +125,10 @@ void CPlayer::LookAround()
                 // paint visible monsters
                 const CMonster* monster = game.GetMonsterFromCell(pos);
 
-                if(monster != nullptr) {
+                if (monster != nullptr) {
                     monster->Print();
                 }
-            }
-            else if(seen_map.get(pos))
-            {
+            } else if (seen_map.get(pos)) {
                 std::uint32_t base_color = cell.getColor();
 
                 // known, but currently not visible
@@ -143,9 +139,7 @@ void CPlayer::LookAround()
                 std::uint32_t dark_color = (r << 16) | (g << 8) | b;
 
                 IOPrintChar(pos.x, pos.y, cell.getGlyph(), dark_color);
-            }
-            else
-            {
+            } else {
                 // unknown
                 IOPrintChar(pos.x, pos.y, ' ');
             }

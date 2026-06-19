@@ -10,7 +10,8 @@ import rl.randomness;
 import rl.distance;
 import std;
 
-export namespace RL {
+export namespace RL
+{
 
 // =============================================================================
 // Tools for natural clearings
@@ -23,19 +24,23 @@ void GenerateAndTrackClearing(
     std::size_t radius,
     std::vector<Position>& all_clearing_tiles,
     std::string_view clearing_type = "grass"
-) {
+)
+{
     const std::size_t max_radius = radius * 2;
     const float noise_scale = 0.3f; // Scaling for "randomness" of the shape
 
     for (std::size_t x = std::max(0, static_cast<int>(center.x) - static_cast<int>(max_radius));
-         x <= std::min(static_cast<int>(map.getWidth()) - 1, static_cast<int>(center.x) + static_cast<int>(max_radius));
-         ++x) {
+            x <= std::min(static_cast<int>(map.getWidth()) - 1, static_cast<int>(center.x) + static_cast<int>(max_radius));
+            ++x) {
         for (std::size_t y = std::max(0, static_cast<int>(center.y) - static_cast<int>(max_radius));
-             y <= std::min(static_cast<int>(map.getHeight()) - 1, static_cast<int>(center.y) + static_cast<int>(max_radius));
-             ++y) {
+                y <= std::min(static_cast<int>(map.getHeight()) - 1, static_cast<int>(center.y) + static_cast<int>(max_radius));
+                ++y) {
             // Calculate the distance to the center
             float dist = Distance(x, y, center.x, center.y);
-            if (dist > max_radius) continue;
+
+            if (dist > max_radius) {
+                continue;
+            }
 
             // Add random "noise" to create irregular shapes
             float noise = (RandomFloat() * 2.0f - 1.0f) * noise_scale * max_radius;
@@ -59,7 +64,8 @@ std::vector<Position> GenerateRiverPath(
     CMap& map,
     const Position& start,
     const Position& end
-) {
+)
+{
     std::vector<Position> path;
     Position current = start;
     path.push_back(current);
@@ -76,6 +82,7 @@ std::vector<Position> GenerateRiverPath(
         if (current.x != end.x) {
             dx = target_dx;
         }
+
         if (current.y != end.y) {
             dy = target_dy;
         }
@@ -130,6 +137,7 @@ std::vector<Position> GenerateRiverPath(
         } else {
             // Try alternative directions
             bool found = false;
+
             for (int attempt = 0; attempt < 5 && !found; ++attempt) {
                 // Prefer directions that make progress towards target
                 if (RandomFloat() < 0.5f && current.x != end.x) {
@@ -173,13 +181,15 @@ void GenerateBranchedRiver(
     std::size_t length,
     std::size_t max_branches = 2,
     std::string_view river_type = "water"
-) {
+)
+{
     std::vector<Position> main_path;
     Position current = start;
 
     // Try to find a valid start position
     std::size_t attempts = 0;
     const std::size_t max_attempts = 20;
+
     while (attempts < max_attempts) {
         current = Position(Random(map.getWidth()), Random(map.getHeight()));
         attempts++;
@@ -198,10 +208,14 @@ void GenerateBranchedRiver(
             if (!main_path.empty() && i > 0) {
                 dx = static_cast<int>(main_path.back().x) - static_cast<int>(main_path[main_path.size() - 2].x);
                 dy = static_cast<int>(main_path.back().y) - static_cast<int>(main_path[main_path.size() - 2].y);
+
                 if (RandomFloat() < 0.5f) {
                     // slight deviation
-                    if (RandomFloat() < 0.5f) dx = -dy;
-                    else dy = -dx;
+                    if (RandomFloat() < 0.5f) {
+                        dx = -dy;
+                    } else {
+                        dy = -dx;
+                    }
                 }
             } else {
                 // starting direction
@@ -221,6 +235,7 @@ void GenerateBranchedRiver(
         }
 
         Position next(current.x + dx, current.y + dy);
+
         if (map.inside(next.x, next.y)) {
             current = next;
             main_path.push_back(current);
@@ -230,6 +245,7 @@ void GenerateBranchedRiver(
                 dx = Random(3) - 1;
                 dy = Random(3) - 1;
                 next = Position(current.x + dx, current.y + dy);
+
                 if (map.inside(next.x, next.y)) {
                     current = next;
                     main_path.push_back(current);
@@ -243,9 +259,11 @@ void GenerateBranchedRiver(
     for (const auto& pos : main_path) {
         if (map.inside(pos.x, pos.y)) {
             map.SetCell(pos.x, pos.y, river_type);
+
             if (pos.x > 0) {
                 map.SetCell(pos.x - 1, pos.y, river_type);
             }
+
             if (pos.y > 0) {
                 map.SetCell(pos.x, pos.y - 1, river_type);
             }
@@ -254,8 +272,9 @@ void GenerateBranchedRiver(
 
     // Generate branches
     for (std::size_t b = 0; b < max_branches; ++b) {
-        if (main_path.size() < 5)
+        if (main_path.size() < 5) {
             continue;
+        }
 
         std::size_t branch_start_idx = RandomBetween(1, main_path.size() - 2);
         Position branch_start = main_path[branch_start_idx];
@@ -275,12 +294,15 @@ bool GeneratePathWithBridges(
     const Position& end,
     std::string_view path_type = "corridor",
     std::string_view bridge_type = "bridge"
-) {
+)
+{
     std::vector<Position> path;
     BuildSigsagPath(path, start, end, 50, 30);
 
     for (const auto& pos : path) {
-        if (!map.inside(pos.x, pos.y)) continue;
+        if (!map.inside(pos.x, pos.y)) {
+            continue;
+        }
 
         // Check if the path hits water and build bridges
         if (map.get(pos.x, pos.y).getType() == "water") {
@@ -289,17 +311,20 @@ bool GeneratePathWithBridges(
             map.SetCell(pos.x, pos.y, path_type);
         }
     }
+
     return true;
 }
 
 // Places rocks randomly on the map, avoiding water and paths
-void GenerateRocks(CMap& map, float rock_density = 0.05f) {
+void GenerateRocks(CMap& map, float rock_density = 0.05f)
+{
     for (std::size_t y = 0; y < map.getHeight(); ++y) {
         for (std::size_t x = 0; x < map.getWidth(); ++x) {
             std::string_view current_type = map.get(x, y).getType();
+
             // Don't place rocks on water, bridges, or paths
             if (current_type != "water" && current_type != "bridge" &&
-                current_type != "corridor" && RandomFloat() < rock_density) {
+                    current_type != "corridor" && RandomFloat() < rock_density) {
                 map.SetCell(x, y, "rock");
             }
         }
@@ -327,7 +352,8 @@ void GenerateForest(
     std::size_t num_rivers = 1,
     std::size_t num_streams = 8,
     float vegetation_density = 0.6f
-) {
+)
+{
     // 1. Fill map with grass
     map.Clear("grass");
 
@@ -360,40 +386,46 @@ void GenerateForest(
 
             // Generate start position on entry side
             switch (entry_side) {
-                case 0: // Top
-                    start = Position(Random(map.getWidth()), 0);
-                    break;
-                case 1: // Right
-                    start = Position(map.getWidth() - 1, Random(map.getHeight()));
-                    break;
-                case 2: // Bottom
-                    start = Position(Random(map.getWidth()), map.getHeight() - 1);
-                    break;
-                case 3: // Left
-                    start = Position(0, Random(map.getHeight()));
-                    break;
+            case 0: // Top
+                start = Position(Random(map.getWidth()), 0);
+                break;
+
+            case 1: // Right
+                start = Position(map.getWidth() - 1, Random(map.getHeight()));
+                break;
+
+            case 2: // Bottom
+                start = Position(Random(map.getWidth()), map.getHeight() - 1);
+                break;
+
+            case 3: // Left
+                start = Position(0, Random(map.getHeight()));
+                break;
             }
 
             // Generate end position on exit side
             switch (exit_side) {
-                case 0: // Top
-                    end = Position(Random(map.getWidth()), 0);
-                    break;
-                case 1: // Right
-                    end = Position(map.getWidth() - 1, Random(map.getHeight()));
-                    break;
-                case 2: // Bottom
-                    end = Position(Random(map.getWidth()), map.getHeight() - 1);
-                    break;
-                case 3: // Left
-                    end = Position(0, Random(map.getHeight()));
-                    break;
+            case 0: // Top
+                end = Position(Random(map.getWidth()), 0);
+                break;
+
+            case 1: // Right
+                end = Position(map.getWidth() - 1, Random(map.getHeight()));
+                break;
+
+            case 2: // Bottom
+                end = Position(Random(map.getWidth()), map.getHeight() - 1);
+                break;
+
+            case 3: // Left
+                end = Position(0, Random(map.getHeight()));
+                break;
             }
 
             attempts++;
         } while ((entry_side == exit_side ||
-                   (start.x == end.x && start.y == end.y) ||
-                   Distance(start.x, start.y, end.x, end.y) < min_distance) &&
+                  (start.x == end.x && start.y == end.y) ||
+                  Distance(start.x, start.y, end.x, end.y) < min_distance) &&
                  attempts < max_attempts);
 
         // Generate the river path
@@ -414,16 +446,19 @@ void GenerateForest(
                 map.SetCell(pos.x - 1, pos.y, "water");
                 all_river_positions.push_back(Position(pos.x - 1, pos.y));
             }
+
             // Right
             if (pos.x + 1 < map.getWidth()) {
                 map.SetCell(pos.x + 1, pos.y, "water");
                 all_river_positions.push_back(Position(pos.x + 1, pos.y));
             }
+
             // Up
             if (pos.y > 0) {
                 map.SetCell(pos.x, pos.y - 1, "water");
                 all_river_positions.push_back(Position(pos.x, pos.y - 1));
             }
+
             // Down
             if (pos.y + 1 < map.getHeight()) {
                 map.SetCell(pos.x, pos.y + 1, "water");
@@ -459,11 +494,23 @@ void GenerateForest(
 
             // Randomly choose which direction to go
             switch (Random(4)) {
-                case 0: end = Position(start.x + offset_x, start.y + offset_y); break;
-                case 1: end = Position(start.x + offset_x, start.y - offset_y); break;
-                case 2: end = Position(start.x - offset_x, start.y + offset_y); break;
-                case 3: end = Position(start.x - offset_x, start.y - offset_y); break;
+            case 0:
+                end = Position(start.x + offset_x, start.y + offset_y);
+                break;
+
+            case 1:
+                end = Position(start.x + offset_x, start.y - offset_y);
+                break;
+
+            case 2:
+                end = Position(start.x - offset_x, start.y + offset_y);
+                break;
+
+            case 3:
+                end = Position(start.x - offset_x, start.y - offset_y);
+                break;
             }
+
             attempts++;
         } while (!map.inside(end.x, end.y) && attempts < max_attempts);
 
@@ -606,14 +653,17 @@ void GenerateForest(
         std::vector<Position> all_path_positions; // Track all path positions for distance checking
 
         // Helper function to check if a position is near any existing path
-        auto IsNearPath = [&](const Position& pos) -> bool {
-            for (const auto& p : all_path_positions) {
+        auto IsNearPath = [&](const Position & pos) -> bool {
+            for (const auto& p : all_path_positions)
+            {
                 std::size_t dx = std::abs(static_cast<int>(pos.x) - static_cast<int>(p.x));
                 std::size_t dy = std::abs(static_cast<int>(pos.y) - static_cast<int>(p.y));
+
                 if (dx <= min_path_distance && dy <= min_path_distance) {
                     return true;
                 }
             }
+
             return false;
         };
 
@@ -621,36 +671,52 @@ void GenerateForest(
         // (i.e., clearing centers that are NOT the endpoints of this path)
         // Clearings have radius 3-8, so use a buffer to ensure paths go around them
         const std::size_t path_clearing_buffer = 3; // Minimum distance from clearing center for path segments
-        auto IsNearOtherClearing = [&](const Position& pos, const Position& path_start, const Position& path_end) -> bool {
-            for (const auto& center : clearing_centers) {
+        auto IsNearOtherClearing = [&](const Position & pos, const Position & path_start, const Position & path_end) -> bool {
+            for (const auto& center : clearing_centers)
+            {
                 // Skip the path endpoints themselves
-                if (Distance(pos.x, pos.y, path_start.x, path_start.y) <= 1.0f) continue;
-                if (Distance(pos.x, pos.y, path_end.x, path_end.y) <= 1.0f) continue;
+                if (Distance(pos.x, pos.y, path_start.x, path_start.y) <= 1.0f) {
+                    continue;
+                }
+
+                if (Distance(pos.x, pos.y, path_end.x, path_end.y) <= 1.0f) {
+                    continue;
+                }
 
                 // If within buffer distance of any OTHER clearing center, reject
                 float dist = Distance(pos.x, pos.y, center.x, center.y);
+
                 if (dist <= path_clearing_buffer) {
                     return true;
                 }
             }
+
             return false;
         };
 
         // Helper function to check if a position is near any clearing except the two specified endpoints
         // Use different buffers for main paths vs extra paths
-        auto IsNearAnyClearing = [&](const Position& pos, const Position& exclude1, const Position& exclude2, bool strict = false) -> bool {
-            for (const auto& center : clearing_centers) {
+        auto IsNearAnyClearing = [&](const Position & pos, const Position & exclude1, const Position & exclude2, bool strict = false) -> bool {
+            for (const auto& center : clearing_centers)
+            {
                 // Skip the two endpoint clearings
-                if (Distance(pos.x, pos.y, exclude1.x, exclude1.y) <= 1.0f) continue;
-                if (Distance(pos.x, pos.y, exclude2.x, exclude2.y) <= 1.0f) continue;
+                if (Distance(pos.x, pos.y, exclude1.x, exclude1.y) <= 1.0f) {
+                    continue;
+                }
+
+                if (Distance(pos.x, pos.y, exclude2.x, exclude2.y) <= 1.0f) {
+                    continue;
+                }
 
                 // If within buffer distance of any OTHER clearing center, reject
                 float dist = Distance(pos.x, pos.y, center.x, center.y);
                 float buffer = strict ? 5.0f : 1.0f;  // Strict for extra paths, minimal for main paths
+
                 if (dist <= buffer) {
                     return true;
                 }
             }
+
             return false;
         };
 
@@ -672,9 +738,10 @@ void GenerateForest(
             for (std::size_t j = 0; j < i; ++j) {
                 if (connected[j]) {
                     float dist = Distance(
-                        clearing_centers[i].x, clearing_centers[i].y,
-                        clearing_centers[j].x, clearing_centers[j].y
-                    );
+                                     clearing_centers[i].x, clearing_centers[i].y,
+                                     clearing_centers[j].x, clearing_centers[j].y
+                                 );
+
                     if (dist < best_dist) {
                         best_dist = dist;
                         best_j = j;
@@ -698,18 +765,25 @@ void GenerateForest(
 
                 // Check if path crosses any clearing or is too close to existing paths
                 path_valid = true;
+
                 for (const auto& pos : path) {
                     // Only check positions that are not the endpoints themselves
-                    if (Distance(pos.x, pos.y, clearing_centers[i].x, clearing_centers[i].y) <= 1.0f) continue;
-                    if (Distance(pos.x, pos.y, clearing_centers[best_j].x, clearing_centers[best_j].y) <= 1.0f) continue;
+                    if (Distance(pos.x, pos.y, clearing_centers[i].x, clearing_centers[i].y) <= 1.0f) {
+                        continue;
+                    }
+
+                    if (Distance(pos.x, pos.y, clearing_centers[best_j].x, clearing_centers[best_j].y) <= 1.0f) {
+                        continue;
+                    }
 
                     // For the main connecting paths, use a lenient clearing buffer to ensure connectivity
                     if (IsNearAnyClearing(pos, clearing_centers[i], clearing_centers[best_j], false) ||
-                        (min_path_distance > 0 && IsNearPath(pos))) {
+                            (min_path_distance > 0 && IsNearPath(pos))) {
                         path_valid = false;
                         break;
                     }
                 }
+
                 path_attempts++;
             }
 
@@ -723,9 +797,11 @@ void GenerateForest(
                         } else {
                             map.SetCell(pos.x, pos.y, "corridor");
                         }
+
                         all_path_positions.push_back(pos);
                     }
                 }
+
                 connected[i] = true;
             }
         }
@@ -736,7 +812,9 @@ void GenerateForest(
             std::size_t i1 = Random(clearing_centers.size());
             std::size_t i2 = Random(clearing_centers.size());
 
-            if (i1 == i2) continue;
+            if (i1 == i2) {
+                continue;
+            }
 
             std::vector<Position> path;
             bool path_valid = false;
@@ -753,18 +831,25 @@ void GenerateForest(
 
                 // Check if path crosses any clearing or is too close to existing paths
                 path_valid = true;
+
                 for (const auto& pos : path) {
                     // Only check positions that are not the endpoints themselves
-                    if (Distance(pos.x, pos.y, clearing_centers[i1].x, clearing_centers[i1].y) <= 1.0f) continue;
-                    if (Distance(pos.x, pos.y, clearing_centers[i2].x, clearing_centers[i2].y) <= 1.0f) continue;
+                    if (Distance(pos.x, pos.y, clearing_centers[i1].x, clearing_centers[i1].y) <= 1.0f) {
+                        continue;
+                    }
+
+                    if (Distance(pos.x, pos.y, clearing_centers[i2].x, clearing_centers[i2].y) <= 1.0f) {
+                        continue;
+                    }
 
                     // For extra paths, use strict clearing check
                     if (IsNearAnyClearing(pos, clearing_centers[i1], clearing_centers[i2], true) ||
-                        (min_path_distance > 0 && IsNearPath(pos))) {
+                            (min_path_distance > 0 && IsNearPath(pos))) {
                         path_valid = false;
                         break;
                     }
                 }
+
                 path_attempts++;
             }
 
@@ -777,6 +862,7 @@ void GenerateForest(
                         } else {
                             map.SetCell(pos.x, pos.y, "corridor");
                         }
+
                         all_path_positions.push_back(pos);
                     }
                 }

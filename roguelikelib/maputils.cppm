@@ -14,114 +14,139 @@ import rl.randomness;
 import rl.tile;
 import std;
 
-namespace RL {
+namespace RL
+{
 
 // Internal Math and Path Helpers
-namespace detail {
-    int Sqr(int x) {
-        return x * x;
+namespace detail
+{
+int Sqr(int x)
+{
+    return x * x;
+}
+
+void CutCorners(std::vector<Position>& seq)
+{
+    if (seq.size() < 3) {
+        return;
     }
 
-    void CutCorners(std::vector<Position>& seq) {
-        if (seq.size() < 3) return;
+    std::size_t j = 1;
 
-        std::size_t j = 1;
-        for (std::size_t i = 1; i < seq.size() - 1; ++i) {
-            seq[j] = seq[i];
-            int dx = std::abs(static_cast<int>(seq[j - 1].x - seq[i + 1].x));
-            int dy = std::abs(static_cast<int>(seq[j - 1].y - seq[i + 1].y));
-            if (std::max(dx, dy) > 1) {
-                j++;
-            }
+    for (std::size_t i = 1; i < seq.size() - 1; ++i) {
+        seq[j] = seq[i];
+        int dx = std::abs(static_cast<int>(seq[j - 1].x - seq[i + 1].x));
+        int dy = std::abs(static_cast<int>(seq[j - 1].y - seq[i + 1].y));
+
+        if (std::max(dx, dy) > 1) {
+            j++;
         }
-        seq[j] = seq.back();
-        j++;
-        seq.resize(j);
     }
 
-    int SignCos2(const Position& p0, const Position& p1, const Position& p2) {
-        int sqlen01 = Sqr(static_cast<int>(p1.x - p0.x)) + Sqr(static_cast<int>(p1.y - p0.y));
-        int sqlen12 = Sqr(static_cast<int>(p2.x - p1.x)) + Sqr(static_cast<int>(p2.y - p1.y));
-        if (sqlen01 == 0 || sqlen12 == 0) return 0;
+    seq[j] = seq.back();
+    j++;
+    seq.resize(j);
+}
 
-        int prod = static_cast<int>((p1.x - p0.x) * (p2.x - p1.x) + (p1.y - p0.y) * (p2.y - p1.y));
-        long long prod_ll = prod; // Prevent overflow
-        long long val = 1000LL * (prod_ll * prod_ll / sqlen01) / sqlen12;
-        if (prod < 0) {
-            val = -val;
-        }
-        return static_cast<int>(val);
+int SignCos2(const Position& p0, const Position& p1, const Position& p2)
+{
+    int sqlen01 = Sqr(static_cast<int>(p1.x - p0.x)) + Sqr(static_cast<int>(p1.y - p0.y));
+    int sqlen12 = Sqr(static_cast<int>(p2.x - p1.x)) + Sqr(static_cast<int>(p2.y - p1.y));
+
+    if (sqlen01 == 0 || sqlen12 == 0) {
+        return 0;
     }
 
-    void PerturbPath(std::vector<Position>& way, const CMap& level, int mindist, int maxdist, int pertamt) {
-        if (way.size() < 3) return;
+    int prod = static_cast<int>((p1.x - p0.x) * (p2.x - p1.x) + (p1.y - p0.y) * (p2.y - p1.y));
+    long long prod_ll = prod; // Prevent overflow
+    long long val = 1000LL * (prod_ll * prod_ll / sqlen01) / sqlen12;
 
-        static const int Xoff[8] = {1,  1,  0, -1, -1, -1,  0,  1};
-        static const int Yoff[8] = {0,  1,  1,  1,  0, -1, -1, -1};
-        const int mincos2 = 500;
+    if (prod < 0) {
+        val = -val;
+    }
 
-        int mind2 = Sqr(mindist);
-        int maxd2 = Sqr(maxdist);
+    return static_cast<int>(val);
+}
 
-        std::size_t loops = static_cast<std::size_t>(pertamt) * way.size();
-        for (std::size_t i = 0; i < loops; ++i) {
-            std::size_t ri = 1 + Random(static_cast<int>(way.size()) - 2);
-            int rdir = Random(8);
-            int nx = static_cast<int>(way[ri].x) + Xoff[rdir];
-            int ny = static_cast<int>(way[ri].y) + Yoff[rdir];
+void PerturbPath(std::vector<Position>& way, const CMap& level, int mindist, int maxdist, int pertamt)
+{
+    if (way.size() < 3) {
+        return;
+    }
 
-            if (nx < 1 || nx >= static_cast<int>(level.getWidth()) - 1 ||
+    static const int Xoff[8] = {1, 1, 0, -1, -1, -1, 0, 1};
+    static const int Yoff[8] = {0, 1, 1, 1, 0, -1, -1, -1};
+    const int mincos2 = 500;
+
+    int mind2 = Sqr(mindist);
+    int maxd2 = Sqr(maxdist);
+
+    std::size_t loops = static_cast<std::size_t>(pertamt) * way.size();
+
+    for (std::size_t i = 0; i < loops; ++i) {
+        std::size_t ri = 1 + Random(static_cast<int>(way.size()) - 2);
+        int rdir = Random(8);
+        int nx = static_cast<int>(way[ri].x) + Xoff[rdir];
+        int ny = static_cast<int>(way[ri].y) + Yoff[rdir];
+
+        if (nx < 1 || nx >= static_cast<int>(level.getWidth()) - 1 ||
                 ny < 1 || ny >= static_cast<int>(level.getHeight()) - 1) {
-                continue;
-            }
-
-            int lox = static_cast<int>(way[ri - 1].x);
-            int loy = static_cast<int>(way[ri - 1].y);
-            int hix = static_cast<int>(way[ri + 1].x);
-            int hiy = static_cast<int>(way[ri + 1].y);
-
-            int lod2 = Sqr(nx - lox) + Sqr(ny - loy);
-            int hid2 = Sqr(nx - hix) + Sqr(ny - hiy);
-
-            if (lod2 < mind2 || lod2 > maxd2 || hid2 < mind2 || hid2 > maxd2) {
-                continue;
-            }
-
-            if (SignCos2(Position(lox, loy), Position(nx, ny), Position(hix, hiy)) < mincos2) {
-                continue;
-            }
-
-            if (ri > 1 && SignCos2(way[ri - 2], Position(lox, loy), Position(nx, ny)) < mincos2) {
-                continue;
-            }
-
-            if (ri < way.size() - 2 && SignCos2(Position(nx, ny), Position(hix, hiy), way[ri + 2]) < mincos2) {
-                continue;
-            }
-
-            way[ri] = Position(nx, ny);
+            continue;
         }
+
+        int lox = static_cast<int>(way[ri - 1].x);
+        int loy = static_cast<int>(way[ri - 1].y);
+        int hix = static_cast<int>(way[ri + 1].x);
+        int hiy = static_cast<int>(way[ri + 1].y);
+
+        int lod2 = Sqr(nx - lox) + Sqr(ny - loy);
+        int hid2 = Sqr(nx - hix) + Sqr(ny - hiy);
+
+        if (lod2 < mind2 || lod2 > maxd2 || hid2 < mind2 || hid2 > maxd2) {
+            continue;
+        }
+
+        if (SignCos2(Position(lox, loy), Position(nx, ny), Position(hix, hiy)) < mincos2) {
+            continue;
+        }
+
+        if (ri > 1 && SignCos2(way[ri - 2], Position(lox, loy), Position(nx, ny)) < mincos2) {
+            continue;
+        }
+
+        if (ri < way.size() - 2 && SignCos2(Position(nx, ny), Position(hix, hiy), way[ri + 2]) < mincos2) {
+            continue;
+        }
+
+        way[ri] = Position(nx, ny);
+    }
+}
+
+void ConnectWaypoints(std::vector<Position>& result, const std::vector<Position>& waypts)
+{
+    result.clear();
+
+    if (waypts.size() <= 1) {
+        return;
     }
 
-    void ConnectWaypoints(std::vector<Position>& result, const std::vector<Position>& waypts) {
-        result.clear();
-        if (waypts.size() <= 1) return;
+    result.push_back(waypts[0]);
 
-        result.push_back(waypts[0]);
+    for (std::size_t i = 0; i < waypts.size() - 1; ++i) {
+        std::vector<Position> segment = waypts[i].BuildBresenhamLine(waypts[i + 1]);
 
-        for (std::size_t i = 0; i < waypts.size() - 1; ++i) {
-            std::vector<Position> segment = waypts[i].BuildBresenhamLine(waypts[i + 1]);
-            for (std::size_t j = 1; j < segment.size(); ++j) {
-                result.push_back(segment[j]);
-            }
+        for (std::size_t j = 1; j < segment.size(); ++j) {
+            result.push_back(segment[j]);
         }
     }
+}
 } // end of detail
 
 } // end of RL namespace (internal)
 
 // Public API (exported)
-export namespace RL {
+export namespace RL
+{
 
 void FindOnMapAllRectanglesOfType(CMap &level, const std::string_view type, const Size &size, std::vector <Position>& positions)
 {
@@ -170,7 +195,7 @@ bool FindOnMapRandomRectangleOfType(CMap &level, std::string_view type, Position
     std::vector<Position> positions;
     FindOnMapAllRectanglesOfType(level, type, size, positions);
 
-    if(positions.empty()) {
+    if (positions.empty()) {
         return false;
     }
 
@@ -194,14 +219,14 @@ void AddDoors(CMap &level, float door_probability, float open_probability)
             int door_cells = open_door_cells + close_door_cells;
 
             if (level.get(x, y).getType() == "corridor") {
-                if((corridor_cells == 1 && door_cells == 0 && room_cells > 0 && room_cells < 4) ||
+                if ((corridor_cells == 1 && door_cells == 0 && room_cells > 0 && room_cells < 4) ||
                         (corridor_cells == 0 && door_cells == 0)) {
                     float exist = (static_cast<float>(Random(1000))) / 1000.0f;
 
-                    if(exist < door_probability) {
+                    if (exist < door_probability) {
                         float is_open = (static_cast<float>(Random(1000))) / 1000.0f;
 
-                        if(is_open < open_probability) {
+                        if (is_open < open_probability) {
                             level.SetCell(x, y, "door_open");
                         } else {
                             level.SetCell(x, y, "door_closed");
@@ -215,9 +240,9 @@ void AddDoors(CMap &level, float door_probability, float open_probability)
 
 //////////////////////////////////////////////////////////////////////////
 
-bool AddCorridor(CMap &level, const std::size_t &start_x1, const std::size_t &start_y1, const std::size_t &start_x2, const std::size_t &start_y2, bool straight = false)
+bool AddCorridor(CMap &level, const std::size_t& start_x1, const std::size_t& start_y1, const std::size_t& start_x2, const std::size_t& start_y2, bool straight = false)
 {
-    if(!level.inside(start_x1, start_y1) || !level.inside(start_x2, start_y2)) {
+    if (!level.inside(start_x1, start_y1) || !level.inside(start_x2, start_y2)) {
         return false;
     }
 
@@ -230,13 +255,13 @@ bool AddCorridor(CMap &level, const std::size_t &start_x1, const std::size_t &st
     int dir_x;
     int dir_y;
 
-    if(start_x2 > start_x1) {
+    if (start_x2 > start_x1) {
         dir_x = 1;
     } else {
         dir_x = -1;
     }
 
-    if(start_y2 > start_y1) {
+    if (start_y2 > start_y1) {
         dir_y = 1;
     } else {
         dir_y = -1;
@@ -246,14 +271,14 @@ bool AddCorridor(CMap &level, const std::size_t &start_x1, const std::size_t &st
     bool first_horizontal = CoinToss();
     bool second_horizontal = CoinToss();
 
-    while(true) {
-        if(!straight) {
+    while (true) {
+        if (!straight) {
             first_horizontal = CoinToss();
             second_horizontal = CoinToss();
         }
 
-        if(x1 != x2 && y1 != y2) {
-            if(first_horizontal) {
+        if (x1 != x2 && y1 != y2) {
+            if (first_horizontal) {
                 x1 += dir_x;
             } else {
                 y1 += dir_y;
@@ -261,8 +286,8 @@ bool AddCorridor(CMap &level, const std::size_t &start_x1, const std::size_t &st
         }
 
         // connect rooms
-        if(x1 != x2 && y1 != y2) {
-            if(second_horizontal) {
+        if (x1 != x2 && y1 != y2) {
+            if (second_horizontal) {
                 x2 -= dir_x;
             } else {
                 y2 -= dir_y;
@@ -314,7 +339,8 @@ bool AddCorridor(CMap &level, const std::size_t &start_x1, const std::size_t &st
 
 //////////////////////////////////////////////////////////////////////////
 
-CMatrix<int> FillDisconnectedRoomsWithDifferentValues(const CMap &level) {
+CMatrix<int> FillDisconnectedRoomsWithDifferentValues(const CMap &level)
+{
     constexpr int any_room = -1;
 
     auto flood_map = CMatrix<int>(level.getSize(), 0);
@@ -363,15 +389,14 @@ void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool str
                 }
 
                 // only border cells without diagonals
-                if (floodmap.CountNeighbors(Position(x, y),0) > 0)
-                {
+                if (floodmap.CountNeighbors(Position(x, y), 0) > 0) {
                     rooms[floodmap.get(x, y)].emplace_back(x, y);
                 }
             } // if no wall at position
         } // for x
     } // for y
 
-    if(rooms.size() < 2) {
+    if (rooms.size() < 2) {
         return;
     }
 
@@ -447,7 +472,7 @@ void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool str
 
             std::size_t distance = distance_matrix[room_a][room_b];
 
-            if(distance < min_distance) {
+            if (distance < min_distance) {
                 min_distance = distance;
                 closest_room = room_b;
             }
@@ -533,38 +558,38 @@ void AddRecursiveRooms(CMap &level, std::string_view type, std::size_t min_size_
 {
     std::size_t size_x = room.corner2.x - room.corner1.x;
 
-    if(size_x % 2 != 0) {
+    if (size_x % 2 != 0) {
         size_x -= CoinToss();
     }
 
     std::size_t size_y = room.corner2.y - room.corner1.y;
 
-    if(size_y % 2 != 0) {
+    if (size_y % 2 != 0) {
         size_y -= CoinToss();
     }
 
     bool split_horizontal;
 
-    if(size_y * 4 > size_x) {
+    if (size_y * 4 > size_x) {
         split_horizontal = true;
-    } else if(size_x * 4 > size_y) {
+    } else if (size_x * 4 > size_y) {
         split_horizontal = false;
     } else {
         split_horizontal = CoinToss();
     }
 
-    if(split_horizontal) { // split horizontal
-        if(size_y / 2 < min_size_y) {
+    if (split_horizontal) { // split horizontal
+        if (size_y / 2 < min_size_y) {
             return;
         }
 
         const std::size_t split = size_y / 2 + Random(size_y / 2 - min_size_y);
 
-        for(std::size_t x = room.corner1.x; x < room.corner2.x; x++) {
+        for (std::size_t x = room.corner1.x; x < room.corner2.x; x++) {
             level.SetCell(x, room.corner1.y + split, type);
         }
 
-        if(with_doors) {
+        if (with_doors) {
             level.SetCell(room.corner1.x + Random(size_x - 1) + 1, room.corner1.y + split, "door_closed");
         }
 
@@ -576,17 +601,17 @@ void AddRecursiveRooms(CMap &level, std::string_view type, std::size_t min_size_
         new_room.corner1.y = room.corner1.y + split;
         AddRecursiveRooms(level, type, min_size_x, min_size_y, new_room, with_doors);
     } else {
-        if(size_x / 2 < min_size_x) {
+        if (size_x / 2 < min_size_x) {
             return;
         }
 
         const std::size_t split = size_x / 2 + Random(size_x / 2 - min_size_x);
 
-        for(std::size_t y = room.corner1.y; y < room.corner2.y; y++) {
+        for (std::size_t y = room.corner1.y; y < room.corner2.y; y++) {
             level.SetCell(room.corner1.x + split, y, type);
         }
 
-        if(with_doors) {
+        if (with_doors) {
             level.SetCell(
                 room.corner1.x + split,
                 room.corner1.y + Random(size_y - 1) + 1,
@@ -607,8 +632,8 @@ void AddRecursiveRooms(CMap &level, std::string_view type, std::size_t min_size_
 
 void DrawRectangleOnMap(CMap &level, const Position& p1, const Position& p2, std::string_view value)
 {
-    for(std::size_t y = p1.y; y < p2.y; ++y) {
-        for(std::size_t x = p1.x; x < p2.x; ++x) {
+    for (std::size_t y = p1.y; y < p2.y; ++y) {
+        for (std::size_t x = p1.x; x < p2.x; ++x) {
             level.SetCell(x, y, value);
         }
     }
@@ -637,10 +662,10 @@ void DrawRectangleOnMap(CMap &level, const Position& p1, const Position& p2, std
  * @return Whether the road generation was successful.
  */
 bool AddWindingRoad(CMap &level,
-    const Position& start,
-    const Position& end,
-    int pertamt,
-    std::string_view tile_type="corridor")
+                    const Position& start,
+                    const Position& end,
+                    int pertamt,
+                    std::string_view tile_type = "corridor")
 {
     if (!level.inside(start) || !level.inside(end)) {
         return false;
@@ -649,12 +674,15 @@ bool AddWindingRoad(CMap &level,
     std::vector<Position> waypts = start.BuildBresenhamLine(end);
 
     std::vector<Position> road;
+
     if (waypts.size() < 5) {
         road = waypts;
     } else {
         std::vector<Position> sampled_waypts;
-        for (std::size_t i = 0; i < waypts.size(); ) {
+
+        for (std::size_t i = 0; i < waypts.size();) {
             sampled_waypts.push_back(waypts[i]);
+
             if (i < waypts.size() - 5) {
                 i += 2 + Random(2);
             } else if (i == waypts.size() - 5) {
@@ -663,6 +691,7 @@ bool AddWindingRoad(CMap &level,
                 i = waypts.size() - 1;
             }
         }
+
         waypts = sampled_waypts;
 
         detail::PerturbPath(waypts, level, 2, 5, pertamt);
@@ -672,7 +701,7 @@ bool AddWindingRoad(CMap &level,
 
     for (const auto& pos : road) {
         if (pos.x >= 1 && pos.x < level.getWidth() - 1 &&
-            pos.y >= 1 && pos.y < level.getHeight() - 1) {
+                pos.y >= 1 && pos.y < level.getHeight() - 1) {
             level.SetCell(pos.x, pos.y, tile_type);
         }
     }
@@ -701,7 +730,8 @@ void BuildZigzagPath(
     const Position& p2,
     unsigned turnpct,
     unsigned diagpct
-) {
+)
+{
     ret.clear();
     int xc = static_cast<int>(p1.x);
     int yc = static_cast<int>(p1.y);
@@ -716,9 +746,9 @@ void BuildZigzagPath(
         int yremain = std::abs(y2 - yc);
 
         if (ret.size() == 1 || (Random(100) < turnpct) ||
-            (std::abs(x2 - (xc + deltax)) > xremain) ||
-            (std::abs(y2 - (yc + deltay)) > yremain) ||
-            ((xremain == yremain) && (Random(100) < diagpct))) {
+                (std::abs(x2 - (xc + deltax)) > xremain) ||
+                (std::abs(y2 - (yc + deltay)) > yremain) ||
+                ((xremain == yremain) && (Random(100) < diagpct))) {
 
             deltax = Sign(x2 - xc);
             deltay = Sign(y2 - yc);
@@ -760,7 +790,8 @@ void BuildSigsagPath(
     const Position& p2,
     unsigned turnpct,
     unsigned diagpct
-) {
+)
+{
     BuildZigzagPath(ret, p1, p2, turnpct, diagpct);
     detail::CutCorners(ret);
 }
@@ -781,8 +812,9 @@ bool AddZigzagRoad(
     const Position& end,
     int turnpct,
     int diagpct,
-    std::string_view tile_type="corridor"
-) {
+    std::string_view tile_type = "corridor"
+)
+{
     if (!level.inside(start) || !level.inside(end)) {
         return false;
     }
@@ -792,7 +824,7 @@ bool AddZigzagRoad(
 
     for (const auto& pos : road) {
         if (pos.x >= 1 && pos.x < level.getWidth() - 1 &&
-            pos.y >= 1 && pos.y < level.getHeight() - 1) {
+                pos.y >= 1 && pos.y < level.getHeight() - 1) {
             level.SetCell(pos.x, pos.y, tile_type);
         }
     }
@@ -810,8 +842,9 @@ bool AddSigsagRoad(
     const Position& end,
     int turnpct,
     int diagpct,
-    std::string_view tile_type="corridor"
-) {
+    std::string_view tile_type = "corridor"
+)
+{
     if (!level.inside(start) || !level.inside(end)) {
         return false;
     }
@@ -822,7 +855,7 @@ bool AddSigsagRoad(
 
     for (const auto& pos : road) {
         if (pos.x >= 1 && pos.x < level.getWidth() - 1 &&
-            pos.y >= 1 && pos.y < level.getHeight() - 1) {
+                pos.y >= 1 && pos.y < level.getHeight() - 1) {
             level.SetCell(pos.x, pos.y, tile_type);
         }
     }

@@ -1,6 +1,6 @@
 module;
 
-export module demo_game.game:impl;
+export module demo_game.game: impl;
 
 import demo_game.game;
 import demo_game.io;
@@ -16,9 +16,9 @@ void CSimpleGame::PlacePlayer()
 {
     RL::Position pos(0, 0);
 
-    if(RL::FindOnMapRandomRectangleOfType(level, "room", pos, RL::Size(1, 1))) {
+    if (RL::FindOnMapRandomRectangleOfType(level, "room", pos, RL::Size(1, 1))) {
         player.MoveTo(pos);
-    } else if(RL::FindOnMapRandomRectangleOfType(level, "corridor", pos, RL::Size(1, 1))) {
+    } else if (RL::FindOnMapRandomRectangleOfType(level, "corridor", pos, RL::Size(1, 1))) {
         player.MoveTo(pos);
     }
 
@@ -30,9 +30,9 @@ void CSimpleGame::AddMonster()
     auto *new_one = new CRodent;
     RL::Position pos(0, 0);
 
-    if(RL::FindOnMapRandomRectangleOfType(level, "room", pos, RL::Size(1, 1))) {
+    if (RL::FindOnMapRandomRectangleOfType(level, "room", pos, RL::Size(1, 1))) {
         new_one->MoveTo(pos);
-    } else if(RL::FindOnMapRandomRectangleOfType(level, "corridor", pos, RL::Size(1, 1))) {
+    } else if (RL::FindOnMapRandomRectangleOfType(level, "corridor", pos, RL::Size(1, 1))) {
         new_one->MoveTo(pos);
     }
 
@@ -41,23 +41,23 @@ void CSimpleGame::AddMonster()
 
 void CSimpleGame::MoveAllMonsters()
 {
-    std::list < CMonster * >::iterator it, _it;
+    std::list < CMonster* >::iterator it, _it;
 
-    for(it = monsters.begin(), _it = monsters.end(); it != _it; ++it) {
+    for (it = monsters.begin(), _it = monsters.end(); it != _it; ++it) {
         CMonster *monster = *it;
 
-        if(monsters_to_remove.find(monster) == monsters_to_remove.end()) {
+        if (monsters_to_remove.find(monster) == monsters_to_remove.end()) {
             monster->DoAction();
         }
     }
 
     // remove all dead monsters
-    for(it = monsters.begin(), _it = monsters.end(); it != _it;) {
+    for (it = monsters.begin(), _it = monsters.end(); it != _it;) {
         auto to_remove = it;
         it++;
         CMonster *monster = *to_remove;
 
-        if(monsters_to_remove.find(monster) != monsters_to_remove.end()) {
+        if (monsters_to_remove.find(monster) != monsters_to_remove.end()) {
             delete monster;
             monsters.erase(to_remove);
         }
@@ -70,10 +70,10 @@ CMonster* CSimpleGame::GetMonsterFromCell(const RL::Position& cell)
 {
     std::list <CMonster*>::iterator it, _it;
 
-    for(it = monsters.begin(), _it = monsters.end(); it != _it; ++it) {
+    for (it = monsters.begin(), _it = monsters.end(); it != _it; ++it) {
         CMonster *monster = *it;
 
-        if(monster->GetPosition() == cell) {
+        if (monster->GetPosition() == cell) {
             return monster;
         }
     }
@@ -85,7 +85,7 @@ void CSimpleGame::CreateLevel()
 {
     int level_type = RL::Random(6);
 
-    switch(level_type) {
+    switch (level_type) {
     case 0:
         RL::CreateStandardDungeon(level, 20, false);
         IOPrintString(60, 24, "Standard Dungeon");
@@ -120,15 +120,15 @@ void CSimpleGame::CreateLevel()
 
     PlacePlayer();
 
-    for(int index = 0; index < 15; ++index) {
+    for (int index = 0; index < 15; ++index) {
         AddMonster();
     }
 }
 
 [[noreturn]] void CSimpleGame::MainLoop()
 {
-    for(;;) { // next turn
-        if(RL::Random(100) == 0) {
+    for (;;) { // next turn
+        if (RL::Random(100) == 0) {
             AddMonster();
         }
 

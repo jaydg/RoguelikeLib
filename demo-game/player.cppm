@@ -5,7 +5,8 @@ export module demo_game.player;
 import demo_game.monster;
 export import rl.matrix;
 
-export class CPlayer final : public CMonster {
+export class CPlayer final : public CMonster
+{
 
 private:
 

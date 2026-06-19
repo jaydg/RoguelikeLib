@@ -8,7 +8,8 @@ export import rl.map;
 export import rl.position;
 import std;
 
-export class CSimpleGame {
+export class CSimpleGame
+{
 private:
 
     void PlacePlayer();
@@ -23,7 +24,7 @@ public:
     CPlayer player;
     std::list <CMonster*> monsters;
     std::set <CMonster*> monsters_to_remove;
-    CMonster *GetMonsterFromCell(const RL::Position& cell);
+    CMonster* GetMonsterFromCell(const RL::Position& cell);
 
     void CreateLevel();
     [[noreturn]] void MainLoop();

@@ -5,9 +5,11 @@ export module rl.position;
 import rl.distance;
 import std;
 
-export namespace RL {
+export namespace RL
+{
 
-inline int Sign(int n) {
+inline int Sign(int n)
+{
     return (n > 0) ? 1 : ((n == 0) ? 0 : -1);
 }
 
@@ -49,7 +51,8 @@ struct Position {
         return !(*this == r);
     }
 
-    [[nodiscard]] std::string toString() const {
+    [[nodiscard]] std::string toString() const
+    {
         return std::format("(x: {}, y: {})", x, y);
     }
 
@@ -79,6 +82,7 @@ struct Position {
 
         if (std::abs(x2 - x1) >= std::abs(y2 - y1)) {
             int acc = std::abs(x2 - x1);
+
             do {
                 xc += xstep;
                 acc += 2 * std::abs(y2 - y1);
@@ -87,10 +91,12 @@ struct Position {
                     acc -= 2 * std::abs(x2 - x1);
                     yc += ystep;
                 }
+
                 ret.emplace_back(static_cast<std::size_t>(xc), static_cast<std::size_t>(yc));
             } while (xc != x2);
         } else {
             int acc = std::abs(y2 - y1);
+
             do {
                 yc += ystep;
                 acc += 2 * std::abs(x2 - x1);
@@ -99,6 +105,7 @@ struct Position {
                     acc -= 2 * std::abs(y2 - y1);
                     xc += xstep;
                 }
+
                 ret.emplace_back(static_cast<std::size_t>(xc), static_cast<std::size_t>(yc));
             } while (yc != y2);
         }

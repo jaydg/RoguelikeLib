@@ -12,9 +12,11 @@ import rl.tile;
 import std;
 import stc;
 
-export namespace RL {
+export namespace RL
+{
 
-class CMap : public CMatrix<CTile> {
+class CMap : public CMatrix<CTile>
+{
 
 public:
     CMap(Size size) : CMatrix<CTile>(size, CTile("wall")) {}
