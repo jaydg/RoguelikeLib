@@ -5,6 +5,7 @@ import rl.maputils;
 import rl.pathfinding;
 import rl.position;
 import rl.randomness;
+import rl.theta_star;
 import std;
 import stc;
 
@@ -157,6 +158,79 @@ int main(void)
     }
 
     level.PrintMap();
+
+    //////////////////////////////////////////////////////////////////////////
+    // Theta* Pathfinding
+    //////////////////////////////////////////////////////////////////////////
+
+    cout << endl << stc::underline << "Theta* Pathfinding" << stc::reset << endl << endl;
+
+    RL::CMap theta_map(RL::Size(40, 20));
+    theta_map.Clear("room");
+
+    // Add some obstacles
+    for (int x = 10; x < 25; x++) {
+        theta_map.SetCell(x, 8, "wall");
+    }
+    for (int y = 3; y < 15; y++) {
+        theta_map.SetCell(20, y, "wall");
+    }
+    theta_map.SetCell(5, 5, "tree");
+    theta_map.SetCell(35, 15, "tree");
+
+    cout << "Map with obstacles:" << endl;
+    theta_map.PrintMap();
+
+    RL::Position theta_start(2, 2);
+    RL::Position theta_end(38, 18);
+
+    cout << endl << "Finding path from " << theta_start.toString()
+              << " to " << theta_end.toString() << " using Theta*" << endl;
+
+    RL::CThetaStar theta_star;
+    std::vector<RL::Position> theta_path;
+    bool theta_path_found = theta_star.FindPath(theta_map, theta_start, theta_end, theta_path, true);
+
+    if (theta_path_found) {
+        cout << "Theta* path found with " << theta_path.size() << " steps!" << endl;
+
+        // Mark path on map
+        for (const auto& pos : theta_path) {
+            if (theta_map.inside(pos)) {
+                theta_map.get(pos).setType("corridor");
+            }
+        }
+
+        cout << endl << "Path (marked with '.')" << endl;
+        theta_map.PrintMap();
+    } else {
+        cout << "No Theta* path found!" << endl;
+    }
+
+    // Test line of sight
+    cout << endl << "Testing line of sight:" << endl;
+    RL::Position los_a(3, 3);
+    RL::Position los_b(35, 10);
+
+    RL::SLineOfSightResult los_result = RL::CheckLineOfSight(theta_map, los_a, los_b);
+    cout << "Line of sight from " << los_a.toString() << " to "
+         << los_b.toString() << ": "
+         << (los_result.visible ? "Visible" : "Blocked") << endl;
+
+    if (!los_result.visible) {
+        cout << "  Blocked at: " << los_result.blocking_pos.toString() << endl;
+    }
+
+    // Test Angle-Propagation Theta*
+    cout << endl << "Testing Angle-Propagation Theta*:" << endl;
+    std::vector<RL::Position> theta_ap_path;
+    bool theta_ap_found = theta_star.FindPathAP(theta_map, theta_start, theta_end, theta_ap_path, true);
+
+    if (theta_ap_found) {
+        cout << "AP Theta* path found with " << theta_ap_path.size() << " steps!" << endl;
+    } else {
+        cout << "No AP Theta* path found!" << endl;
+    }
 
     //////////////////////////////////////////////////////////////////////////
     // That's all folks!
