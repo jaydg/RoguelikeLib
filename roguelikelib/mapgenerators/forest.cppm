@@ -335,7 +335,7 @@ void GenerateRocks(CMap& map, float rock_density = 0.05f)
 // Main function: generate forest
 // =============================================================================
 
-// @param tree_density       Probability of trees (0.0–1.0)  (def. 0.7)
+// @param tree_density       Share of vegetation that is trees, not plants (0.0–1.0, def. 0.7)
 // @param rock_density       Probability of rocks (0.0–1.0) (def. 0.05)
 // @param num_clearings      Number of clearings (def. 5)
 // @param num_paths          Number of paths (def. 8)
@@ -361,7 +361,7 @@ void GenerateForest(
     for (std::size_t y = 0; y < map.getHeight(); ++y) {
         for (std::size_t x = 0; x < map.getWidth(); ++x) {
             if (RandomFloat() < vegetation_density) {
-                map.SetCell(x, y, CoinToss() ? "tree" : "plant");
+                map.SetCell(x, y, RandomFloat() < tree_density ? "tree" : "plant");
             }
         }
     }
