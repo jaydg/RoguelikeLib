@@ -20,9 +20,6 @@ export struct STileData {
     bool passable = false;
 };
 
-// Additional tiles, can be added at runtime
-static std::unordered_map<std::string, STileData> additional_tiles;
-
 export {
 
     // Encode a glyph as UTF-8, for printing it to a terminal. Anything that
@@ -56,13 +53,26 @@ export {
 
     class CTileData {
     private:
-        using TileDataEntry = std::map<std::string_view, STileData, std::less<>>;
+        // Lets the registry be searched with a string_view, without building
+        // a std::string for every lookup
+        struct SNameHash {
+            using is_transparent = void;
 
-        // Builtin standard tiles
-        static const TileDataEntry & defaults()
+            std::size_t operator()(std::string_view name) const
+            {
+                return std::hash<std::string_view> {}(name);
+            }
+        };
+
+        using TileRegistry = std::unordered_map<std::string, STileData, SNameHash, std::equal_to<>>;
+
+        // Every tile type, the builtin ones and those added at runtime. The
+        // registry owns the names, and as its nodes never move, a view of a
+        // name stays valid for as long as the program runs.
+        static TileRegistry & registry()
         {
             // *INDENT-OFF* (keep astyle from ruining this beauty)
-            static const TileDataEntry defaults = {
+            static TileRegistry tiles = {
                 { "wall",        { U'#', 0x888888, false, false } },
                 { "corridor",    { U'.', 0xCCCCCC, true,  true } },
                 { "grass",       { U'"', 0xA7CC7C, true,  true } },
@@ -77,32 +87,34 @@ export {
             };
             // *INDENT-ON*
 
-            return defaults;
+            return tiles;
         }
 
     public:
 
+        // The registry's entry for a tile type: its own copy of the name and
+        // the data. Throws for a type that was never registered.
         [[nodiscard]]
-        static const STileData * get(std::string_view key)
+        static const std::pair<const std::string, STileData>& get(std::string_view key)
         {
-            if (auto it = defaults().find(key); it != defaults().end()) {
-                return &(it->second);
+            auto it = registry().find(key);
+
+            if (it == registry().end()) {
+                throw std::invalid_argument("Unknown tile type: " + std::string(key));
             }
 
-            // Search in runtime data (O(1))
-            auto dyn_it = additional_tiles.find(std::string(key));
-
-            if (dyn_it != additional_tiles.end()) {
-                return &(dyn_it->second);
-            }
-
-            return nullptr;
+            return *it;
         }
 
-        // Add new tile type at runtime
-        static void RegisterTile(std::string name, STileData data)
+        // Add a new tile type at runtime, or change an existing one. Tiles
+        // already on a map keep the data they were set with.
+        static void RegisterTile(std::string_view name, const STileData & data)
         {
-            additional_tiles[std::move(name)] = data;
+            if (auto it = registry().find(name); it != registry().end()) {
+                it->second = data;
+            } else {
+                registry().emplace(name, data);
+            }
         }
     };
 
@@ -127,13 +139,15 @@ export {
 
         void setType(std::string_view key)
         {
-            type = key;
-            auto data = CTileData::get(key);
+            const auto& [name, data] = CTileData::get(key);
 
-            glyph = data->glyph;
-            rgb_color = GetJitteredColor(data->rgb_color);
-            transparent = data->transparent;
-            passable = data->passable;
+            // Keep the registry's name, not the caller's, which may be a
+            // temporary
+            type = name;
+            glyph = data.glyph;
+            rgb_color = GetJitteredColor(data.rgb_color);
+            transparent = data.transparent;
+            passable = data.passable;
         }
 
         [[nodiscard]] std::string_view getType() const

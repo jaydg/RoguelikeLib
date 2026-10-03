@@ -599,8 +599,6 @@ void ConnectRegions(CMap& level, std::string_view floor)
 // Public API
 export {
 
-    // `wall`, `floor` and the water tiles are kept by the map as views, so
-    // they have to outlive it - string literals do.
     void CreateCaveAndGlade(CMap & level,
                             std::string_view wall = "wall",
                             std::string_view floor = "room",
