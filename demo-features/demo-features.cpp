@@ -10,13 +10,23 @@ import stc;
 
 using namespace std;
 
-int main(void)
+int main(int argc, char* argv[])
 {
     //////////////////////////////////////////////////////////////////////////
     // Initialization of randomness
     //////////////////////////////////////////////////////////////////////////
 
-    RL::InitRandomness();
+    // Pass a seed as first argument to generate the same levels again
+    std::uint32_t seed;
+
+    if (argc > 1) {
+        seed = static_cast<std::uint32_t>(std::stoul(argv[1]));
+        RL::InitRandomness(seed);
+    } else {
+        seed = RL::InitRandomness();
+    }
+
+    cout << "Seed: " << seed << endl << endl;
 
     //////////////////////////////////////////////////////////////////////////
     // Define the map

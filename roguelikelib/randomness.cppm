@@ -17,10 +17,22 @@ std::mt19937 mt;
 // Public API (exported)
 export {
 
-    void InitRandomness()
+    // Seed with a fixed value, so that the same sequence of calls
+    // generates the same maps again
+    void InitRandomness(const std::uint32_t seed)
     {
-        std::random_device rd; // non-deterministic generator
-        mt.seed(rd());         // to seed mersenne twister.
+        mt.seed(seed);
+    }
+
+    // Seed from a non-deterministic source. The seed is returned, so that
+    // it can be logged and passed to InitRandomness(seed) to replay a run.
+    std::uint32_t InitRandomness()
+    {
+        std::random_device rd;
+        const std::uint32_t seed = rd();
+
+        InitRandomness(seed);
+        return seed;
     }
 
     unsigned Random(const std::size_t limit)
