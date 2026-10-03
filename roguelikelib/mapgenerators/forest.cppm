@@ -186,13 +186,9 @@ void GenerateBranchedRiver(
     std::vector<Position> main_path;
     Position current = start;
 
-    // Try to find a valid start position
-    std::size_t attempts = 0;
-    const std::size_t max_attempts = 20;
-
-    while (attempts < max_attempts) {
+    // Start anywhere when the start position is not on the map
+    if (!map.inside(current.x, current.y)) {
         current = Position(Random(map.getWidth()), Random(map.getHeight()));
-        attempts++;
     }
 
     main_path.push_back(current);
@@ -278,7 +274,8 @@ void GenerateBranchedRiver(
 
         std::size_t branch_start_idx = RandomBetween(1, main_path.size() - 2);
         Position branch_start = main_path[branch_start_idx];
-        std::size_t branch_length = RandomBetween(5, length / 2);
+        // At least 5, also when half the river is shorter than that
+        std::size_t branch_length = RandomBetween(5, std::max(length / 2, std::size_t{6}));
         GenerateBranchedRiver(map, branch_start, branch_length, 0, river_type);
     }
 }
