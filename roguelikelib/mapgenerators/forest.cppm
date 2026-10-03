@@ -700,28 +700,23 @@ void GenerateForest(
             }
         };
 
-        // Build a path network connecting all clearings
-        // Use a simple approach: connect each clearing to the next, forming a chain or tree
-        std::vector<bool> connected(clearing_centers.size(), false);
-        connected[0] = true;
-
-        // Connect remaining clearings to the network
+        // Build a path network connecting all clearings: connect each clearing
+        // to the closest earlier one, forming a tree. Every earlier clearing
+        // is already part of the network.
         for (std::size_t i = 1; i < clearing_centers.size(); ++i) {
-            // Find the closest already-connected clearing
+            // Find the closest earlier clearing
             std::size_t best_j = 0;
             float best_dist = std::numeric_limits<float>::max();
 
             for (std::size_t j = 0; j < i; ++j) {
-                if (connected[j]) {
-                    float dist = Distance(
-                                     clearing_centers[i].x, clearing_centers[i].y,
-                                     clearing_centers[j].x, clearing_centers[j].y
-                                 );
+                float dist = Distance(
+                                 clearing_centers[i].x, clearing_centers[i].y,
+                                 clearing_centers[j].x, clearing_centers[j].y
+                             );
 
-                    if (dist < best_dist) {
-                        best_dist = dist;
-                        best_j = j;
-                    }
+                if (dist < best_dist) {
+                    best_dist = dist;
+                    best_j = j;
                 }
             }
 
@@ -765,7 +760,6 @@ void GenerateForest(
             // A path through another clearing is better than none: without it
             // this clearing would be cut off from the rest
             LayPath(path);
-            connected[i] = true;
         }
 
         // Add additional paths if we have capacity and want more connections
