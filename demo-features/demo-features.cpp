@@ -5,6 +5,7 @@ import rl.maputils;
 import rl.pathfinding;
 import rl.position;
 import rl.randomness;
+import rl.tile;
 import std;
 import stc;
 
@@ -90,6 +91,14 @@ int main(int argc, char* argv[])
     RL::CreateCaveAndGlade(level, "tree", "grass", RL::GladeShape, RL::GladeWater);
     level.PrintMap();
 
+    // Tiles can be registered at runtime, with any Unicode symbol as glyph
+    RL::CTileData::RegisterTile("pine", {U'♣', 0x2E7D32, false, false});
+    RL::CTileData::RegisterTile("pond", {U'≈', 0x3399FF, true, false});
+
+    cout << endl << stc::underline << "Cave and Glade - Glade with Unicode glyphs" << stc::reset << endl << endl;
+    RL::CreateCaveAndGlade(level, "pine", "grass", RL::GladeShape, {.shallow = "pond", .level = 12, .deep_level = 35, .grain = 20});
+    level.PrintMap();
+
     cout << endl << stc::underline << "Simple City with 15 buildings" << stc::reset << endl << endl;
     RL::CreateSimpleCity(level, 15);
     level.PrintMap();
@@ -125,9 +134,9 @@ int main(int argc, char* argv[])
             if (pos == observer) {
                 cout << stc::rgb_fg(0xF0F000) << '@' << stc::reset;
             } else if (fov.get(pos)) { // visible cells take from the map
-                cout << stc::rgb_fg(tile.getColor()) << tile.getGlyph() << stc::reset;
-            } else if (level.get(pos).getGlyph() == '#') { // not visible
-                cout << stc::rgb_fg(0x202020) << tile.getGlyph() << stc::reset;
+                cout << stc::rgb_fg(tile.getColor()) << RL::EncodeUTF8(tile.getGlyph()) << stc::reset;
+            } else if (level.get(pos).getGlyph() == U'#') { // not visible
+                cout << stc::rgb_fg(0x202020) << RL::EncodeUTF8(tile.getGlyph()) << stc::reset;
             } else { // others are empty
                 cout << ' ';
             }

@@ -6,6 +6,7 @@ module;
 
 export module demo_game.io;
 
+import rl.tile;
 import std;
 
 // internal state variables for notcurses
@@ -44,12 +45,15 @@ export {
         }
     }
 
-    void IOPrintChar(int x, int y, char to_print, std::optional<std::uint32_t> rgb_fg = std::nullopt)
+    void IOPrintChar(int x, int y, char32_t to_print, std::optional<std::uint32_t> rgb_fg = std::nullopt)
     {
         std::uint32_t fg = rgb_fg.has_value() ? rgb_fg.value() : IO_default_fg;
 
+        // notcurses takes a NUL-terminated UTF-8 grapheme
+        const std::string utf8 = RL::EncodeUTF8(to_print);
+
         nccell c = NCCELL_TRIVIAL_INITIALIZER;
-        nccell_load(std_plane, &c, &to_print);
+        nccell_load(std_plane, &c, utf8.c_str());
         nccell_set_fg_rgb(&c, fg);
         ncplane_putc_yx(std_plane, y, x, &c);
         nccell_release(std_plane, &c);

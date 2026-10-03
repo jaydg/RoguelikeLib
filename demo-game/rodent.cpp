@@ -13,7 +13,7 @@ import std;
 
 CRodent::CRodent()
 {
-    tile = 'r';
+    tile = U'r';
     // Random gray value (R=G=B) between 136 (0x88) and 255 (0xFF)
     std::uint32_t gray_val = 136 + RL::Random(120);
     rgb_color = (gray_val << 16) | (gray_val << 8) | gray_val;

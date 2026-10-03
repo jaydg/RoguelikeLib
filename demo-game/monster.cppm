@@ -10,7 +10,7 @@ import std;
 export class CMonster
 {
 protected:
-    char tile{};
+    char32_t tile{};
     std::uint32_t rgb_color{0xFFFFFF};
     RL::CFOV fov;
     int hit_points{};

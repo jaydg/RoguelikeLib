@@ -13,7 +13,7 @@ import std;
 
 CPlayer::CPlayer()
 {
-    tile = '@';
+    tile = U'@';
     rgb_color = 0xFFFF00;
     hit_points = 20;
     experience = 0;
@@ -141,7 +141,7 @@ void CPlayer::LookAround()
                 IOPrintChar(pos.x, pos.y, cell.getGlyph(), dark_color);
             } else {
                 // unknown
-                IOPrintChar(pos.x, pos.y, ' ');
+                IOPrintChar(pos.x, pos.y, U' ');
             }
         }
     }

@@ -49,7 +49,7 @@ public:
         for (std::size_t y = 0; y < getHeight(); ++y) {
             for (std::size_t x = 0; x < getWidth(); ++x) {
                 auto tile = get(x, y);
-                std::cout << stc::rgb_fg(tile.getColor()) << tile.getGlyph();
+                std::cout << stc::rgb_fg(tile.getColor()) << EncodeUTF8(tile.getGlyph());
             }
 
             std::cout << stc::reset << std::endl;
