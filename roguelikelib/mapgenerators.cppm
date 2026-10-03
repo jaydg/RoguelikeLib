@@ -15,3 +15,4 @@ export import rl.mapgenerators.spaceshuttle;
 export import rl.mapgenerators.simplecity;
 export import rl.mapgenerators.delve;
 export import rl.mapgenerators.forest;
+export import rl.mapgenerators.caveandglade;

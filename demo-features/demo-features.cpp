@@ -68,6 +68,18 @@ int main(void)
     RL::GenerateForest(level);
     level.PrintMap();
 
+    cout << endl << stc::underline << "Cave and Glade - Cave" << stc::reset << endl << endl;
+    RL::CreateCaveAndGlade(level, "wall", "room", RL::CaveShape, RL::CaveWater);
+    level.PrintMap();
+
+    cout << endl << stc::underline << "Cave and Glade - Small cave without water" << stc::reset << endl << endl;
+    RL::CreateCaveAndGlade(level, "wall", "room", {.min_areas = 7, .max_areas = 11, .scale = 2}, {.shallow = {}});
+    level.PrintMap();
+
+    cout << endl << stc::underline << "Cave and Glade - Glade" << stc::reset << endl << endl;
+    RL::CreateCaveAndGlade(level, "tree", "grass", RL::GladeShape, RL::GladeWater);
+    level.PrintMap();
+
     cout << endl << stc::underline << "Simple City with 15 buildings" << stc::reset << endl << endl;
     RL::CreateSimpleCity(level, 15);
     level.PrintMap();
