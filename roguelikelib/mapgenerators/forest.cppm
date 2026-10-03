@@ -2,6 +2,7 @@ module;
 
 export module rl.mapgenerators.forest;
 
+export import rl.locations;
 import rl.map;
 import rl.maputils;
 import rl.matrix;
@@ -340,8 +341,15 @@ void GenerateRocks(CMap& map, float rock_density = 0.05f)
 // @param num_rivers         Number of rivers (def. 1)
 // @param num_streams        Number of streams (def. 8)
 // @param vegetation_density Target vegetation coverage (0.0-1.0, def. 0.6)
+//
+// @return The clearings, as locations of type Clearing. A clearing is
+//         grass everywhere within 0.4 times its radius of the center,
+//         save for water, paths and rocks; further out it frays, and at
+//         1.6 times its radius it ends. Clearings may overlap. With more
+//         than one clearing, each center lies on the path network, on a
+//         path or a bridge.
 
-void GenerateForest(
+std::vector<SLocation> GenerateForest(
     CMap& map,
     float tree_density = 0.7f,
     float rock_density = 0.05f,
@@ -821,6 +829,15 @@ void GenerateForest(
 
     // 6. Place rocks (after rivers, streams, clearings, and paths)
     GenerateRocks(map, rock_density);
+
+    std::vector<SLocation> clearings;
+    clearings.reserve(clearing_centers.size());
+
+    for (std::size_t i = 0; i < clearing_centers.size(); ++i) {
+        clearings.push_back({ELocationType::Clearing, clearing_centers[i], clearing_radii[i]});
+    }
+
+    return clearings;
 }
 
 } // namespace RL
