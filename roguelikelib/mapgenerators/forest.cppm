@@ -552,32 +552,46 @@ void GenerateForest(
 
     std::vector<Position> all_clearing_tiles;
 
-    for (std::size_t i = 0; i < num_clearings; ++i) {
-        Position center;
-        bool valid_position = false;
-        std::size_t attempts = 0;
-        const std::size_t max_attempts = 100;
+    // Picks a random center at least min_distance away from every existing
+    // clearing. When none is found, the candidate farthest from the others is
+    // returned in `best`, and the result is false.
+    const auto find_clearing_center = [&](std::size_t min_distance, std::size_t max_attempts, Position & best) {
+        std::size_t best_distance = 0;
 
-        while (!valid_position && attempts < max_attempts) {
-            center = Position(Random(map.getWidth()), Random(map.getHeight()));
-            valid_position = true;
+        for (std::size_t attempt = 0; attempt < max_attempts; ++attempt) {
+            const Position candidate(Random(map.getWidth()), Random(map.getHeight()));
+            std::size_t nearest = std::numeric_limits<std::size_t>::max();
 
             for (const auto& existing : clearing_centers) {
-                std::size_t dx = std::abs(static_cast<int>(center.x) - static_cast<int>(existing.x));
-                std::size_t dy = std::abs(static_cast<int>(center.y) - static_cast<int>(existing.y));
-
-                if ((dx < min_clearing_distance || dy < min_clearing_distance) || (dx == 0 || dy == 0)) {
-                    valid_position = false;
-                    break;
-                }
+                nearest = std::min(nearest, Distance(candidate.x, candidate.y, existing.x, existing.y));
             }
 
-            attempts++;
+            if (attempt == 0 || nearest > best_distance) {
+                best = candidate;
+                best_distance = nearest;
+            }
+
+            if (nearest >= min_distance) {
+                return true;
+            }
         }
 
-        if (!valid_position) {
-            center = Position(Random(map.getWidth()), Random(map.getHeight()));
-        }
+        return false;
+    };
+
+    // Overlapping and regrown clearings track the same tile more than once
+    const auto count_clearing_tiles = [&all_clearing_tiles]() {
+        std::ranges::sort(all_clearing_tiles, [](const Position & a, const Position & b) {
+            return a.y < b.y || (a.y == b.y && a.x < b.x);
+        });
+        all_clearing_tiles.erase(std::unique(all_clearing_tiles.begin(), all_clearing_tiles.end()), all_clearing_tiles.end());
+
+        return all_clearing_tiles.size();
+    };
+
+    for (std::size_t i = 0; i < num_clearings; ++i) {
+        Position center;
+        find_clearing_center(min_clearing_distance, 100, center);
 
         std::size_t radius = RandomBetween(10, 14); // Larger clearings: 12 +/- 2
         GenerateAndTrackClearing(map, center, radius, all_clearing_tiles, "grass");
@@ -588,35 +602,15 @@ void GenerateForest(
 
     std::size_t total_tiles = map.getWidth() * map.getHeight();
     std::size_t target_clearing_tiles = static_cast<std::size_t>(total_tiles * min_clearing_percentage);
-    std::size_t current_clearing_tiles = all_clearing_tiles.size();
+    std::size_t current_clearing_tiles = count_clearing_tiles();
 
     while (current_clearing_tiles < target_clearing_tiles) {
         bool added_clearing = false;
 
         if (clearing_centers.size() < num_clearings * 2) {
             Position center;
-            bool valid_position = false;
-            std::size_t attempts = 0;
-            const std::size_t max_attempts = 50;
 
-            while (!valid_position && attempts < max_attempts) {
-                center = Position(Random(map.getWidth()), Random(map.getHeight()));
-                valid_position = true;
-
-                for (const auto& existing : clearing_centers) {
-                    std::size_t dx = std::abs(static_cast<int>(center.x) - static_cast<int>(existing.x));
-                    std::size_t dy = std::abs(static_cast<int>(center.y) - static_cast<int>(existing.y));
-
-                    if ((dx < min_clearing_distance / 2 || dy < min_clearing_distance / 2) || (dx == 0 || dy == 0)) {
-                        valid_position = false;
-                        break;
-                    }
-                }
-
-                attempts++;
-            }
-
-            if (valid_position) {
+            if (find_clearing_center(min_clearing_distance / 2, 50, center)) {
                 std::size_t radius = RandomBetween(4, 10);
                 GenerateAndTrackClearing(map, center, radius, all_clearing_tiles, "grass");
 
@@ -641,7 +635,7 @@ void GenerateForest(
             break;
         }
 
-        current_clearing_tiles = all_clearing_tiles.size();
+        current_clearing_tiles = count_clearing_tiles();
     }
 
     // 5. Generate ways connecting clearings (with collision avoidance and bridges)
