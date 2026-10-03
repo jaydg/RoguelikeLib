@@ -604,8 +604,8 @@ export {
     void CreateCaveAndGlade(CMap & level,
                             std::string_view wall = "wall",
                             std::string_view floor = "room",
-                            const SCaveAndGladeShape & shape = CaveShape,
-                            const SCaveAndGladeWater & water = CaveWater)
+                            const SCaveAndGladeShape & shape = SCaveAndGladeShape(),
+                            const SCaveAndGladeWater & water = SCaveAndGladeWater())
     {
         using namespace caveandglade_detail;
 
