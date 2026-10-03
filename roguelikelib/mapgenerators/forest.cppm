@@ -2,6 +2,7 @@ module;
 
 export module rl.mapgenerators.forest;
 
+export import rl.connectivity;
 export import rl.locations;
 import rl.map;
 import rl.maputils;
@@ -333,6 +334,17 @@ void GenerateRocks(CMap& map, float rock_density = 0.05f)
 // =============================================================================
 // Main function: generate forest
 // =============================================================================
+
+// What may be opened up to make a forest reachable everywhere: streams and
+// rivers are bridged, trees and rocks give way to grass. Trees are cleared
+// rather than rocks, and both rather than a long bridge built. See
+// MakeReachable() in rl.connectivity.
+constexpr std::array<SOpening, 3> ForestOpenings = {{
+        {"water", 2, "bridge"},
+        {"tree", 3, "grass"},
+        {"rock", 4, "grass"}
+    }
+};
 
 // @param tree_density       Share of vegetation that is trees, not plants (0.0–1.0, def. 0.7)
 // @param rock_density       Probability of rocks (0.0–1.0) (def. 0.05)
