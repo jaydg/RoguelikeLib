@@ -100,13 +100,13 @@ bool FindPath(
                 continue;
             }
 
-        if (pos.x > 0 && pos.y < pathmap.getHeight() - 1)
+        if (pos.y < pathmap.getHeight() - 1)
             if (pathmap.get(pos.x, pos.y + 1) < current_value) { // S
                 new_pos.y++;
                 continue;
             }
 
-        if (pos.x > 0 && pos.y > 0)
+        if (pos.x > 0)
             if (pathmap.get(pos.x - 1, pos.y) < current_value) { // W
                 new_pos.x--;
                 continue;
