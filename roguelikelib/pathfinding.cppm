@@ -36,8 +36,8 @@ bool FindPath(
         }
     }
 
-    // fill from end to start
-    if (!pathmap.FloodFill(end, 0, false, 1, start)) {
+    // fill from end to start, with the same moves the walk back may take
+    if (!pathmap.FloodFill(end, 0, diagonals, 1, start)) {
         return false;
     }
 
