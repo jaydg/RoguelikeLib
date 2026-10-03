@@ -4,6 +4,7 @@ export module rl.mapgenerators.forest;
 
 import rl.map;
 import rl.maputils;
+import rl.matrix;
 import rl.tile;
 import rl.position;
 import rl.randomness;
@@ -640,45 +641,18 @@ void GenerateForest(
 
     // 5. Generate ways connecting clearings (with collision avoidance and bridges)
     if (!clearing_centers.empty()) {
-        const std::size_t min_path_distance = 1; // Minimum distance between paths
-        std::vector<Position> all_path_positions; // Track all path positions for distance checking
+        // Path tiles laid so far, so that nearness to a path is a look at the
+        // surrounding tiles rather than a search through every path tile
+        CMatrix<bool> path_tiles(map.getSize(), false);
 
-        // Helper function to check if a position is near any existing path
+        // Helper function to check if a position is on or next to an existing path
         auto IsNearPath = [&](const Position & pos) -> bool {
-            for (const auto& p : all_path_positions)
+            for (std::size_t x = pos.x > 0 ? pos.x - 1 : 0; x <= pos.x + 1 && x < map.getWidth(); ++x)
             {
-                std::size_t dx = std::abs(static_cast<int>(pos.x) - static_cast<int>(p.x));
-                std::size_t dy = std::abs(static_cast<int>(pos.y) - static_cast<int>(p.y));
-
-                if (dx <= min_path_distance && dy <= min_path_distance) {
-                    return true;
-                }
-            }
-
-            return false;
-        };
-
-        // Helper function to check if a position is near any OTHER clearing center
-        // (i.e., clearing centers that are NOT the endpoints of this path)
-        // Clearings have radius 3-8, so use a buffer to ensure paths go around them
-        const std::size_t path_clearing_buffer = 3; // Minimum distance from clearing center for path segments
-        auto IsNearOtherClearing = [&](const Position & pos, const Position & path_start, const Position & path_end) -> bool {
-            for (const auto& center : clearing_centers)
-            {
-                // Skip the path endpoints themselves
-                if (Distance(pos.x, pos.y, path_start.x, path_start.y) <= 1.0f) {
-                    continue;
-                }
-
-                if (Distance(pos.x, pos.y, path_end.x, path_end.y) <= 1.0f) {
-                    continue;
-                }
-
-                // If within buffer distance of any OTHER clearing center, reject
-                float dist = Distance(pos.x, pos.y, center.x, center.y);
-
-                if (dist <= path_clearing_buffer) {
-                    return true;
+                for (std::size_t y = pos.y > 0 ? pos.y - 1 : 0; y <= pos.y + 1 && y < map.getHeight(); ++y) {
+                    if (path_tiles.get(x, y)) {
+                        return true;
+                    }
                 }
             }
 
@@ -711,14 +685,25 @@ void GenerateForest(
             return false;
         };
 
+        // Lays a path on the map, with bridges where it crosses water
+        auto LayPath = [&](const std::vector<Position>& path) {
+            for (const auto& pos : path) {
+                if (map.inside(pos.x, pos.y)) {
+                    if (map.get(pos.x, pos.y).getType() == "water") {
+                        map.SetCell(pos.x, pos.y, "bridge");
+                    } else {
+                        map.SetCell(pos.x, pos.y, "corridor");
+                    }
+
+                    path_tiles.set(pos.x, pos.y, true);
+                }
+            }
+        };
+
         // Build a path network connecting all clearings
         // Use a simple approach: connect each clearing to the next, forming a chain or tree
         std::vector<bool> connected(clearing_centers.size(), false);
-
-        // Always connect the first clearing
-        if (!clearing_centers.empty()) {
-            connected[0] = true;
-        }
+        connected[0] = true;
 
         // Connect remaining clearings to the network
         for (std::size_t i = 1; i < clearing_centers.size(); ++i) {
@@ -740,7 +725,9 @@ void GenerateForest(
                 }
             }
 
-            // Connect clearing i to clearing best_j
+            // Connect clearing i to clearing best_j. Every path laid so far is
+            // part of the network, so the path ends where it first reaches one
+            // and joins it there, rather than running alongside it.
             std::vector<Position> path;
             bool path_valid = false;
             int path_attempts = 0;
@@ -754,22 +741,19 @@ void GenerateForest(
                 unsigned diagpct = 30 + Random(20);  // 30-50%
                 BuildSigsagPath(path, clearing_centers[i], clearing_centers[best_j], turnpct, diagpct);
 
-                // Check if path crosses any clearing or is too close to existing paths
+                for (std::size_t step = 0; step < path.size(); ++step) {
+                    if (IsNearPath(path[step])) {
+                        path.resize(step + 1);
+                        break;
+                    }
+                }
+
+                // Check if path crosses any other clearing
                 path_valid = true;
 
                 for (const auto& pos : path) {
-                    // Only check positions that are not the endpoints themselves
-                    if (Distance(pos.x, pos.y, clearing_centers[i].x, clearing_centers[i].y) <= 1.0f) {
-                        continue;
-                    }
-
-                    if (Distance(pos.x, pos.y, clearing_centers[best_j].x, clearing_centers[best_j].y) <= 1.0f) {
-                        continue;
-                    }
-
                     // For the main connecting paths, use a lenient clearing buffer to ensure connectivity
-                    if (IsNearAnyClearing(pos, clearing_centers[i], clearing_centers[best_j], false) ||
-                            (min_path_distance > 0 && IsNearPath(pos))) {
+                    if (IsNearAnyClearing(pos, clearing_centers[i], clearing_centers[best_j], false)) {
                         path_valid = false;
                         break;
                     }
@@ -778,23 +762,10 @@ void GenerateForest(
                 path_attempts++;
             }
 
-            if (path_valid) {
-                // Add this path
-                for (const auto& pos : path) {
-                    if (map.inside(pos.x, pos.y)) {
-                        // Check if on water for bridge
-                        if (map.get(pos.x, pos.y).getType() == "water") {
-                            map.SetCell(pos.x, pos.y, "bridge");
-                        } else {
-                            map.SetCell(pos.x, pos.y, "corridor");
-                        }
-
-                        all_path_positions.push_back(pos);
-                    }
-                }
-
-                connected[i] = true;
-            }
+            // A path through another clearing is better than none: without it
+            // this clearing would be cut off from the rest
+            LayPath(path);
+            connected[i] = true;
         }
 
         // Add additional paths if we have capacity and want more connections
@@ -824,18 +795,15 @@ void GenerateForest(
                 path_valid = true;
 
                 for (const auto& pos : path) {
-                    // Only check positions that are not the endpoints themselves
-                    if (Distance(pos.x, pos.y, clearing_centers[i1].x, clearing_centers[i1].y) <= 1.0f) {
-                        continue;
-                    }
-
-                    if (Distance(pos.x, pos.y, clearing_centers[i2].x, clearing_centers[i2].y) <= 1.0f) {
+                    // Inside its own two clearings a path meets the paths that
+                    // already lead there; that is where paths converge
+                    if (Distance(pos.x, pos.y, clearing_centers[i1].x, clearing_centers[i1].y) <= clearing_radii[i1] ||
+                            Distance(pos.x, pos.y, clearing_centers[i2].x, clearing_centers[i2].y) <= clearing_radii[i2]) {
                         continue;
                     }
 
                     // For extra paths, use strict clearing check
-                    if (IsNearAnyClearing(pos, clearing_centers[i1], clearing_centers[i2], true) ||
-                            (min_path_distance > 0 && IsNearPath(pos))) {
+                    if (IsNearAnyClearing(pos, clearing_centers[i1], clearing_centers[i2], true) || IsNearPath(pos)) {
                         path_valid = false;
                         break;
                     }
@@ -845,18 +813,7 @@ void GenerateForest(
             }
 
             if (path_valid) {
-                // Add this path
-                for (const auto& pos : path) {
-                    if (map.inside(pos.x, pos.y)) {
-                        if (map.get(pos.x, pos.y).getType() == "water") {
-                            map.SetCell(pos.x, pos.y, "bridge");
-                        } else {
-                            map.SetCell(pos.x, pos.y, "corridor");
-                        }
-
-                        all_path_positions.push_back(pos);
-                    }
-                }
+                LayPath(path);
             }
         }
     } else {
