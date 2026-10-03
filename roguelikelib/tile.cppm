@@ -9,6 +9,9 @@ import std;
 
 export module rl.tile;
 
+// Glyphs are code points, and printing them needs EncodeUTF8()
+export import rl.utf8;
+
 namespace RL
 {
 
@@ -21,35 +24,6 @@ export struct STileData {
 };
 
 export {
-
-    // Encode a glyph as UTF-8, for printing it to a terminal. Anything that
-    // is not a valid code point comes out as the replacement character.
-    std::string EncodeUTF8(char32_t glyph)
-    {
-        if (glyph > 0x10FFFF || (glyph >= 0xD800 && glyph <= 0xDFFF)) {
-            glyph = U'\uFFFD';
-        }
-
-        std::string utf8;
-
-        if (glyph < 0x80) {
-            utf8 += static_cast<char>(glyph);
-        } else if (glyph < 0x800) {
-            utf8 += static_cast<char>(0xC0 | (glyph >> 6));
-            utf8 += static_cast<char>(0x80 | (glyph & 0x3F));
-        } else if (glyph < 0x10000) {
-            utf8 += static_cast<char>(0xE0 | (glyph >> 12));
-            utf8 += static_cast<char>(0x80 | ((glyph >> 6) & 0x3F));
-            utf8 += static_cast<char>(0x80 | (glyph & 0x3F));
-        } else {
-            utf8 += static_cast<char>(0xF0 | (glyph >> 18));
-            utf8 += static_cast<char>(0x80 | ((glyph >> 12) & 0x3F));
-            utf8 += static_cast<char>(0x80 | ((glyph >> 6) & 0x3F));
-            utf8 += static_cast<char>(0x80 | (glyph & 0x3F));
-        }
-
-        return utf8;
-    }
 
     class CTileData {
     private:

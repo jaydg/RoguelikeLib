@@ -9,6 +9,7 @@ export module rl.map;
 import rl.matrix;
 import rl.position;
 import rl.tile;
+import rl.utf8;
 import std;
 import stc;
 
