@@ -35,6 +35,60 @@ std::uint32_t Dim(std::uint32_t rgb, int percent)
     return (scale((rgb >> 16) & 0xFF) << 16) | (scale((rgb >> 8) & 0xFF) << 8) | scale(rgb & 0xFF);
 }
 
+// A rectangle of cells: its top left corner and its size
+struct SRect {
+    Position corner{0, 0};
+    Size size{0, 0};
+
+    // The column and row just past it
+    [[nodiscard]] std::size_t Right() const
+    {
+        return corner.x + size.x;
+    }
+
+    [[nodiscard]] std::size_t Bottom() const
+    {
+        return corner.y + size.y;
+    }
+
+    [[nodiscard]] bool Empty() const
+    {
+        return size.x == 0 || size.y == 0;
+    }
+
+    [[nodiscard]] bool Contains(Position pos) const
+    {
+        return pos.x >= corner.x && pos.y >= corner.y && pos.x < Right() && pos.y < Bottom();
+    }
+
+    // What it has in common with another
+    [[nodiscard]] SRect Intersection(const SRect& other) const
+    {
+        const std::size_t left = std::max(corner.x, other.corner.x);
+        const std::size_t top = std::max(corner.y, other.corner.y);
+        const std::size_t right = std::min(Right(), other.Right());
+        const std::size_t bottom = std::min(Bottom(), other.Bottom());
+
+        if (right <= left || bottom <= top) {
+            return {Position(left, top), Size(0, 0)};
+        }
+
+        return {Position(left, top), Size(right - left, bottom - top)};
+    }
+
+    // Smaller by a number of cells on every side
+    [[nodiscard]] SRect Inset(std::size_t cells) const
+    {
+        if (size.x <= 2 * cells || size.y <= 2 * cells) {
+            return {Position(corner.x + std::min(cells, size.x), corner.y + std::min(cells, size.y)), Size(0, 0)};
+        }
+
+        return {Position(corner.x + cells, corner.y + cells), Size(size.x - 2 * cells, size.y - 2 * cells)};
+    }
+
+    bool operator==(const SRect&) const = default;
+};
+
 struct SCell {
     char32_t glyph = U' ';
     std::uint32_t rgb = default_text_colour;
@@ -49,6 +103,9 @@ private:
     std::vector<SCell> cells;
     std::uint32_t text_colour = default_text_colour;
     std::map<std::string, std::uint32_t, std::less<>> tags;
+
+    // Where drawing goes; anything outside is dropped
+    std::optional<SRect> clip;
 
     // The colour a tag names, if it is one
     [[nodiscard]] std::optional<std::uint32_t> TagColour(std::string_view name) const
@@ -172,17 +229,31 @@ public:
         return cells[y * size.x + x];
     }
 
-    // Draws a glyph; off the screen it is dropped. Control codes are drawn
-    // as blanks, so that they cannot reach the terminal.
+    // Keeps drawing within a rectangle, e.g. a window's: what falls
+    // outside it is dropped, as if it were off the screen
+    void setClip(const SRect& rect)
+    {
+        clip = rect;
+    }
+
+    // Lets drawing go anywhere on the screen again
+    void resetClip()
+    {
+        clip.reset();
+    }
+
+    // Draws a glyph; off the screen or outside the clip rectangle it is
+    // dropped. Control codes are drawn as blanks, so that they cannot reach
+    // the terminal.
     void Put(std::size_t x, std::size_t y, char32_t glyph, std::uint32_t rgb)
     {
-        if (x < size.x && y < size.y) {
+        if (x < size.x && y < size.y && (!clip || clip->Contains(Position(x, y)))) {
             cells[y * size.x + x] = SCell{glyph < U' ' || glyph == U'\x7F' ? U' ' : glyph, rgb};
         }
     }
 
     // Draws text with markup from (x, y) to the right, cut off at the edge
-    // of the screen. Returns the column after the text.
+    // of the screen or the clip rectangle. Returns the column after the text.
     std::size_t Print(std::size_t x, std::size_t y, std::string_view markup, std::uint32_t rgb)
     {
         ForEachGlyph(markup, rgb, [&](char32_t glyph, std::uint32_t colour) {
