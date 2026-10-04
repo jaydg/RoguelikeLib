@@ -23,6 +23,7 @@ void CSimpleGame::PlacePlayer()
     }
 
     monsters.push_back(&player);
+    scheduler.Schedule(&player, 0);
 }
 
 void CSimpleGame::AddMonster()
@@ -37,30 +38,15 @@ void CSimpleGame::AddMonster()
     }
 
     monsters.push_back(new_one);
+    scheduler.Schedule(new_one, new_one->Delay());
 }
 
-void CSimpleGame::MoveAllMonsters()
+void CSimpleGame::RemoveDeadMonsters()
 {
-    std::list < CMonster* >::iterator it, _it;
-
-    for (it = monsters.begin(), _it = monsters.end(); it != _it; ++it) {
-        CMonster *monster = *it;
-
-        if (monsters_to_remove.find(monster) == monsters_to_remove.end()) {
-            monster->DoAction();
-        }
-    }
-
-    // remove all dead monsters
-    for (it = monsters.begin(), _it = monsters.end(); it != _it;) {
-        auto to_remove = it;
-        it++;
-        CMonster *monster = *to_remove;
-
-        if (monsters_to_remove.find(monster) != monsters_to_remove.end()) {
-            delete monster;
-            monsters.erase(to_remove);
-        }
+    for (CMonster *monster : monsters_to_remove) {
+        scheduler.Remove(monster);
+        monsters.remove(monster);
+        delete monster;
     }
 
     monsters_to_remove.clear();
@@ -127,12 +113,28 @@ void CSimpleGame::CreateLevel()
 
 [[noreturn]] void CSimpleGame::MainLoop()
 {
-    for (;;) { // next turn
-        if (RL::Random(100) == 0) {
-            AddMonster();
+    for (;;) {
+        // The player is always on the timeline, so someone always is next
+        CMonster *actor = *scheduler.Next();
+
+        // Once a turn of the player
+        if (actor == &player) {
+            if (RL::Random(100) == 0) {
+                AddMonster();
+            }
+
+            player.Regenerate();
         }
 
-        player.Regenerate();
-        MoveAllMonsters();
+        actor->DoAction();
+
+        // Monsters killed in the action leave the game; whoever acted is
+        // back on the timeline for its next action
+        const bool alive = !monsters_to_remove.contains(actor);
+        RemoveDeadMonsters();
+
+        if (alive) {
+            scheduler.Schedule(actor, actor->Delay());
+        }
     }
 }

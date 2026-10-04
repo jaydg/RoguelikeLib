@@ -5,6 +5,7 @@ export module demo_game.monster;
 export import rl.fov;
 export import rl.map;
 export import rl.position;
+export import rl.scheduler;
 import std;
 
 export class CMonster
@@ -15,6 +16,10 @@ protected:
     RL::CFOV fov;
     int hit_points{};
     int strength{};
+
+    // How quick it is: 100 is as quick as the player, 200 twice as quick
+    int speed{100};
+
     RL::Position position;
 public:
     virtual ~CMonster() = default;
@@ -30,4 +35,7 @@ public:
     virtual void Death();
     virtual void Print() const;
     RL::Position GetPosition() const;
+
+    // How long until it acts again after acting: 100 ticks at speed 100
+    RL::Ticks Delay() const;
 };

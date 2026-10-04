@@ -71,3 +71,8 @@ RL::Position CMonster::GetPosition() const
 {
     return position;
 }
+
+RL::Ticks CMonster::Delay() const
+{
+    return static_cast<RL::Ticks>(100 * 100 / speed);
+}

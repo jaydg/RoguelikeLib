@@ -20,6 +20,9 @@ CRodent::CRodent()
 
     hit_points = 5;
     strength = 3;
+
+    // Some rats are slower than the player, some quicker
+    speed = 50 + static_cast<int>(RL::Random(101));
 }
 
 void CRodent::LookAround()

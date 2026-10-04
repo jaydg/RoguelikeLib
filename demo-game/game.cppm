@@ -14,7 +14,7 @@ private:
 
     void PlacePlayer();
     void AddMonster();
-    void MoveAllMonsters();
+    void RemoveDeadMonsters();
 
 public:
     static constexpr int LEVEL_SIZE_X = 80;
@@ -24,6 +24,9 @@ public:
     CPlayer player;
     std::list <CMonster*> monsters;
     std::set <CMonster*> monsters_to_remove;
+
+    // Whose turn it is: every monster, the player included, is on it
+    RL::CScheduler<CMonster*> scheduler;
     CMonster* GetMonsterFromCell(const RL::Position& cell);
 
     void CreateLevel();
