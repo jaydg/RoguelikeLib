@@ -1,3 +1,5 @@
+import rl.clock;
+import rl.distancemap;
 import rl.fov;
 import rl.map;
 import rl.mapgenerators;
@@ -5,6 +7,7 @@ import rl.maputils;
 import rl.pathfinding;
 import rl.position;
 import rl.randomness;
+import rl.scheduler;
 import rl.tile;
 import std;
 import stc;
@@ -188,6 +191,77 @@ int main(int argc, char* argv[])
     }
 
     level.PrintMap();
+
+    //////////////////////////////////////////////////////////////////////////
+    // Distance map: the way from everywhere to the nearest goal
+    //////////////////////////////////////////////////////////////////////////
+
+    cout << endl << stc::underline << "Distance map in a cave" << stc::reset
+         << " (the last digit of the distance to '@', near in yellow, far in blue)" << endl << endl;
+
+    RL::CreateCaves(level, 3);
+    RL::Position goal;
+    RL::FindOnMapRandomRectangleOfType(level, "room", goal, RL::Size(1, 1));
+    const RL::CDistanceMap distances(level, std::array{goal});
+
+    for (pos.y = 0; pos.y < level_size.y; ++pos.y) {
+        for (pos.x = 0; pos.x < level_size.x; ++pos.x) {
+            const int distance = distances.Distance(pos);
+
+            if (pos == goal) {
+                cout << stc::rgb_fg(0xF0F000) << '@';
+            } else if (distance == RL::CDistanceMap::unreachable) {
+                cout << stc::rgb_fg(0x404040) << (level.get(pos).isPassable() ? ' ' : '#');
+            } else {
+                // From yellow to blue over the first 60 steps
+                const float far = static_cast<float>(std::min(distance, 60)) / 60.0f;
+                cout << stc::hsl_fg(0.15f + 0.5f * far, 0.8f, 0.55f) << distance % 10;
+            }
+        }
+
+        cout << stc::reset << endl;
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    // Clock: the time of day, and what holds at it
+    //////////////////////////////////////////////////////////////////////////
+
+    cout << endl << stc::underline << "A day" << stc::reset << " (half an hour a turn)" << endl << endl;
+
+    RL::CClock clock(30);
+    RL::CDailySchedule<string_view> phases;
+    phases.Set(6, 0, "morning");
+    phases.Set(12, 0, "afternoon");
+    phases.Set(18, 0, "evening");
+    phases.Set(22, 0, "night");
+
+    for (int turn = 0; turn < 48; turn += 6) {
+        cout << clock.ToString() << ' ' << phases.At(clock) << endl;
+        clock.Advance(6);
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    // Scheduler: who acts when, by speed
+    //////////////////////////////////////////////////////////////////////////
+
+    cout << endl << stc::underline << "Scheduler" << stc::reset
+         << " (a hare acts every 50 ticks, a fox every 100, a snail every 400)" << endl << endl;
+
+    const map<string_view, RL::Ticks> delays = {{"hare", 50}, {"fox", 100}, {"snail", 400}};
+    RL::CScheduler<string_view> scheduler;
+
+    for (const auto& [name, delay] : delays) {
+        scheduler.Schedule(name, 0);
+    }
+
+    while (auto actor = scheduler.Next()) {
+        if (scheduler.Now() > 400) {
+            break;
+        }
+
+        cout << scheduler.Now() << ": " << *actor << endl;
+        scheduler.Schedule(*actor, delays.at(*actor));
+    }
 
     //////////////////////////////////////////////////////////////////////////
     // That's all folks!
