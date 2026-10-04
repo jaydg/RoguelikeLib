@@ -35,7 +35,8 @@ class CDistanceMap
 private:
     CMatrix<int> distance;
 
-    // What walking onto each tile costs; 0 where it cannot be done
+    // What walking onto each tile costs, for those the measuring reached;
+    // 0 where it cannot be done, or was not measured
     CMatrix<int> step_cost;
 
     Neighbors neighbors;
@@ -72,9 +73,12 @@ public:
     // Measures the way from every tile to the nearest goal. The distance of
     // a tile is what walking onto each tile on the way costs, the goal's
     // included. A goal that cannot be stood on, like a well, counts 1 to
-    // walk onto, and leads walkers next to it.
+    // walk onto, and leads walkers next to it. Tiles further from every
+    // goal than `max_distance` are not measured, and count as unreachable:
+    // for walkers that only ever go a little way, that saves measuring the
+    // whole map.
     CDistanceMap(const CMap& map, std::span<const Position> goals, std::span<const SStepCost> costs = {},
-                 Neighbors a_neighbors = Neighbors::All8)
+                 Neighbors a_neighbors = Neighbors::All8, int max_distance = unreachable)
         : distance(map.getSize(), unreachable), step_cost(map.getSize(), 0), neighbors(a_neighbors)
     {
         for (const SStepCost& cost : costs) {
@@ -83,26 +87,16 @@ public:
             }
         }
 
-        for (std::size_t y = 0; y < map.getHeight(); ++y) {
-            for (std::size_t x = 0; x < map.getWidth(); ++x) {
-                const CTile& tile = map.get(x, y);
-
-                if (!tile.isPassable()) {
-                    continue;
+        // What walking onto a tile that can be stood on costs
+        const auto cost_of = [&costs](const CTile & tile) {
+            for (const SStepCost& listed : costs) {
+                if (tile.getType() == listed.type) {
+                    return listed.cost;
                 }
-
-                int cost = 1;
-
-                for (const SStepCost& listed : costs) {
-                    if (tile.getType() == listed.type) {
-                        cost = listed.cost;
-                        break;
-                    }
-                }
-
-                step_cost.set(x, y, cost);
             }
-        }
+
+            return 1;
+        };
 
         // From the goals outwards: a tile is as far as the cheapest
         // neighbour, plus what walking onto that neighbour costs
@@ -115,11 +109,7 @@ public:
         for (const Position& goal : goals) {
             if (map.inside(goal)) {
                 distance.set(goal, 0);
-
-                if (step_cost.get(goal) == 0) {
-                    step_cost.set(goal, 1);
-                }
-
+                step_cost.set(goal, map.get(goal).isPassable() ? cost_of(map.get(goal)) : 1);
                 queue.emplace(0, goal);
             }
         }
@@ -136,8 +126,9 @@ public:
 
             // Only tiles that can be stood on lead anywhere
             ForNeighbors(at, [&](const Position & from) {
-                if (map.get(from).isPassable() && so_far + onto < distance.get(from)) {
+                if (map.get(from).isPassable() && so_far + onto < distance.get(from) && so_far + onto <= max_distance) {
                     distance.set(from, so_far + onto);
+                    step_cost.set(from, cost_of(map.get(from)));
                     queue.emplace(so_far + onto, from);
                 }
             });
