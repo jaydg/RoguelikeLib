@@ -21,6 +21,12 @@ void CMonster::LookAround()
 
 bool CMonster::MoveTo(const RL::Position &new_pos)
 {
+    // Off the edge of the map: a step left of column 0 or above row 0
+    // wraps round to a huge coordinate, which is off the map as well
+    if (!game.level.inside(new_pos)) {
+        return false;
+    }
+
     RL::CTile cell = game.level.get(new_pos);
 
     if (cell.isPassable()) {
