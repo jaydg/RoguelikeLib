@@ -111,6 +111,15 @@ export {
             setType(key);
         }
 
+        // A tile of a registered type as it was, e.g. when it was saved:
+        // with the data given rather than the type's, and the colour as it
+        // is, not jittered. Throws for a type that was never registered.
+        CTile(std::string_view key, const STileData & data)
+            : type(CTileData::get(key).first), glyph(data.glyph), rgb_color(data.rgb_color),
+              transparent(data.transparent), passable(data.passable)
+        {
+        }
+
         void setType(std::string_view key)
         {
             const auto& [name, data] = CTileData::get(key);

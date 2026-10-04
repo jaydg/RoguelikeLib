@@ -35,6 +35,31 @@ export {
         return seed;
     }
 
+    // The generator's state, as text, so that a saved game can carry on
+    // with the same random numbers it would have had
+    std::string GetRandomState()
+    {
+        std::ostringstream state;
+        state << mt;
+        return state.str();
+    }
+
+    // Puts the generator back into a state GetRandomState() gave. Returns
+    // whether the text was one; if not, the generator is left as it was.
+    bool SetRandomState(std::string_view text)
+    {
+        std::istringstream state{std::string(text)};
+        std::mt19937 restored;
+        state >> restored;
+
+        if (state.fail() || !(state >> std::ws).eof()) {
+            return false;
+        }
+
+        mt = restored;
+        return true;
+    }
+
     unsigned Random(const std::size_t limit)
     {
         if (limit == 0) {

@@ -64,6 +64,12 @@ private:
     std::uint64_t next_order = 0;
 
 public:
+    // An actor on the timeline, and when it acts
+    struct SScheduled {
+        Id id;
+        Ticks time;
+    };
+
     // Puts an actor on the timeline to act `delay` ticks from now. An actor
     // on it already is moved to that time.
     void Schedule(const Id& id, Ticks delay)
@@ -99,6 +105,44 @@ public:
     [[nodiscard]] Ticks Now() const
     {
         return now;
+    }
+
+    // The actors on the timeline, in the order they will act, e.g. to save
+    // them
+    [[nodiscard]] std::vector<SScheduled> Scheduled() const
+    {
+        auto pending = timeline;
+        std::vector<SScheduled> scheduled;
+
+        while (!pending.empty()) {
+            const SEntry entry = pending.top();
+            pending.pop();
+
+            if (const auto it = current.find(entry.id); it != current.end() && it->second == entry.order) {
+                scheduled.push_back({entry.id, entry.time});
+            }
+        }
+
+        return scheduled;
+    }
+
+    // Puts the timeline back the way Now() and Scheduled() describe it:
+    // those actors, in that order, from that time on, and no others. Throws
+    // if one would act before the time now.
+    void Restore(Ticks a_now, std::span<const SScheduled> scheduled)
+    {
+        timeline = {};
+        current.clear();
+        now = a_now;
+        next_order = 0;
+
+        for (const SScheduled& entry : scheduled) {
+            if (entry.time < now) {
+                throw std::invalid_argument("an actor cannot be scheduled to act before the time now");
+            }
+
+            Schedule(entry.id, entry.time - now);
+        }
     }
 
     // Takes the actor whose turn is next off the timeline, and moves the

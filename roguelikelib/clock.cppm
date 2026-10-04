@@ -47,10 +47,26 @@ public:
         }
     }
 
+    // A clock that is advanced `a_minutes_per_turn` minutes a turn, and
+    // has run `a_minutes` minutes since midnight of the first day, as
+    // Minutes() said, e.g. when it was saved
+    static CClock FromMinutes(unsigned a_minutes_per_turn, std::uint64_t a_minutes)
+    {
+        CClock clock(a_minutes_per_turn);
+        clock.minutes = a_minutes;
+        return clock;
+    }
+
     // Lets turns pass
     void Advance(unsigned turns = 1)
     {
         minutes += std::uint64_t{turns} * minutes_per_turn;
+    }
+
+    // Minutes since midnight of the first day
+    [[nodiscard]] std::uint64_t Minutes() const
+    {
+        return minutes;
     }
 
     [[nodiscard]] unsigned MinutesPerTurn() const
