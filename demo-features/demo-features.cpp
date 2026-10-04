@@ -3,6 +3,7 @@ import rl.distancemap;
 import rl.fov;
 import rl.map;
 import rl.mapgenerators;
+import rl.names;
 import rl.maputils;
 import rl.pathfinding;
 import rl.position;
@@ -266,5 +267,26 @@ int main(int argc, char* argv[])
     //////////////////////////////////////////////////////////////////////////
     // That's all folks!
     //////////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////
+    // Names, made up from others
+    //////////////////////////////////////////////////////////////////////////
+
+    RL::CPersonNames names;
+
+    for (const auto& [gender, title] : {
+                std::pair(RL::EGender::Female, "Names of women"), std::pair(RL::EGender::Male, "Names of men")
+            }) {
+        cout << endl << stc::underline << title << stc::reset
+             << " (of between 4 and 6 tokens, made from fifty common English ones)" << endl << endl;
+
+        for (int count = 0; count < 15; ++count) {
+            if (const auto name = names.Generate(gender)) {
+                cout << *name << (count % 5 == 4 ? "\n" : "  ");
+            }
+        }
+    }
+
+    cout << endl;
+
     return 0;
 }

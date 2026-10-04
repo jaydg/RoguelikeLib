@@ -1,7 +1,7 @@
 # Authors
   * Jakub Debski <jakunek@gmail.com> - original author
-  * Kusigrosz - wrote the delve map and winding path generator
+  * Kusigrosz - wrote the delve map, the winding path generator, and the
+    name generator, all of them in the public domain
   * Adam Milazzo <adam@adammil.net> - FOV algorithm
   * Joachim de Groot <jdegroot@web.de> - modernisation
   * illyigan - terminal colors code
-
