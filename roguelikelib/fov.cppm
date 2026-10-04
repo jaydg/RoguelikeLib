@@ -14,10 +14,13 @@ import std;
 export namespace RL
 {
 
+// Whether light passes through a cell
+using Transparency = std::function<bool(std::size_t x, std::size_t y)>;
+
 class CFOV : public CMatrix<bool>
 {
 private:
-    const CMap* map;
+    Transparency transparent;
 
     // Represents the slope Y/X as a rational number for the shadowcasting bounds
     struct Slope {
@@ -62,11 +65,11 @@ private:
         }
         // *INDENT-ON*
 
-        if (nx < 0 || ny < 0 || nx >= static_cast<int>(map->getWidth()) || ny >= static_cast<int>(map->getHeight())) {
+        if (nx < 0 || ny < 0 || nx >= static_cast<int>(getWidth()) || ny >= static_cast<int>(getHeight())) {
             return true;
         }
 
-        return !map->get(nx, ny).isTransparent();
+        return !transparent(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny));
     }
 
     void SetVisible(unsigned int x, unsigned int y, unsigned int octant, Position origin)
@@ -221,8 +224,20 @@ private:
     }
 
 public:
-    CFOV() : CMatrix<bool>(Size(0, 0), false), map(nullptr) {}
-    explicit CFOV(const CMap *map) : CMatrix<bool>(map->getSize(), false), map(map) {}
+    CFOV() : CMatrix<bool>(Size(0, 0), false) {}
+
+    // The field of view on a map, through the tiles that are transparent
+    explicit CFOV(const CMap *map)
+        : CFOV(map->getSize(), [map](std::size_t x, std::size_t y) {
+        return map->get(x, y).isTransparent();
+    })
+    {
+    }
+
+    // The field of view on anything of a size that light passes through
+    // or not, e.g. a level seen together with the one below it. The cells
+    // asked about all lie within the size.
+    CFOV(Size size, Transparency a_transparent) : CMatrix<bool>(size, false), transparent(std::move(a_transparent)) {}
 
     // Triggers a recalculation of the Field of View using Adam Milazzo's Shadowcasting
     void Calculate(Position start, int radius)
@@ -237,7 +252,7 @@ public:
         int cx = static_cast<int>(start.x);
         int cy = static_cast<int>(start.y);
 
-        if (!map->inside(cx, cy)) {
+        if (!inside(cx, cy)) {
             return;
         }
 
