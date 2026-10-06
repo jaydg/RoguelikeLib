@@ -35,6 +35,19 @@ std::uint32_t Dim(std::uint32_t rgb, int percent)
     return (scale((rgb >> 16) & 0xFF) << 16) | (scale((rgb >> 8) & 0xFF) << 8) | scale(rgb & 0xFF);
 }
 
+// A colour moved towards another by a percentage: 0 is the first, 100 the
+// second; e.g. to tint what a fire lights with the fire's colour
+std::uint32_t Blend(std::uint32_t rgb, std::uint32_t towards, int percent)
+{
+    const auto weight = static_cast<std::uint32_t>(std::clamp(percent, 0, 100));
+    const auto mix = [weight](std::uint32_t from, std::uint32_t to) {
+        return (from * (100 - weight) + to * weight) / 100;
+    };
+
+    return (mix((rgb >> 16) & 0xFF, (towards >> 16) & 0xFF) << 16) | (mix((rgb >> 8) & 0xFF, (towards >> 8) & 0xFF) << 8) |
+           mix(rgb & 0xFF, towards & 0xFF);
+}
+
 // A rectangle of cells: its top left corner and its size
 struct SRect {
     Position corner{0, 0};
