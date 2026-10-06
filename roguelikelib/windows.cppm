@@ -19,6 +19,7 @@
 // dragging a docked window's
 // inner edge                      resizes it
 // dragging its title              floats it again
+// double-clicking the title       makes it large, or small again
 // clicking ×                      closes it
 // the wheel                       scrolls it, if it scrolls
 //
@@ -94,6 +95,11 @@ private:
 
     // Where it was laid out last; empty when there was no room for it
     SRect frame;
+
+    // How large it was before a double-click on its title made it larger
+    // or smaller, to go back to with the next: floating, or docked
+    std::optional<SRect> restore_floating;
+    std::optional<std::size_t> restore_dock_size;
 
 public:
     // A window that floats at first where it is given, and is never made
@@ -199,6 +205,18 @@ private:
     };
 
     std::optional<SDrag> drag;
+
+    // Two clicks on a window's title within this time are a double-click
+    static constexpr std::chrono::milliseconds double_click_time{400};
+
+    // The last click on a window's title, to tell a double-click by
+    struct STitleClick {
+        CWindow* window = nullptr;
+        Position at{0, 0};
+        std::chrono::steady_clock::time_point time;
+    };
+
+    std::optional<STitleClick> title_click;
 
     static bool Vertical(EDock dock)
     {
@@ -331,7 +349,83 @@ private:
         return EDock::None;
     }
 
-    void Press(CWindow& window, const SMouse& mouse)
+    // A window is large when it fills the area across or down, floating;
+    // docked, when it takes more than half of it. A double-click on its
+    // title makes a large window small - as it was before, or half the area
+    // - and a small one large, filling the area.
+    void ToggleSize(CWindow& window)
+    {
+        if (window.dock == EDock::None) {
+            const SRect& frame = window.frame;
+            const bool wide = frame.size.x >= area.size.x;
+            const bool tall = frame.size.y >= area.size.y;
+
+            if (!wide && !tall) {
+                window.restore_floating = window.floating;
+                window.floating = area;
+            } else if (window.restore_floating && window.restore_floating->size.x < area.size.x &&
+                       window.restore_floating->size.y < area.size.y) {
+                window.floating = *window.restore_floating;
+                window.restore_floating.reset();
+            } else {
+                // What fills the area is halved, in the middle of it
+                SRect smaller = frame;
+
+                if (wide) {
+                    smaller.size.x = area.size.x / 2;
+                    smaller.corner.x = area.corner.x + (area.size.x - smaller.size.x) / 2;
+                }
+
+                if (tall) {
+                    smaller.size.y = area.size.y / 2;
+                    smaller.corner.y = area.corner.y + (area.size.y - smaller.size.y) / 2;
+                }
+
+                window.floating = smaller;
+                window.restore_floating.reset();
+            }
+
+            window.floating = Clamp(window.floating, window.min_size);
+            return;
+        }
+
+        const bool vertical = Vertical(window.dock);
+        const std::size_t room = vertical ? area.size.y : area.size.x;
+        const std::size_t least = vertical ? window.min_size.y : window.min_size.x;
+        const std::size_t half = std::max(room / 2, least);
+        const std::size_t size = std::min(window.dock_size, room);
+
+        if (size > half) {
+            const bool back = window.restore_dock_size && *window.restore_dock_size <= half;
+            window.dock_size = back ? std::max(*window.restore_dock_size, least) : half;
+            window.restore_dock_size = back ? std::nullopt : std::optional(size);
+        } else {
+            window.restore_dock_size = size;
+            window.dock_size = room;
+        }
+    }
+
+    // Whether a press on a window's title at a moment makes a double-click
+    // with the one before it; it is remembered for the next if not
+    bool DoubleClicked(CWindow& window, Position pos, std::optional<std::chrono::steady_clock::time_point> now)
+    {
+        if (!now) {
+            return false;
+        }
+
+        const bool twice = title_click && title_click->window == &window && title_click->at == pos &&
+                           *now - title_click->time <= double_click_time;
+
+        if (twice) {
+            title_click.reset();
+        } else {
+            title_click = STitleClick{&window, pos, * now};
+        }
+
+        return twice;
+    }
+
+    void Press(CWindow& window, const SMouse& mouse, std::optional<std::chrono::steady_clock::time_point> now)
     {
         Raise(window);
 
@@ -352,6 +446,11 @@ private:
         }
 
         if (const auto grab = GrabAt(window, pos)) {
+            if ((grab == EGrab::Move || grab == EGrab::Undock) && DoubleClicked(window, pos, now)) {
+                ToggleSize(window);
+                return;
+            }
+
             drag = SDrag{&window, * grab, Position(pos.x - frame.corner.x, pos.y - frame.corner.y), pos};
             return;
         }
@@ -371,6 +470,9 @@ private:
         if (!drag->moved) {
             return;
         }
+
+        // A window dragged was not clicked
+        title_click.reset();
 
 
         switch (drag->grab) {
@@ -500,6 +602,10 @@ public:
 
         if (drag && drag->window == &window) {
             drag.reset();
+        }
+
+        if (title_click && title_click->window == &window) {
+            title_click.reset();
         }
     }
 
@@ -650,8 +756,9 @@ public:
 
     // Moves, resizes, docks, closes and scrolls windows as the mouse says.
     // Returns whether it was meant for a window, rather than for what is
-    // under them.
-    bool HandleMouse(const SMouse& mouse)
+    // under them. Told when the mouse did it, two clicks on a title in
+    // quick succession are a double-click; without, there are none.
+    bool HandleMouse(const SMouse& mouse, std::optional<std::chrono::steady_clock::time_point> now = std::nullopt)
     {
         const Position pos = mouse.position;
 
@@ -675,7 +782,7 @@ public:
 
         switch (mouse.action) {
         case EMouseAction::Press:
-            Press(*window, mouse);
+            Press(*window, mouse, now);
             break;
 
         case EMouseAction::ScrollUp:
