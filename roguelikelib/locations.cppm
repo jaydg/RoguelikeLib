@@ -18,7 +18,8 @@ export namespace RL
 {
 
 enum class ELocationType {
-    Clearing    // an open area in a forest
+    Clearing,   // an open area in a forest
+    Town        // the settlement a wilderness starts out in
 };
 
 struct SLocation {

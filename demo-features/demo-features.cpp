@@ -103,6 +103,21 @@ int main(int argc, char* argv[])
     RL::CreateCaveAndGlade(level, "pine", "grass", RL::GladeShape, {.shallow = "pond", .level = 12, .deep_level = 35, .grain = 20});
     level.PrintMap();
 
+    cout << endl << stc::underline << "Voronoi Wilderness" << stc::reset
+         << " (difficulty 0 in the town, up to 9 in the hardest region)" << endl << endl;
+
+    const RL::SWildernessInfo wilderness = RL::CreateVoronoiWilderness(level, 24);
+    level.PrintMap();
+
+    cout << wilderness.regions << " regions, " << wilderness.adjacency << " Delaunay edges";
+
+    for (const RL::SLocation & location : wilderness.locations) {
+        cout << ", town at (" << location.center.x << ", " << location.center.y
+             << ") with radius " << location.radius;
+    }
+
+    cout << endl;
+
     cout << endl << stc::underline << "Simple City with 15 buildings" << stc::reset << endl << endl;
     RL::CreateSimpleCity(level, 15);
     level.PrintMap();

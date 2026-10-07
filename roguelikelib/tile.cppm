@@ -66,6 +66,15 @@ export {
 
     public:
 
+        // Whether a tile type is registered: a builtin one or one added at
+        // runtime. Lets a caller add a type only when the name is still
+        // free, without throwing to find out.
+        [[nodiscard]]
+        static bool has(std::string_view key)
+        {
+            return registry().contains(key);
+        }
+
         // The registry's entry for a tile type: its own copy of the name and
         // the data. Throws for a type that was never registered.
         [[nodiscard]]
