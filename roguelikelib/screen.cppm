@@ -7,6 +7,9 @@
 // Text can carry its colours as markup: "<#ffd24a>" switches to a colour
 // given outright, "<name>" to one registered with RegisterTag(), and "<<"
 // is a literal '<'. Anything else in angle brackets stays as written.
+//
+// A cell is bold or inverse on top of its colour, for text that has to
+// stand out from the rest: an inverse space is a filled cell.
 //////////////////////////////////////////////////////////////////////////
 
 module;
@@ -105,6 +108,12 @@ struct SRect {
 struct SCell {
     char32_t glyph = U' ';
     std::uint32_t rgb = default_text_colour;
+
+    // How the cell is drawn on top of its colour: bold as heavier text,
+    // inverse with the colour as the background and the terminal's own
+    // as the text
+    bool bold = false;
+    bool inverse = false;
 
     bool operator==(const SCell&) const = default;
 };
@@ -257,20 +266,21 @@ public:
 
     // Draws a glyph; off the screen or outside the clip rectangle it is
     // dropped. Control codes are drawn as blanks, so that they cannot reach
-    // the terminal.
-    void Put(std::size_t x, std::size_t y, char32_t glyph, std::uint32_t rgb)
+    // the terminal. Bold and inverse hold for the whole glyph.
+    void Put(std::size_t x, std::size_t y, char32_t glyph, std::uint32_t rgb, bool bold = false, bool inverse = false)
     {
         if (x < size.x && y < size.y && (!clip || clip->Contains(Position(x, y)))) {
-            cells[y * size.x + x] = SCell{glyph < U' ' || glyph == U'\x7F' ? U' ' : glyph, rgb};
+            cells[y * size.x + x] = SCell{glyph < U' ' || glyph == U'\x7F' ? U' ' : glyph, rgb, bold, inverse};
         }
     }
 
     // Draws text with markup from (x, y) to the right, cut off at the edge
     // of the screen or the clip rectangle. Returns the column after the text.
-    std::size_t Print(std::size_t x, std::size_t y, std::string_view markup, std::uint32_t rgb)
+    std::size_t Print(std::size_t x, std::size_t y, std::string_view markup, std::uint32_t rgb,
+                      bool bold = false, bool inverse = false)
     {
         ForEachGlyph(markup, rgb, [&](char32_t glyph, std::uint32_t colour) {
-            Put(x++, y, glyph, colour);
+            Put(x++, y, glyph, colour, bold, inverse);
         });
 
         return x;
@@ -284,13 +294,16 @@ public:
     // Everything needed to show the whole screen on a terminal, from the
     // top left corner. Colours go out as 24-bit values or as the nearest
     // of 256, and only when they change, which keeps a frame small enough
-    // to be written at once.
+    // to be written at once; bold and inverse likewise, as escape sequences
+    // of their own.
     [[nodiscard]] std::string Compose(bool true_color) const
     {
         std::ostringstream out;
         out << (true_color ? stc::true_color : stc::color_256);
 
         std::optional<std::uint32_t> current;
+        bool bold = false;
+        bool inverse = false;
 
         for (std::size_t y = 0; y < size.y; ++y) {
             out << "\x1b[" << y + 1 << ";1H";
@@ -298,7 +311,30 @@ public:
             for (std::size_t x = 0; x < size.x; ++x) {
                 const SCell& cell = cells[y * size.x + x];
 
-                if (cell.glyph != U' ' && cell.rgb != current) {
+                if (cell.bold != bold || cell.inverse != inverse) {
+                    // An attribute taken off has to be reset, and a reset
+                    // takes the colour with it, so that starts over below
+                    if (!cell.bold || !cell.inverse) {
+                        out << stc::reset;
+                        current.reset();
+                        bold = false;
+                        inverse = false;
+                    }
+
+                    if (cell.bold) {
+                        out << stc::bold;
+                        bold = true;
+                    }
+
+                    if (cell.inverse) {
+                        out << stc::inverse;
+                        inverse = true;
+                    }
+                }
+
+                // An inverse space is a filled cell, so it needs its colour
+                // even though no glyph is written
+                if ((cell.glyph != U' ' || cell.inverse) && cell.rgb != current) {
                     out << stc::rgb_fg(cell.rgb);
                     current = cell.rgb;
                 }

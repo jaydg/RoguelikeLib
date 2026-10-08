@@ -10,10 +10,37 @@ import rl.position;
 import rl.randomness;
 import rl.scheduler;
 import rl.tile;
+import rl.windows;
 import std;
 import stc;
 
 using namespace std;
+
+// A window that shows a few lines of text, to have something behind the
+// tabs of windows docked to an edge
+class CTextWindow : public RL::CWindow
+{
+private:
+    std::vector<std::string> lines;
+
+public:
+    CTextWindow(std::string a_title, std::vector<std::string> a_lines)
+        : RL::CWindow(std::move(a_title), RL::SRect{RL::Position(4, 4), RL::Size(30, 10)}),
+          lines(std::move(a_lines))
+    {
+    }
+
+    void Draw(RL::CScreen& screen, const RL::SRect& inside) override
+    {
+        for (std::size_t line = 0; line < lines.size(); ++line) {
+            if (inside.corner.y + line >= inside.Bottom()) {
+                break;
+            }
+
+            screen.Print(inside.corner.x, inside.corner.y + line, lines[line]);
+        }
+    }
+};
 
 int main(int argc, char* argv[])
 {
@@ -278,6 +305,77 @@ int main(int argc, char* argv[])
         cout << scheduler.Now() << ": " << *actor << endl;
         scheduler.Schedule(*actor, delays.at(*actor));
     }
+
+    //////////////////////////////////////////////////////////////////////////
+    // Tabbed windows: one frame, one window of the group at a time
+    //////////////////////////////////////////////////////////////////////////
+
+    cout << endl << stc::underline << "Tabbed windows" << stc::reset
+         << " (two windows docked left, sharing one frame under its tabs)" << endl << endl;
+
+    // The composed screen prints row by row here: the jumps of the cursor
+    // it asks the terminal for become line breaks
+    const auto print_screen = [](const std::string & composed) {
+        for (std::size_t pos = 0; pos < composed.size();) {
+            if (composed[pos] != '\x1b' || pos + 1 >= composed.size() || composed[pos + 1] != '[') {
+                cout << composed[pos++];
+                continue;
+            }
+
+            std::size_t end = pos + 2;
+
+            while (end < composed.size() && !(composed[end] >= 'A' && composed[end] <= 'Z') &&
+                    !(composed[end] >= 'a' && composed[end] <= 'z')) {
+                ++end;
+            }
+
+            if (end >= composed.size()) {
+                cout << composed[pos++];
+                continue;
+            }
+
+            if (composed[end] == 'H') {
+                cout << endl;
+            } else {
+                cout << composed.substr(pos, end - pos + 1);
+            }
+
+            pos = end + 1;
+        }
+    };
+
+    RL::CScreen tabs_screen(RL::Size(64, 14));
+    RL::CWindowManager windows;
+
+    CTextWindow stats("Stats", {"Health  <#FF4040>34/34", "Level   3", "Exp     120/200"});
+    CTextWindow log("Log", {"You hit the rat.", "The rat flees.", "You pick up 12 gold."});
+
+    windows.Open(stats);
+    windows.Open(log);
+    windows.Dock(stats, RL::EDock::Left, 22);
+    windows.Dock(log, RL::EDock::Left, 22);
+    windows.Tab(log, stats);
+
+    windows.Layout({RL::Position(0, 0), tabs_screen.getSize()});
+    windows.Draw(tabs_screen);
+    print_screen(tabs_screen.Compose(false));
+
+    // A click on the first tab of the strip shows its window in place of
+    // the one that did; the strip is the row under the title, and the
+    // first tab its box two columns in
+    const RL::SRect tabbed = log.getFrame();
+
+    RL::SMouse click;
+    click.button = RL::EMouseButton::Left;
+    click.position = RL::Position(tabbed.corner.x + 4, tabbed.corner.y + 1);
+    windows.HandleMouse(click);
+
+    cout << endl << "After a click on the first tab:" << endl << endl;
+
+    tabs_screen.Clear();
+    windows.Draw(tabs_screen);
+    print_screen(tabs_screen.Compose(false));
+    cout << endl;
 
     //////////////////////////////////////////////////////////////////////////
     // That's all folks!

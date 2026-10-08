@@ -7,6 +7,10 @@
 // room it needs from what is left for the rest - a log along the bottom of
 // the screen, for instance, with the map above it.
 //
+// Windows docked to the same edge that are put in one tab group share the
+// room they take: one frame, with the tabs of the group under its title,
+// of which one window shows at a time.
+//
 // What a window shows is its own business: a window is a class derived
 // from CWindow, which draws its content into the rectangle inside its
 // frame. CWindowManager knows which windows are open, lays them out, draws
@@ -21,6 +25,8 @@
 // dragging its title              floats it again
 // double-clicking the title       makes it large, or small again
 // clicking ×                      closes it
+// clicking a tab                  shows its window, in place of the
+// others of its tab group
 // the wheel                       scrolls it, if it scrolls
 //
 // The windows belong to the caller; the manager only refers to them, and
@@ -72,6 +78,10 @@ struct SWindowLayout {
     // Where it floats when it is not docked
     SRect floating;
 
+    // The tab group it is in: docked to the same edge, windows of one
+    // group share a frame and show as tabs of it, 0 for none
+    std::uint64_t tab_group = 0;
+
     bool operator==(const SWindowLayout&) const = default;
 };
 
@@ -92,6 +102,10 @@ private:
     // When it was docked: windows docked first are laid out nearest to
     // the edge
     std::uint64_t docked_at = 0;
+
+    // The tab group it is in, 0 for none: docked to the same edge,
+    // windows of one group share a frame, one at a time behind tabs
+    std::uint64_t tab_group = 0;
 
     // Where it was laid out last; empty when there was no room for it
     SRect frame;
@@ -159,6 +173,13 @@ public:
         return dock_size;
     }
 
+    // The tab group the window shares a frame with when docked to the
+    // same edge as the others of it, 0 for none
+    [[nodiscard]] std::uint64_t getTabGroup() const
+    {
+        return tab_group;
+    }
+
     [[nodiscard]] const SRect& getFloating() const
     {
         return floating;
@@ -181,6 +202,7 @@ private:
 
     SWindowStyle style;
     std::uint64_t next_docked_at = 1;
+    std::uint64_t next_tab_group = 1;
 
     enum class EGrab {
         Move,
@@ -246,6 +268,101 @@ private:
         return order;
     }
 
+    // The open windows in the tab group of `window`, docked to its edge
+    // and ordered as they were docked. Fewer than two of them, and it
+    // shares its frame with nobody - not even with those of its group
+    // docked to another edge
+    [[nodiscard]] std::vector<CWindow*> TabGroup(const CWindow& window) const
+    {
+        if (window.tab_group == 0 || window.dock == EDock::None) {
+            return {};
+        }
+
+        std::vector<CWindow*> group;
+
+        for (CWindow* candidate : windows) {
+            if (candidate->tab_group == window.tab_group && candidate->dock == window.dock) {
+                group.push_back(candidate);
+            }
+        }
+
+        if (group.size() < 2) {
+            return {};
+        }
+
+        std::ranges::stable_sort(group, {}, &CWindow::docked_at);
+        return group;
+    }
+
+    // The tab of a group that shows: the one of them raised last. All of
+    // a group is open, so one of them always is
+    [[nodiscard]] CWindow* Active(const std::vector<CWindow*>& group) const
+    {
+        CWindow* active = nullptr;
+
+        for (CWindow* window : windows) {
+            if (std::ranges::find(group, window) != group.end()) {
+                active = window;
+            }
+        }
+
+        return active;
+    }
+
+    // Where the tabs of a group are drawn, in the strip under the title
+    struct STab {
+        CWindow* window = nullptr;
+        std::size_t x = 0;     // column the box starts at
+        std::size_t size = 0;  // cells the box takes, the ┌┐ included
+    };
+
+    // Where each tab of a group is drawn. A tab is its window's title in
+    // a box, with a space after the frame before it and one between tabs;
+    // one that does not fit whole is shortened, one that does not fit at
+    // all is left out
+    [[nodiscard]] std::vector<STab> TabsIn(const std::vector<CWindow*>& group, const SRect& frame) const
+    {
+        std::vector<STab> tabs;
+        const std::size_t last = frame.Right() - 2;  // the last column the strip has
+        std::size_t x = frame.corner.x + 2;          // the frame's side, then a space
+
+        for (CWindow* window : group) {
+            const std::size_t room = x <= last ? last - x + 1 : 0;
+            const std::size_t size = std::min(window->title.size() + 4, room);
+
+            if (size < 3) {
+                break;
+            }
+
+            tabs.push_back({window, x, size});
+            x += size + 1;
+        }
+
+        return tabs;
+    }
+
+    // Whether a frame has room for the tabs of its group under its title:
+    // the strip, the rule under it and a line of content below. Too short
+    // or too narrow, the window shows without them
+    [[nodiscard]] bool HasTabs(const CWindow& window) const
+    {
+        return !TabGroup(window).empty() && window.frame.size.y >= 5 && window.frame.size.x >= 6;
+    }
+
+    // What is inside a window's frame for its content: below the title,
+    // and below the tabs of a group when it shows them. Drawing into it
+    // and clicks on it go to the window that shows
+    [[nodiscard]] SRect ContentRect(const CWindow& window) const
+    {
+        const SRect& frame = window.frame;
+
+        if (!HasTabs(window)) {
+            return frame.Inset(1);
+        }
+
+        return {Position(frame.corner.x + 1, frame.corner.y + 3), Size(frame.size.x - 2, frame.size.y - 4)};
+    }
+
     // The window on top at a position, if any
     [[nodiscard]] CWindow* At(Position pos) const
     {
@@ -253,7 +370,10 @@ private:
 
         for (auto it = order.rbegin(); it != order.rend(); ++it) {
             if ((*it)->frame.Contains(pos)) {
-                return *it;
+                // A frame with tabs holds all of its group; anything on
+                // it goes to the one of them that shows
+                const auto group = TabGroup(**it);
+                return group.empty() ? *it : Active(group);
             }
         }
 
@@ -349,6 +469,18 @@ private:
         return EDock::None;
     }
 
+    // How many rows or columns a docked window takes along its edge. The
+    // others of its tab group take as many, as they share the slot with
+    // it and switching tabs must not move the frame
+    void SetDockSize(CWindow& window, std::size_t size)
+    {
+        window.dock_size = size;
+
+        for (CWindow* member : TabGroup(window)) {
+            member->dock_size = size;
+        }
+    }
+
     // A window is large when it fills the area across or down, floating;
     // docked, when it takes more than half of it. A double-click on its
     // title makes a large window small - as it was before, or half the area
@@ -397,11 +529,11 @@ private:
 
         if (size > half) {
             const bool back = window.restore_dock_size && *window.restore_dock_size <= half;
-            window.dock_size = back ? std::max(*window.restore_dock_size, least) : half;
+            SetDockSize(window, back ? std::max(*window.restore_dock_size, least) : half);
             window.restore_dock_size = back ? std::nullopt : std::optional(size);
         } else {
             window.restore_dock_size = size;
-            window.dock_size = room;
+            SetDockSize(window, room);
         }
     }
 
@@ -433,7 +565,7 @@ private:
         const Position pos = mouse.position;
 
         if (mouse.button != EMouseButton::Left) {
-            if (const SRect inside = frame.Inset(1); inside.Contains(pos)) {
+            if (const SRect inside = ContentRect(window); inside.Contains(pos)) {
                 window.Click(Position(pos.x - inside.corner.x, pos.y - inside.corner.y), mouse.button);
             }
 
@@ -455,7 +587,31 @@ private:
             return;
         }
 
-        if (const SRect inside = frame.Inset(1); inside.Contains(pos)) {
+        // The tabs of a group show in the two rows under the title: a
+        // press on one of them shows that window, the rule under them is
+        // nobody's content
+        if (HasTabs(window)) {
+            const std::size_t strip = frame.corner.y + 1;
+
+            if (pos.y == strip) {
+                const std::vector<STab> tabs = TabsIn(TabGroup(window), frame);
+
+                for (const STab& tab : tabs) {
+                    if (pos.x >= tab.x && pos.x < tab.x + tab.size) {
+                        Raise(*tab.window);
+                        break;
+                    }
+                }
+
+                return;
+            }
+
+            if (pos.y == strip + 1) {
+                return;
+            }
+        }
+
+        if (const SRect inside = ContentRect(window); inside.Contains(pos)) {
             window.Click(Position(pos.x - inside.corner.x, pos.y - inside.corner.y), mouse.button);
         }
     }
@@ -535,7 +691,7 @@ private:
                 break;
             }
 
-            window.dock_size = std::max(size, Vertical(window.dock) ? window.min_size.y : window.min_size.x);
+            SetDockSize(window, std::max(size, Vertical(window.dock) ? window.min_size.y : window.min_size.x));
             break;
         }
         }
@@ -581,6 +737,48 @@ private:
         screen.setClip({Position(frame.corner.x + 1, frame.corner.y), Size(frame.size.x - 3, 1)});
         screen.Print(frame.corner.x + 1, frame.corner.y, " " + window.title + " ", focused ? style.focused_title : style.title);
         screen.resetClip();
+    }
+
+    // Draws the tabs of a group in the strip under the title, and the
+    // rule under them that the frame's sides turn into
+    void DrawTabs(CScreen& screen, const std::vector<CWindow*>& group, const CWindow& showing, bool focused) const
+    {
+        const SRect& frame = showing.frame;
+        const std::size_t strip = frame.corner.y + 1;
+        const std::size_t rule = strip + 1;
+        const std::size_t right = frame.Right() - 1;
+        const std::uint32_t colour = focused ? style.focused_frame : style.frame;
+
+        screen.Put(frame.corner.x, rule, U'├', colour);
+        screen.Put(right, rule, U'┤', colour);
+
+        for (std::size_t x = frame.corner.x + 1; x < right; ++x) {
+            screen.Put(x, rule, U'─', colour);
+        }
+
+        for (const STab& tab : TabsIn(group, frame)) {
+            // The top of the box the tab is in; its sides come down to
+            // the rule, which closes it there
+            screen.Put(tab.x, strip, U'┌', colour);
+            screen.Put(tab.x + tab.size - 1, strip, U'┐', colour);
+
+            for (std::size_t x = tab.x + 1; x + 1 < tab.x + tab.size; ++x) {
+                screen.Put(x, strip, U'─', colour);
+            }
+
+            // The tab that shows takes its title bold and inverse, so
+            // that it stands out from the others of the strip
+            const bool active = tab.window == &showing;
+
+            screen.setClip({Position(tab.x + 1, strip), Size(tab.size - 2, 1)});
+            screen.Print(tab.x + 1, strip, " " + tab.window->title + " ",
+                         active && focused ? style.focused_title : style.title, active, active);
+            screen.resetClip();
+
+            // The rule meets the sides of the box coming down to it
+            screen.Put(tab.x, rule, U'┴', colour);
+            screen.Put(tab.x + tab.size - 1, rule, U'┴', colour);
+        }
     }
 
 public:
@@ -646,10 +844,33 @@ public:
         window.docked_at = next_docked_at++;
     }
 
+    // Puts a window in the tab group of another: docked to the same
+    // edge, the two then share one slot and one frame, one of them
+    // showing at a time behind tabs under its title. Docked elsewhere,
+    // each keeps a frame of its own until they meet at an edge again
+    void Tab(CWindow& window, CWindow& with)
+    {
+        if (&window == &with) {
+            return;
+        }
+
+        if (with.tab_group == 0) {
+            with.tab_group = next_tab_group++;
+        }
+
+        window.tab_group = with.tab_group;
+    }
+
+    // Takes a window out of its tab group, docked where it was
+    void Untab(CWindow& window)
+    {
+        window.tab_group = 0;
+    }
+
     // Where a window is and how it is shown
     [[nodiscard]] SWindowLayout getLayout(const CWindow& window) const
     {
-        return {IsOpen(window), window.dock, window.dock_size, window.docked_at, window.floating};
+        return {IsOpen(window), window.dock, window.dock_size, window.docked_at, window.floating, window.tab_group};
     }
 
     // Puts a window where a layout says, opening or closing it
@@ -661,6 +882,8 @@ public:
                            std::max(layout.dock_size, Vertical(layout.dock) ? window.min_size.y : window.min_size.x);
         window.docked_at = layout.docked_at;
         next_docked_at = std::max(next_docked_at, layout.docked_at + 1);
+        window.tab_group = layout.tab_group;
+        next_tab_group = std::max(next_tab_group, layout.tab_group + 1);
 
         if (layout.open) {
             Open(window);
@@ -671,11 +894,13 @@ public:
 
     // Lays the open windows out in an area of the screen: the docked ones
     // along its edges, the floating ones within it. Returns what is left
-    // between the docked ones.
+    // between the docked ones. A tab group is laid out as one window in
+    // one slot, as large as the largest of it asks for.
     SRect Layout(const SRect& a_area)
     {
         area = a_area;
         SRect free = area;
+        std::vector<CWindow*> laid;
 
         for (CWindow* window : InDrawingOrder()) {
             if (window->dock == EDock::None) {
@@ -683,73 +908,138 @@ public:
                 continue;
             }
 
+            // The first of a tab group to come decides where the slot is,
+            // the rest of them skip along to be laid out with it
+            std::vector<CWindow*> slot{window};
+            const std::vector<CWindow*> group = TabGroup(*window);
+
+            if (!group.empty()) {
+                if (std::ranges::find(laid, window) != laid.end()) {
+                    continue;
+                }
+
+                slot = group;
+            }
+
+            for (CWindow* member : slot) {
+                laid.push_back(member);
+            }
+
             const bool vertical = Vertical(window->dock);
             const std::size_t room = vertical ? free.size.y : free.size.x;
             const std::size_t across = vertical ? free.size.x : free.size.y;
-            const std::size_t least = vertical ? window->min_size.y : window->min_size.x;
-            const std::size_t least_across = vertical ? window->min_size.x : window->min_size.y;
+
+            // What the slot has to fit at least: the largest of the
+            // windows in it along the edge and across it, and as many
+            // rows or columns as the largest of them wants
+            std::size_t least = 0;
+            std::size_t least_across = 0;
+            std::size_t wanted = 0;
+
+            for (CWindow* member : slot) {
+                least = std::max(least, vertical ? member->min_size.y : member->min_size.x);
+                least_across = std::max(least_across, vertical ? member->min_size.x : member->min_size.y);
+                wanted = std::max(wanted, member->dock_size);
+            }
 
             // No room for it: it is not shown until there is
             if (room < least || across < least_across) {
-                window->frame = {free.corner, Size(0, 0)};
+                for (CWindow* member : slot) {
+                    member->frame = {free.corner, Size(0, 0)};
+                }
+
                 continue;
             }
 
-            const std::size_t size = std::min(window->dock_size, room);
+            // The tabs take as much as the largest of them, so that
+            // switching one does not move the frame
+            for (CWindow* member : slot) {
+                member->dock_size = wanted;
+            }
+
+            const std::size_t size = std::min(wanted, room);
+            SRect frame{free.corner, Size(0, 0)};
 
             switch (window->dock) {
             case EDock::Top:
-                window->frame = {free.corner, Size(free.size.x, size)};
+                frame = {free.corner, Size(free.size.x, size)};
                 free.corner.y += size;
                 free.size.y -= size;
                 break;
 
             case EDock::Bottom:
-                window->frame = {Position(free.corner.x, free.Bottom() - size), Size(free.size.x, size)};
+                frame = {Position(free.corner.x, free.Bottom() - size), Size(free.size.x, size)};
                 free.size.y -= size;
                 break;
 
             case EDock::Left:
-                window->frame = {free.corner, Size(size, free.size.y)};
+                frame = {free.corner, Size(size, free.size.y)};
                 free.corner.x += size;
                 free.size.x -= size;
                 break;
 
             case EDock::Right:
-                window->frame = {Position(free.Right() - size, free.corner.y), Size(size, free.size.y)};
+                frame = {Position(free.Right() - size, free.corner.y), Size(size, free.size.y)};
                 free.size.x -= size;
                 break;
 
             case EDock::None:
                 break;
             }
+
+            for (CWindow* member : slot) {
+                member->frame = frame;
+            }
         }
 
         return free;
     }
 
-    // Draws the open windows as laid out last, over what is on the screen
+    // Draws the open windows as laid out last, over what is on the screen.
+    // A tab group is drawn once, as the frame of all of it with the tabs
+    // under its title and the content of the one that shows
     void Draw(CScreen& screen) const
     {
+        std::vector<const CWindow*> drawn;
+
         for (CWindow* window : InDrawingOrder()) {
+            if (std::ranges::find(drawn, window) != drawn.end()) {
+                continue;   // it drew with the others of its tabs
+            }
+
             const SRect& frame = window->frame;
 
             if (frame.size.x < 5 || frame.size.y < 3) {
                 continue;
             }
 
-            const SRect inside = frame.Inset(1);
+            const std::vector<CWindow*> group = TabGroup(*window);
+            CWindow* showing = group.empty() ? window : Active(group);
 
-            for (std::size_t y = inside.corner.y; y < inside.Bottom(); ++y) {
-                for (std::size_t x = inside.corner.x; x < inside.Right(); ++x) {
+            for (CWindow* member : group) {
+                drawn.push_back(member);
+            }
+
+            // What is inside the frame, tabs included: it is cleared
+            // first, so that nothing of an earlier frame shows through
+            const SRect interior = frame.Inset(1);
+
+            for (std::size_t y = interior.corner.y; y < interior.Bottom(); ++y) {
+                for (std::size_t x = interior.corner.x; x < interior.Right(); ++x) {
                     screen.Put(x, y, U' ', default_text_colour);
                 }
             }
 
-            DrawFrame(screen, *window, window == Top());
+            DrawFrame(screen, *showing, showing == Top());
+
+            if (HasTabs(*showing)) {
+                DrawTabs(screen, group, *showing, showing == Top());
+            }
+
+            const SRect inside = ContentRect(*showing);
 
             screen.setClip(inside);
-            window->Draw(screen, inside);
+            showing->Draw(screen, inside);
             screen.resetClip();
         }
     }
