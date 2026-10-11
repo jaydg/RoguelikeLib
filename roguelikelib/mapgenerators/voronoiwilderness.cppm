@@ -10,9 +10,9 @@ module;
 // into a difficulty between 0 and 9. The difficulty decides the terrain of
 // a region, and the terrain decides the tiles: open ground scattered with
 // point terrain, the starting town as a building at difficulty 0,
-// farmland walled in by hedges and left a single gate, hills whose slope
-// decides between flat ground, scree and cliff, mountains and high snow
-// worn to a fractal outline, and lakes and chasms dropped in only where
+// farmland walled in by hedges and left a single gate, rolling hills with
+// crags on their tops, mountains and high snow rounded and worn to a
+// fractal outline, and lakes and chasms dropped in only where
 // every passable region stays reachable.
 //
 // The shape of the algorithm is Andrew Doull's "Wilderness generation
@@ -362,7 +362,9 @@ private:
 
     std::vector<Region> regions_;
     std::vector<int> region_id_;        // which region each cell belongs to
-    std::vector<int> edge_dist_;        // how far each cell is from its region's edge
+    std::vector<int> edge_dist_;        // how far each cell is from its region's edge, in thirds of a cell
+    std::vector<double> elevation_;     // that depth normalised to 0..1 and smoothed
+    std::vector<std::vector<int>> touching_;   // which regions share a border on the map
     std::vector<std::vector<int>> adjacency_;
     std::set<std::pair<int, int>> adjacency_set_;
 
@@ -413,15 +415,22 @@ CWilderness::CWilderness(const int width, const int height, const int num_region
     // rasterised Voronoi diagram
     const std::size_t cells = static_cast<std::size_t>(width_) * static_cast<std::size_t>(height_);
     region_id_.resize(cells);
+    constexpr double warp = 6.0;
+    constexpr double warp_scale = 0.07;
 
     for (int y = 0; y < height_; ++y) {
         for (int x = 0; x < width_; ++x) {
             double best = std::numeric_limits<double>::max();
             int best_id = 0;
 
+            // Looked up at a point the noise pushes off the cell, so that
+            // the borders between regions wander rather than run straight
+            const double px = x + 0.5 + warp * (2.0 * Fbm(x * warp_scale, y * warp_scale, noise_seed_ + 7) - 1.0);
+            const double py = y + 0.5 + warp * (2.0 * Fbm(x * warp_scale, y * warp_scale, noise_seed_ + 13) - 1.0);
+
             for (std::size_t i = 0; i < regions_.size(); ++i) {
-                const double dx = regions_[i].center.x - (x + 0.5);
-                const double dy = regions_[i].center.y - (y + 0.5);
+                const double dx = regions_[i].center.x - px;
+                const double dy = regions_[i].center.y - py;
                 const double distance = dx * dx + dy * dy;
 
                 if (distance < best) {
@@ -434,9 +443,9 @@ CWilderness::CWilderness(const int width, const int height, const int num_region
         }
     }
 
-    // How far every cell is from the edge of its region (Chebyshev chamfer
-    // transform). Cells with a value of 0 lie on a region boundary, larger
-    // values are deeper inside.
+    // How far every cell is from the edge of its region (a 3-4 chamfer
+    // transform, in thirds of a cell). Cells with a value of 0 lie on a
+    // region boundary, larger values are deeper inside.
     constexpr int infinity = std::numeric_limits<int>::max() / 4;
     edge_dist_.assign(cells, infinity);
 
@@ -461,13 +470,13 @@ CWilderness::CWilderness(const int width, const int height, const int num_region
 
     for (int y = 0; y < height_; ++y) {             // forward pass
         for (int x = 0; x < width_; ++x) {
-            Relax(x, y, -1, -1);
+            Relax(x, y, +1, +1);
         }
     }
 
     for (int y = height_ - 1; y >= 0; --y) {        // backward pass
         for (int x = width_ - 1; x >= 0; --x) {
-            Relax(x, y, +1, +1);
+            Relax(x, y, -1, -1);
         }
     }
 
@@ -475,6 +484,62 @@ CWilderness::CWilderness(const int width, const int height, const int num_region
         for (int x = 0; x < width_; ++x) {
             Region & region = regions_[region_id_[Index(x, y)]];
             region.max_edge = std::max(region.max_edge, edge_dist_[Index(x, y)]);
+        }
+    }
+
+    // The depth as a height between 0 at the edge and 1 at the deepest
+    // cell, blurred within the region: contours of the distance to a
+    // polygon's edge keep the polygon's corners, blurring rounds them off
+    elevation_.resize(cells);
+
+    for (std::size_t cell = 0; cell < cells; ++cell) {
+        elevation_[cell] = static_cast<double>(edge_dist_[cell]) / std::max(1, regions_[region_id_[cell]].max_edge);
+    }
+
+    for (int pass = 0; pass < 3; ++pass) {
+        std::vector<double> blurred(cells);
+
+        for (int y = 0; y < height_; ++y) {
+            for (int x = 0; x < width_; ++x) {
+                const int id = region_id_[Index(x, y)];
+                double sum = 0.0;
+                int count = 0;
+
+                for (int ny = std::max(0, y - 1); ny <= std::min(height_ - 1, y + 1); ++ny) {
+                    for (int nx = std::max(0, x - 1); nx <= std::min(width_ - 1, x + 1); ++nx) {
+                        if (region_id_[Index(nx, ny)] == id) {
+                            sum += elevation_[Index(nx, ny)];
+                            ++count;
+                        }
+                    }
+                }
+
+                blurred[Index(x, y)] = sum / count;
+            }
+        }
+
+        elevation_ = std::move(blurred);
+    }
+
+    // Which regions really share a border on the map
+    touching_.assign(regions_.size(), {});
+
+    const auto touch = [&](const int a, const int b) {
+        if (a != b && std::ranges::find(touching_[a], b) == touching_[a].end()) {
+            touching_[a].push_back(b);
+            touching_[b].push_back(a);
+        }
+    };
+
+    for (int y = 0; y < height_; ++y) {
+        for (int x = 0; x < width_; ++x) {
+            if (x + 1 < width_) {
+                touch(region_id_[Index(x, y)], region_id_[Index(x + 1, y)]);
+            }
+
+            if (y + 1 < height_) {
+                touch(region_id_[Index(x, y)], region_id_[Index(x, y + 1)]);
+            }
         }
     }
 
@@ -534,22 +599,24 @@ void CWilderness::Relax(const int x, const int y, const int dx, const int dy)
 {
     const int here = Index(x, y);
 
-    const auto better = [&](const int nx, const int ny) {
+    // A straight step costs 3, a diagonal one 4: close enough to the 3 and
+    // 4.24 of the true distance that contours come out round, not square
+    const auto better = [&](const int nx, const int ny, const int cost) {
         if (nx < 0 || ny < 0 || nx >= width_ || ny >= height_) {
             return;
         }
 
         const int there = Index(nx, ny);
 
-        if (edge_dist_[there] + 1 < edge_dist_[here]) {
-            edge_dist_[here] = edge_dist_[there] + 1;
+        if (edge_dist_[there] + cost < edge_dist_[here]) {
+            edge_dist_[here] = edge_dist_[there] + cost;
         }
     };
 
-    better(x - dx, y);
-    better(x, y - dy);
-    better(x - dx, y - dy);
-    better(x + dx, y - dy);
+    better(x - dx, y, 3);
+    better(x, y - dy, 3);
+    better(x - dx, y - dy, 4);
+    better(x + dx, y - dy, 4);
 }
 
 void CWilderness::AssignTerrain()
@@ -605,14 +672,14 @@ void CWilderness::AssignTerrain()
 
         if (have_water < want_water && regions_[i].difficulty >= 1 &&
                 regions_[i].terrain != Ter::Snow &&
-                PassableGraphConnected(regions_, adjacency_, static_cast<int>(i))) {
+                PassableGraphConnected(regions_, touching_, static_cast<int>(i))) {
             regions_[i].terrain = Ter::Water;
             ++have_water;
             continue;
         }
 
         if (have_blocked < want_blocked && regions_[i].difficulty >= 3 &&
-                PassableGraphConnected(regions_, adjacency_, static_cast<int>(i))) {
+                PassableGraphConnected(regions_, touching_, static_cast<int>(i))) {
             regions_[i].terrain = Ter::Blocked;
             ++have_blocked;
         }
@@ -759,10 +826,7 @@ bool CWilderness::PlaceTown(Region & region, const std::size_t id)
 
 double CWilderness::HeightAt(const int x, const int y) const
 {
-    const int cell = Index(x, y);
-    const Region & region = regions_[region_id_[cell]];
-
-    return static_cast<double>(edge_dist_[cell]) / std::max(1, region.max_edge);
+    return elevation_[Index(x, y)];
 }
 
 bool CWilderness::LowerFieldNeighbour(const int x, const int y, const Region & region) const
@@ -827,31 +891,16 @@ std::string_view CWilderness::TileAt(const int x, const int y) const
         return noise > 0.90 ? "plant" : "field";
 
     case Ter::Hills: {
-        // The slope of the height field of the region decides
-        const double height = HeightAt(x, y);
-        double gradient = 0.0;
+        // Rolling ground: the region rises towards its middle and the
+        // noise puts hillocks on it. Only the crags on the tops are rock,
+        // so hills never ring anything in.
+        const double height = 0.5 * HeightAt(x, y) + 0.5 * Fbm(x * 0.15, y * 0.15, noise_seed_ + 99);
 
-        if (x > 0) {
-            gradient = std::max(gradient, std::abs(HeightAt(x - 1, y) - height));
+        if (height > 0.68) {
+            return "rock";
         }
 
-        if (x < width_ - 1) {
-            gradient = std::max(gradient, std::abs(HeightAt(x + 1, y) - height));
-        }
-
-        if (y > 0) {
-            gradient = std::max(gradient, std::abs(HeightAt(x, y - 1) - height));
-        }
-
-        if (y < height_ - 1) {
-            gradient = std::max(gradient, std::abs(HeightAt(x, y + 1) - height));
-        }
-
-        if (gradient > 0.30) {
-            return "rock";      // steep: a cliff
-        }
-
-        if (gradient > 0.10) {
+        if (height > 0.50) {
             return "slope";
         }
 
@@ -859,15 +908,15 @@ std::string_view CWilderness::TileAt(const int x, const int y) const
     }
 
     case Ter::Mountain: {
-        // Height is the fractal distance from the region edge; past it the
-        // mountain is impassable rock
-        const double snow_line = region.max_edge * (0.45 + 0.30 * noise);
+        // The smoothed height, its outline worn by the noise; past the
+        // rock line the mountain is impassable
+        const double height = HeightAt(x, y) + 0.4 * (noise - 0.5);
 
-        if (distance > snow_line) {
+        if (height > 0.45) {
             return "wall";
         }
 
-        if (distance > snow_line * 0.6) {
+        if (height > 0.25) {
             return "slope";
         }
 
@@ -875,13 +924,13 @@ std::string_view CWilderness::TileAt(const int x, const int y) const
     }
 
     case Ter::Snow: {
-        const double snow_line = region.max_edge * (0.55 + 0.30 * noise);
+        const double height = HeightAt(x, y) + 0.4 * (noise - 0.5);
 
-        if (distance > snow_line) {
+        if (height > 0.50) {
             return "peak";
         }
 
-        if (distance > snow_line * 0.7) {
+        if (height > 0.32) {
             return "rock";
         }
 
