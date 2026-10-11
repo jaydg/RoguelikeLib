@@ -130,6 +130,25 @@ public:
         }
     }
 
+    [[nodiscard]] std::optional<SScrollInfo> getScrollInfo() const override
+    {
+        std::size_t width = 0;
+
+        for (const auto& item : items) {
+            std::string_view text = item;
+            std::size_t columns = 0;
+
+            while (!text.empty()) {
+                text.remove_prefix(DecodeUTF8(text).length);
+                ++columns;
+            }
+
+            width = std::max(width, columns);
+        }
+
+        return SScrollInfo{Size(width, items.size()), view, Position(0, first)};
+    }
+
     bool HandleKey(const SKey& key) override
     {
         if (!selected) {

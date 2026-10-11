@@ -89,6 +89,13 @@ struct SWindowLayout {
 // How many lines a turn of the wheel scrolls
 constexpr int scroll_lines = 3;
 
+// Dimensions in cells and the origin of the visible content.
+struct SScrollInfo {
+    Size content{0, 0};
+    Size viewport{0, 0};
+    Position offset{0, 0};
+};
+
 class CWindow
 {
 private:
@@ -154,6 +161,13 @@ public:
     {
         static_cast<void>(key);
         return false;
+    }
+
+    // Called after Draw() has laid out the content. No value means no
+    // indicators. Indicators show position; input stays with the window.
+    [[nodiscard]] virtual std::optional<SScrollInfo> getScrollInfo() const
+    {
+        return std::nullopt;
     }
 
     [[nodiscard]] const std::string& getTitle() const
@@ -762,6 +776,42 @@ private:
         screen.resetClip();
     }
 
+    // Tracks occupy the right and bottom borders; content and corners stay intact.
+    void DrawScrollIndicators(CScreen& screen, const CWindow& window, const SRect& inside) const
+    {
+        const auto info = window.getScrollInfo();
+
+        if (!info || inside.Empty()) {
+            return;
+        }
+
+        const std::uint32_t colour = &window == Top() ? style.focused_frame : style.frame;
+        const auto axis = [&](bool vertical, std::size_t content, std::size_t viewport, std::size_t offset) {
+            const std::size_t length = vertical ? inside.size.y : inside.size.x;
+
+            if (viewport == 0 || content <= viewport || length == 0) {
+                return;
+            }
+
+            // Ratios avoid multiplying potentially large content dimensions.
+            const std::size_t thumb = std::clamp(static_cast<std::size_t>(
+                                                     static_cast<long double>(viewport) / content * length), std::size_t{1}, length);
+            const std::size_t start = static_cast<std::size_t>(
+                                          static_cast<long double>(std::min(offset, content - viewport)) /
+                                          (content - viewport) * (length - thumb));
+
+            for (std::size_t index = 0; index < length; ++index) {
+                const bool selected = index >= start && index - start < thumb;
+                screen.Put(vertical ? window.frame.Right() - 1 : inside.corner.x + index,
+                           vertical ? inside.corner.y + index : window.frame.Bottom() - 1,
+                           selected ? U' ' : vertical ? U'│' : U'─', colour, false, selected);
+            }
+        };
+
+        axis(true, info->content.y, info->viewport.y, info->offset.y);
+        axis(false, info->content.x, info->viewport.x, info->offset.x);
+    }
+
     // Draws the tabs of a group in the strip under the title, and the
     // rule under them that the frame's sides turn into
     void DrawTabs(CScreen& screen, const std::vector<CWindow*>& group, const CWindow& showing, bool focused) const
@@ -1124,6 +1174,7 @@ public:
             screen.setClip(inside);
             showing->Draw(screen, inside);
             screen.resetClip();
+            DrawScrollIndicators(screen, *showing, inside);
         }
     }
 

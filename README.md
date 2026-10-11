@@ -45,6 +45,15 @@ optional index; empty lists have no selection. `Select(index)` allows
 programmatic selection, and `setItems(labels)` replaces the list and resets
 selection. Labels are literal UTF-8 text, clipped to the content width.
 
+Windows can override `getScrollInfo()` to report `SScrollInfo{content,
+viewport, offset}` in cells. The manager draws proportional position
+indicators on the right and bottom frame borders only when that axis
+overflows. The thumb is an inverse-video space, using ordinary terminal
+attributes. These are indicators, not draggable controls; scrolling and
+resizing retain their existing behavior. The list widget reports its
+content automatically, and the feature demo's map tabs report their
+camera viewport and offset.
+
 Windows receive keyboard input by overriding `CWindow::HandleKey(const SKey&)`
 and returning whether they consumed it. Call `windows.HandleKey(key)` from
 the event loop; a false result lets the application handle global shortcuts.

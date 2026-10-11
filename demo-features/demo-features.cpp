@@ -434,6 +434,15 @@ public:
         }
     }
 
+    [[nodiscard]] std::optional<SScrollInfo> getScrollInfo() const override
+    {
+        if (mode < 4 && ready) {
+            return SScrollInfo{level.getSize(), map_area.size, origin};
+        }
+
+        return std::nullopt;
+    }
+
     void Scroll(int lines) override
     {
         if (mode == 0) {
