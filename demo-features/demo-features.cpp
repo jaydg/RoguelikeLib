@@ -1,413 +1,516 @@
+import rl.calendar;
 import rl.clock;
 import rl.distancemap;
 import rl.fov;
-import rl.map;
 import rl.mapgenerators;
-import rl.names;
-import rl.maputils;
 import rl.pathfinding;
-import rl.position;
 import rl.randomness;
 import rl.scheduler;
 import rl.tile;
-import rtui.windows;
+import rtui.list;
 import rtui.map;
-import rtui.utf8;
 import std;
-import stc;
 
-using namespace std;
+using namespace RL;
 
-// A window that shows a few lines of text, to have something behind the
-// tabs of windows docked to an edge
-class CTextWindow : public RL::CWindow
+struct SGenerator {
+    std::string name;
+    std::function<void(CMap&)> generate;
+};
+
+std::vector<SGenerator> Generators()
 {
-private:
-    std::vector<std::string> lines;
+    std::vector<SGenerator> result = {
+        {
+            "Standard Dungeon", [](CMap & map)
+            {
+                CreateStandardDungeon(map, 20);
+            }
+        },
+        {
+            "Ant's Nest", [](CMap & map)
+            {
+                CreateAntNest(map, true);
+            }
+        },
+        {
+            "Mines", [](CMap & map)
+            {
+                CreateMines(map, 25);
+            }
+        },
+        {
+            "Caves Sharp", [](CMap & map)
+            {
+                CreateCaves(map, 1, 0.75);
+            }
+        },
+        {
+            "Caves Soft", [](CMap & map)
+            {
+                CreateCaves(map, 3);
+            }
+        },
+        {
+            "Maze", [](CMap & map)
+            {
+                CreateMaze(map);
+            }
+        },
+        {
+            "Space shuttle", [](CMap & map)
+            {
+                CreateSpaceShuttle(map, 25);
+            }
+        },
+        {
+            "Forest", [](CMap & map)
+            {
+                GenerateForest(map);
+            }
+        },
+        {
+            "Cave and Glade - Cave", [](CMap & map)
+            {
+                CreateCaveAndGlade(map, "wall", "room", CaveShape, CaveWater);
+            }
+        },
+        {
+            "Small cave", [](CMap & map)
+            {
+                CreateCaveAndGlade(map, "wall", "room", {.min_areas = 7, .max_areas = 11, .scale = 2}, {.shallow = {}});
+            }
+        },
+        {
+            "Cave and Glade - Glade", [](CMap & map)
+            {
+                CreateCaveAndGlade(map, "tree", "grass", GladeShape, GladeWater);
+            }
+        },
+        {
+            "Unicode glade", [](CMap & map)
+            {
+                CreateCaveAndGlade(map, "pine", "grass", GladeShape, {.shallow = "pond", .level = 12, .deep_level = 35, .grain = 20});
+            }
+        },
+        {
+            "Voronoi Wilderness", [](CMap & map)
+            {
+                CreateVoronoiWilderness(map, 24, true);
+            }
+        },
+        {
+            "Simple City", [](CMap & map)
+            {
+                CreateSimpleCity(map, 15);
+            }
+        }
+    };
 
-public:
-    CTextWindow(std::string a_title, std::vector<std::string> a_lines)
-        : RL::CWindow(std::move(a_title), RL::SRect{RL::Position(4, 4), RL::Size(30, 10)}),
-          lines(std::move(a_lines))
-    {
+    for (const auto& name : GetDelvePresets()) {
+        result.push_back({"Delve - " + std::string(name), [preset = std::string(name)](CMap & map)
+        {
+            CreateDelve(map, preset);
+        }});
     }
 
-    void Draw(RL::CScreen& screen, const RL::SRect& inside) override
+    return result;
+}
+
+// Each tab owns its demonstration state. The generator tab embeds the
+// library list widget, forwarding input in its sidebar to that widget.
+class CFeatureWindow : public CWindow
+{
+private:
+    int mode;
+    std::vector<SGenerator> generators;
+    CListWindow list{"Generators", {Position(0, 0), Size(30, 10)}};
+    CMap level{Size(79, 50)};
+    bool ready = false;
+    std::size_t generated = 0;
+    Position focus{0, 0};
+    Position origin{0, 0};
+    Position start{0, 0};
+    Position goal{0, 0};
+    Position content_origin{0, 0};
+    SRect map_area;
+    SRect list_area;
+    std::vector<Position> path;
+    std::string detail;
+    CScheduler<std::string> scheduler;
+    std::vector<std::string> history;
+    CClock clock{30};
+    CCalendar calendar{{{"Thawmoon", 30}, {"Seedmoon", 30}, {"Sunmoon", 30}, {"Frostmoon", 30}}};
+    CDailySchedule<std::string> phases;
+
+    Position FirstFloor(bool last = false) const
     {
-        for (std::size_t line = 0; line < lines.size(); ++line) {
-            if (inside.corner.y + line >= inside.Bottom()) {
-                break;
+        Position found{0, 0};
+
+        for (std::size_t y = 0; y < level.getHeight(); ++y) {
+            for (std::size_t x = 0; x < level.getWidth(); ++x) {
+                if (level.get(x, y).isPassable()) {
+                    found = Position(x, y);
+
+                    if (!last) {
+                        return found;
+                    }
+                }
+            }
+        }
+
+        return found;
+    }
+
+    void Generate()
+    {
+        level.Clear();
+        path.clear();
+
+        if (mode == 0) {
+            generated = list.getSelected().value_or(0);
+            generators[generated].generate(level);
+            detail = generators[generated].name;
+            focus = Position(level.getWidth() / 2, level.getHeight() / 2);
+        } else if (mode == 1) {
+            CreateSimpleCity(level, 15);
+            focus = FirstFloor();
+            detail = "Arrows move observer; visible tiles are bright";
+        } else if (mode == 2) {
+            CreateMaze(level);
+            start = FirstFloor();
+            goal = FirstFloor(true);
+            const bool found = FindPath(level, start, goal, path, false);
+            focus = start;
+            detail = found ? std::format("Path: {} steps; S start / E end / + trail", path.size()) : "No path found";
+        } else if (mode == 3) {
+            CreateCaves(level, 3);
+            goal = FirstFloor();
+            focus = goal;
+            detail = "Click a floor to set goal; digits show distance to @";
+        }
+
+        ready = true;
+    }
+
+    void Step()
+    {
+        if (mode == 4) {
+            if (const auto actor = scheduler.Next()) {
+                history.push_back(std::format("Tick {:4}: {} acts", scheduler.Now(), *actor));
+                scheduler.Schedule(*actor, *actor == "hare" ? 50 : *actor == "fox" ? 100 : 400);
+
+                if (history.size() > 100) {
+                    history.erase(history.begin());
+                }
+            }
+        } else if (mode == 5) {
+            clock.Advance();
+        }
+    }
+
+    void Move(int dx, int dy)
+    {
+        const auto x = static_cast<std::int64_t>(focus.x) + dx;
+        const auto y = static_cast<std::int64_t>(focus.y) + dy;
+
+        if (x < 0 || y < 0 || x >= static_cast<std::int64_t>(level.getWidth()) || y >= static_cast<std::int64_t>(level.getHeight())) {
+            return;
+        }
+
+        const Position next(static_cast<std::size_t>(x), static_cast<std::size_t>(y));
+
+        if (mode != 1 || level.get(next).isPassable()) {
+            focus = next;
+        }
+    }
+
+public:
+    CFeatureWindow(std::string title, int a_mode)
+        : CWindow(std::move(title),
+    {
+        Position(0, 0), Size(100, 30)
+    }), mode(a_mode)
+    {
+        if (mode == 0) {
+            generators = Generators();
+            std::vector<std::string> labels;
+
+            for (const auto& generator : generators) {
+                labels.push_back(generator.name);
             }
 
-            screen.Print(inside.corner.x, inside.corner.y + line, lines[line]);
+            list.setItems(std::move(labels));
+            list.setOnActivate([this](std::size_t) {
+                Generate();
+            });
+        }
+
+        if (mode == 4) {
+            for (const auto& actor : {
+                        "hare", "fox", "snail"
+                    }) {
+                scheduler.Schedule(actor, 0);
+            }
+        }
+
+        phases.Set(6, 0, "morning");
+        phases.Set(12, 0, "afternoon");
+        phases.Set(18, 0, "evening");
+        phases.Set(22, 0, "night");
+    }
+
+    void Draw(CScreen& screen, const SRect& inside) override
+    {
+        content_origin = inside.corner;
+
+        if (inside.Empty()) {
+            return;
+        }
+
+        if (mode >= 4) {
+            if (mode == 4) {
+                screen.Print(inside.corner.x, inside.corner.y, "Enter/Space: next actor | hare 50, fox 100, snail 400 ticks");
+                const std::size_t rows = inside.size.y - 1;
+                const std::size_t first = history.size() > rows ? history.size() - rows : 0;
+
+                for (std::size_t index = first; index < history.size(); ++index) {
+                    screen.Print(inside.corner.x, inside.corner.y + 1 + index - first, history[index]);
+                }
+            } else {
+                const SDate date = calendar.DateOf(clock.Day());
+                const std::vector<std::string> lines = {
+                    "Enter/Space: advance 30 minutes | D: advance one day",
+                    std::format("Year {}, {} of {}", date.year, Ordinal(date.day), calendar.PartName(date.part)),
+                    std::format("Time: {} ({})", clock.ToString(), phases.At(clock)),
+                    std::format("Elapsed: {} days / {} minutes", clock.Day(), clock.Minutes()),
+                    std::format("Calendar: {} months, {} days per year", calendar.Parts(), calendar.DaysPerYear())
+                };
+
+                for (std::size_t row = 0; row < std::min(lines.size(), inside.size.y); ++row) {
+                    screen.Print(inside.corner.x, inside.corner.y + row, lines[row]);
+                }
+            }
+
+            return;
+        }
+
+        if (!ready) {
+            Generate();
+        }
+
+        screen.Print(inside.corner.x, inside.corner.y, detail);
+        map_area = {Position(inside.corner.x, inside.corner.y + 1), Size(inside.size.x, inside.size.y - 1)};
+        list_area = {};
+
+        if (mode == 0) {
+            const std::size_t width = std::min<std::size_t>(30, inside.size.x / 2);
+            list_area = {map_area.corner, Size(width, map_area.size.y)};
+            list.Draw(screen, list_area);
+            map_area.corner.x += width + 1;
+            map_area.size.x -= std::min(width + 1, map_area.size.x);
+        }
+
+        origin = CameraOrigin(level.getSize(), map_area.size, focus);
+        DrawMap(screen, level, map_area, origin);
+
+        if (mode == 1 || mode == 3) {
+            CFOV fov(&level);
+            fov.Calculate(focus, 9);
+            const CDistanceMap distances(level, std::array{goal});
+
+            for (std::size_t y = 0; y < map_area.size.y && origin.y + y < level.getHeight(); ++y) {
+                for (std::size_t x = 0; x < map_area.size.x && origin.x + x < level.getWidth(); ++x) {
+                    const Position pos(origin.x + x, origin.y + y);
+                    const auto& tile = level.get(pos);
+                    char32_t glyph = tile.getGlyph();
+                    std::uint32_t colour = tile.getColor();
+
+                    if (mode == 1) {
+                        colour = fov.get(pos) ? colour : Dim(colour, 15);
+
+                        if (pos == focus) {
+                            glyph = U'@';
+                            colour = 0xFFFF00;
+                        }
+                    } else {
+                        const int distance = distances.Distance(pos);
+                        glyph = distance == CDistanceMap::unreachable ? (tile.isPassable() ? U' ' : U'#') : U'0' + distance % 10;
+                        colour = distance == CDistanceMap::unreachable ? 0x404040 : Blend(0xFFFF00, 0x4080FF, std::min(distance, 60) * 100 / 60);
+
+                        if (pos == goal) {
+                            glyph = U'@';
+                        }
+                    }
+
+                    screen.Put(map_area.corner.x + x, map_area.corner.y + y, glyph, colour);
+                }
+            }
+        } else if (mode == 2) {
+            for (const auto& pos : path) {
+                if (const auto at = OnScreen(map_area, origin, pos)) {
+                    screen.Put(at->x, at->y, U'+', 0xFFFF00);
+                }
+            }
+
+            for (const auto& [pos, glyph] : {
+                        std::pair{start, U'S'}, std::pair{goal, U'E'}
+                    }) {
+                if (const auto at = OnScreen(map_area, origin, pos)) {
+                    screen.Put(at->x, at->y, glyph, 0xFFFFFF);
+                }
+            }
+        }
+    }
+
+    bool HandleKey(const SKey& key) override
+    {
+        if (mode == 0 && list.HandleKey(key)) {
+            if (list.getSelected() != generated) {
+                Generate();
+            }
+
+            return true;
+        }
+
+        if (key.type == EKey::Char && (key.ch == U'r' || key.ch == U'R') && mode < 4) {
+            Generate();
+            return true;
+        }
+
+        if (mode >= 4 && (key.type == EKey::Enter || (key.type == EKey::Char && key.ch == U' '))) {
+            Step();
+            return true;
+        }
+
+        if (mode == 5 && key.type == EKey::Char && (key.ch == U'd' || key.ch == U'D')) {
+            clock.Advance(48);
+            return true;
+        }
+
+        if (mode < 4) {
+            if (!ready) {
+                Generate();
+            }
+
+            if (key.type == EKey::Left || (key.type == EKey::Char && key.ch == U'h')) {
+                Move(-1, 0);
+            } else if (key.type == EKey::Right || (key.type == EKey::Char && key.ch == U'l')) {
+                Move(1, 0);
+            } else if (key.type == EKey::Up || (key.type == EKey::Char && key.ch == U'k')) {
+                Move(0, -1);
+            } else if (key.type == EKey::Down || (key.type == EKey::Char && key.ch == U'j')) {
+                Move(0, 1);
+            } else {
+                return false;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    void Click(Position at, EMouseButton button) override
+    {
+        if (button != EMouseButton::Left) {
+            return;
+        }
+
+        const Position absolute(content_origin.x + at.x, content_origin.y + at.y);
+
+        if (mode == 0 && list_area.Contains(absolute)) {
+            list.Click(Position(absolute.x - list_area.corner.x, absolute.y - list_area.corner.y), button);
+        } else if ((mode == 1 || mode == 3) && map_area.Contains(absolute)) {
+            const Position pos(origin.x + absolute.x - map_area.corner.x, origin.y + absolute.y - map_area.corner.y);
+
+            if (level.inside(pos) && level.get(pos).isPassable()) {
+                if (mode == 1) {
+                    focus = pos;
+                } else {
+                    goal = pos;
+                }
+            }
+        }
+    }
+
+    void Scroll(int lines) override
+    {
+        if (mode == 0) {
+            list.Scroll(lines);
+            Generate();
+        } else if (mode < 4) {
+            Move(0, lines);
         }
     }
 };
 
 int main(int argc, char* argv[])
 {
-    //////////////////////////////////////////////////////////////////////////
-    // Initialization of randomness
-    //////////////////////////////////////////////////////////////////////////
+    try {
+        const std::uint32_t seed = argc > 1 ? static_cast<std::uint32_t>(std::stoul(argv[1])) : InitRandomness();
+        InitRandomness(seed);
+        CTileData::RegisterTile("pine", {U'♣', 0x2E7D32, false, false});
+        CTileData::RegisterTile("pond", {U'≈', 0x3399FF, true, false});
+        CTerminal terminal;
+        CScreen screen;
+        CWindowManager windows;
+        std::vector<std::unique_ptr<CFeatureWindow>> tabs;
+        const std::array titles = {"Map generators", "FOV", "Path finding", "Distance map", "Scheduler", "Calendar"};
 
-    // Pass a seed as first argument to generate the same levels again
-    std::uint32_t seed;
+        for (std::size_t index = 0; index < titles.size(); ++index) {
+            tabs.push_back(std::make_unique<CFeatureWindow>(titles[index], static_cast<int>(index)));
+            windows.Open(*tabs.back());
+            windows.Dock(*tabs.back(), EDock::Top, 1000);
 
-    if (argc > 1) {
-        seed = static_cast<std::uint32_t>(std::stoul(argv[1]));
-        RL::InitRandomness(seed);
-    } else {
-        seed = RL::InitRandomness();
-    }
-
-    cout << "Seed: " << seed << endl << endl;
-
-    //////////////////////////////////////////////////////////////////////////
-    // Define the map
-    //////////////////////////////////////////////////////////////////////////
-
-    const RL::Size level_size(79, 50);
-    RL::CMap level = RL::CMap(level_size);
-
-    //////////////////////////////////////////////////////////////////////////
-    // Generate some levels
-    //////////////////////////////////////////////////////////////////////////
-
-    cout << stc::underline << "Standard Dungeon" << stc::reset << endl << endl;
-    RL::CreateStandardDungeon(level, 20);
-    RL::PrintMap(level);
-
-    cout << endl << stc::underline << "Ant's Nest" << stc::reset << endl << endl;
-    RL::CreateAntNest(level, true);
-    RL::PrintMap(level);
-
-    cout << endl << stc::underline << "Mines" << stc::reset << endl << endl;
-    RL::CreateMines(level, 25);
-    RL::PrintMap(level);
-
-    cout << endl << stc::underline << "Caves Sharp" << stc::reset << endl << endl;
-    RL::CreateCaves(level, 1, 0.75);
-    RL::PrintMap(level);
-
-    cout << endl << stc::underline << "Caves Soft" << stc::reset << endl << endl;
-    RL::CreateCaves(level, 3);
-    RL::PrintMap(level);
-
-    for (const auto& name : RL::GetDelvePresets()) {
-        cout << endl << stc::underline << "Delve - " << name << stc::reset << endl << endl;
-
-        RL::CreateDelve(level, name);
-        RL::PrintMap(level);
-    }
-
-    cout << endl << stc::underline << "Space shuttle" << stc::reset << endl << endl;
-    RL::CreateSpaceShuttle(level, 25);
-    RL::PrintMap(level);
-
-    cout << endl << stc::underline << "Castle" << stc::reset << endl << endl;
-    RL::CreateSpaceShuttle(level, 25);
-    RL::PrintMap(level);
-
-    cout << endl << stc::underline << "Forest" << stc::reset << endl << endl;
-    RL::GenerateForest(level);
-    RL::PrintMap(level);
-
-    cout << endl << stc::underline << "Cave and Glade - Cave" << stc::reset << endl << endl;
-    RL::CreateCaveAndGlade(level, "wall", "room", RL::CaveShape, RL::CaveWater);
-    RL::PrintMap(level);
-
-    cout << endl << stc::underline << "Cave and Glade - Small cave without water" << stc::reset << endl << endl;
-    RL::CreateCaveAndGlade(level, "wall", "room", {.min_areas = 7, .max_areas = 11, .scale = 2}, {.shallow = {}});
-    RL::PrintMap(level);
-
-    cout << endl << stc::underline << "Cave and Glade - Glade" << stc::reset << endl << endl;
-    RL::CreateCaveAndGlade(level, "tree", "grass", RL::GladeShape, RL::GladeWater);
-    RL::PrintMap(level);
-
-    // Tiles can be registered at runtime, with any Unicode symbol as glyph
-    RL::CTileData::RegisterTile("pine", {U'♣', 0x2E7D32, false, false});
-    RL::CTileData::RegisterTile("pond", {U'≈', 0x3399FF, true, false});
-
-    cout << endl << stc::underline << "Cave and Glade - Glade with Unicode glyphs" << stc::reset << endl << endl;
-    RL::CreateCaveAndGlade(level, "pine", "grass", RL::GladeShape, {.shallow = "pond", .level = 12, .deep_level = 35, .grain = 20});
-    RL::PrintMap(level);
-
-    cout << endl << stc::underline << "Voronoi Wilderness" << stc::reset
-         << " (difficulty 0 in the town, up to 9 in the hardest region)" << endl << endl;
-
-    const RL::SWildernessInfo wilderness = RL::CreateVoronoiWilderness(level, 24, true);
-    RL::PrintMap(level);
-
-    cout << wilderness.regions << " regions, " << wilderness.adjacency << " Delaunay edges";
-
-    for (const RL::SLocation & location : wilderness.locations) {
-        cout << ", town at (" << location.center.x << ", " << location.center.y
-             << ") with radius " << location.radius;
-    }
-
-    for (const RL::SBuilding & building : wilderness.buildings) {
-        cout << ", building from (" << building.corner1.x << ", " << building.corner1.y
-             << ") to (" << building.corner2.x << ", " << building.corner2.y
-             << ") with its door at (" << building.door.x << ", " << building.door.y << ")";
-    }
-
-    cout << endl;
-
-    cout << endl << stc::underline << "Simple City with 15 buildings" << stc::reset << endl << endl;
-    RL::CreateSimpleCity(level, 15);
-    RL::PrintMap(level);
-
-    //////////////////////////////////////////////////////////////////////////
-    // Field of view testing
-    //////////////////////////////////////////////////////////////////////////
-
-    cout << endl << stc::underline << "Field of View in Simple City from the road" << stc::reset << endl << endl;
-
-
-    // Place observer somewhere on a horizontal road
-
-    RL::Position observer;
-    RL::FindOnMapRandomRectangleOfType(level, "corridor", observer, RL::Size(2, 1));
-
-    // Define the FOV
-
-    RL::CFOV fov(&level);
-
-    // FOV prepared, calculate it
-
-    fov.Calculate(observer, 9);
-
-    // Print calculated FOV
-
-    RL::Position pos;
-
-    for (pos.y = 0; pos.y < level_size.y; ++pos.y) {
-        for (pos.x = 0; pos.x < level_size.x; ++pos.x) {
-            auto tile = level.get(pos);
-
-            if (pos == observer) {
-                cout << stc::rgb_fg(0xF0F000) << '@' << stc::reset;
-            } else if (fov.get(pos)) { // visible cells take from the map
-                cout << stc::rgb_fg(tile.getColor()) << RL::EncodeUTF8(tile.getGlyph()) << stc::reset;
-            } else if (level.get(pos).getGlyph() == U'#') { // not visible
-                cout << stc::rgb_fg(0x202020) << RL::EncodeUTF8(tile.getGlyph()) << stc::reset;
-            } else { // others are empty
-                cout << ' ';
+            if (index > 0) {
+                windows.Tab(*tabs.back(), *tabs.front());
             }
         }
 
-        cout << endl;
-    }
+        windows.Focus(*tabs.front());
+        std::size_t active = 0;
 
-    //////////////////////////////////////////////////////////////////////////
-    // Find path in the maze
-    //////////////////////////////////////////////////////////////////////////
+        for (;;) {
+            screen.Resize(terminal.getSize());
+            screen.Clear();
+            const Size size = screen.getSize();
 
-    // Create maze
+            if (size.x < 40 || size.y < 10) {
+                screen.Print(0, 0, "Resize to at least 40x10; Q quits");
+            } else {
+                windows.Layout({Position(0, 0), Size(size.x, size.y - 1)});
+                windows.Draw(screen);
+                screen.Print(0, size.y - 1, "1-6/Tab: tabs | R: regenerate | hjkl: pan | Q: quit");
+            }
 
-    cout << endl << stc::underline << "Maze" << stc::reset << endl << endl;
-    RL::CreateMaze(level);
-    RL::PrintMap(level);
+            terminal.Write(screen.Compose(false));
+            const SKey key = terminal.ReadKey();
 
-    cout << endl << stc::underline << "Path in this maze" << stc::reset << " '+' (from top-left to bottom-right corner)" << endl << endl;
+            if (key.type == EKey::Closed || key.type == EKey::Escape ||
+                    (key.type == EKey::Char && (key.ch == U'q' || key.ch == U'Q' || key.ch == 3))) {
+                break;
+            }
 
-    // Find corners
+            if (key.type == EKey::Mouse && size.x >= 40 && size.y >= 10) {
+                windows.HandleMouse(key.mouse);
 
-    RL::Position start, end;
-
-    for (pos.x = 0; pos.x < level_size.x; ++pos.x) {
-        for (pos.y = 0; pos.y < level_size.y; ++pos.y) {
-            if (level.get(pos).getType() == "corridor") {
-                // set top-left corner
-                if (start.x == RL::Position::invalid) {
-                    start = pos;
+                for (std::size_t index = 0; index < tabs.size(); ++index) {
+                    if (windows.getFocused() == tabs[index].get()) {
+                        active = index;
+                    }
                 }
-
-                // set bottom-right corner
-                end = pos;
-            }
-        }
-    }
-
-    // find path in maze
-
-    vector < RL::Position > path;
-    RL::FindPath(level, start, end, path);
-
-    // print maze with path
-
-    for (std::size_t index = 0; index < path.size(); index++) {
-        // this looks bogus, but we get a trail of '+' this way
-        level.get(path[index].x, path[index].y).setType("door_closed");
-    }
-
-    RL::PrintMap(level);
-
-    //////////////////////////////////////////////////////////////////////////
-    // Distance map: the way from everywhere to the nearest goal
-    //////////////////////////////////////////////////////////////////////////
-
-    cout << endl << stc::underline << "Distance map in a cave" << stc::reset
-         << " (the last digit of the distance to '@', near in yellow, far in blue)" << endl << endl;
-
-    RL::CreateCaves(level, 3);
-    RL::Position goal;
-    RL::FindOnMapRandomRectangleOfType(level, "room", goal, RL::Size(1, 1));
-    const RL::CDistanceMap distances(level, std::array{goal});
-
-    for (pos.y = 0; pos.y < level_size.y; ++pos.y) {
-        for (pos.x = 0; pos.x < level_size.x; ++pos.x) {
-            const int distance = distances.Distance(pos);
-
-            if (pos == goal) {
-                cout << stc::rgb_fg(0xF0F000) << '@';
-            } else if (distance == RL::CDistanceMap::unreachable) {
-                cout << stc::rgb_fg(0x404040) << (level.get(pos).isPassable() ? ' ' : '#');
-            } else {
-                // From yellow to blue over the first 60 steps
-                const float far = static_cast<float>(std::min(distance, 60)) / 60.0f;
-                cout << stc::hsl_fg(0.15f + 0.5f * far, 0.8f, 0.55f) << distance % 10;
+            } else if (key.type == EKey::Char && (key.ch == U'\t' || (key.ch >= U'1' && key.ch <= U'6'))) {
+                active = key.ch == U'\t' ? (active + 1) % tabs.size() : static_cast<std::size_t>(key.ch - U'1');
+                windows.Open(*tabs[active]);
+            } else if (size.x >= 40 && size.y >= 10) {
+                windows.HandleKey(key);
             }
         }
 
-        cout << stc::reset << endl;
+        return 0;
+    } catch (const std::exception& error) {
+        std::cerr << "Feature demo: " << error.what() << '\n';
+        return 1;
     }
-
-    //////////////////////////////////////////////////////////////////////////
-    // Clock: the time of day, and what holds at it
-    //////////////////////////////////////////////////////////////////////////
-
-    cout << endl << stc::underline << "A day" << stc::reset << " (half an hour a turn)" << endl << endl;
-
-    RL::CClock clock(30);
-    RL::CDailySchedule<string_view> phases;
-    phases.Set(6, 0, "morning");
-    phases.Set(12, 0, "afternoon");
-    phases.Set(18, 0, "evening");
-    phases.Set(22, 0, "night");
-
-    for (int turn = 0; turn < 48; turn += 6) {
-        cout << clock.ToString() << ' ' << phases.At(clock) << endl;
-        clock.Advance(6);
-    }
-
-    //////////////////////////////////////////////////////////////////////////
-    // Scheduler: who acts when, by speed
-    //////////////////////////////////////////////////////////////////////////
-
-    cout << endl << stc::underline << "Scheduler" << stc::reset
-         << " (a hare acts every 50 ticks, a fox every 100, a snail every 400)" << endl << endl;
-
-    const map<string_view, RL::Ticks> delays = {{"hare", 50}, {"fox", 100}, {"snail", 400}};
-    RL::CScheduler<string_view> scheduler;
-
-    for (const auto& [name, delay] : delays) {
-        scheduler.Schedule(name, 0);
-    }
-
-    while (auto actor = scheduler.Next()) {
-        if (scheduler.Now() > 400) {
-            break;
-        }
-
-        cout << scheduler.Now() << ": " << *actor << endl;
-        scheduler.Schedule(*actor, delays.at(*actor));
-    }
-
-    //////////////////////////////////////////////////////////////////////////
-    // Tabbed windows: one frame, one window of the group at a time
-    //////////////////////////////////////////////////////////////////////////
-
-    cout << endl << stc::underline << "Tabbed windows" << stc::reset
-         << " (two windows docked left, sharing one frame under its tabs)" << endl << endl;
-
-    // The composed screen prints row by row here: the jumps of the cursor
-    // it asks the terminal for become line breaks
-    const auto print_screen = [](const std::string & composed) {
-        for (std::size_t pos = 0; pos < composed.size();) {
-            if (composed[pos] != '\x1b' || pos + 1 >= composed.size() || composed[pos + 1] != '[') {
-                cout << composed[pos++];
-                continue;
-            }
-
-            std::size_t end = pos + 2;
-
-            while (end < composed.size() && !(composed[end] >= 'A' && composed[end] <= 'Z') &&
-                    !(composed[end] >= 'a' && composed[end] <= 'z')) {
-                ++end;
-            }
-
-            if (end >= composed.size()) {
-                cout << composed[pos++];
-                continue;
-            }
-
-            if (composed[end] == 'H') {
-                cout << endl;
-            } else {
-                cout << composed.substr(pos, end - pos + 1);
-            }
-
-            pos = end + 1;
-        }
-    };
-
-    RL::CScreen tabs_screen(RL::Size(64, 14));
-    RL::CWindowManager windows;
-
-    CTextWindow stats("Stats", {"Health  <#FF4040>34/34", "Level   3", "Exp     120/200"});
-    CTextWindow log("Log", {"You hit the rat.", "The rat flees.", "You pick up 12 gold."});
-
-    windows.Open(stats);
-    windows.Open(log);
-    windows.Dock(stats, RL::EDock::Left, 22);
-    windows.Dock(log, RL::EDock::Left, 22);
-    windows.Tab(log, stats);
-
-    windows.Layout({RL::Position(0, 0), tabs_screen.getSize()});
-    windows.Draw(tabs_screen);
-    print_screen(tabs_screen.Compose(false));
-
-    // A click on the first tab of the strip shows its window in place of
-    // the one that did; the strip is the row under the title, and the
-    // first tab its box two columns in
-    const RL::SRect tabbed = log.getFrame();
-
-    RL::SMouse click;
-    click.button = RL::EMouseButton::Left;
-    click.position = RL::Position(tabbed.corner.x + 4, tabbed.corner.y + 1);
-    windows.HandleMouse(click);
-
-    cout << endl << "After a click on the first tab:" << endl << endl;
-
-    tabs_screen.Clear();
-    windows.Draw(tabs_screen);
-    print_screen(tabs_screen.Compose(false));
-    cout << endl;
-
-    //////////////////////////////////////////////////////////////////////////
-    // That's all folks!
-    //////////////////////////////////////////////////////////////////////////
-    //////////////////////////////////////////////////////////////////////////
-    // Names, made up from others
-    //////////////////////////////////////////////////////////////////////////
-
-    RL::CPersonNames names;
-
-    for (const auto& [gender, title] : {
-                std::pair(RL::EGender::Female, "Names of women"), std::pair(RL::EGender::Male, "Names of men")
-            }) {
-        cout << endl << stc::underline << title << stc::reset
-             << " (of between 4 and 6 tokens, made from fifty common English ones)" << endl << endl;
-
-        for (int count = 0; count < 15; ++count) {
-            if (const auto name = names.Generate(gender)) {
-                cout << *name << (count % 5 == 4 ? "\n" : "  ");
-            }
-        }
-    }
-
-    cout << endl;
-
-    return 0;
 }
