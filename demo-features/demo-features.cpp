@@ -463,8 +463,10 @@ public:
     void Scroll(int lines) override
     {
         if (mode == 0) {
-            list.Scroll(lines);
-            Generate();
+            const std::size_t maximum = level.getHeight() > map_area.size.y ? level.getHeight() - map_area.size.y : 0;
+            const auto y = std::clamp(static_cast<std::int64_t>(origin.y) + lines,
+                                      std::int64_t{0}, static_cast<std::int64_t>(maximum));
+            setScrollOffset(Position(origin.x, static_cast<std::size_t>(y)));
         } else if (mode < 4) {
             Move(0, lines);
         }

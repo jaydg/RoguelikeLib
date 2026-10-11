@@ -131,8 +131,8 @@ You can run the generated executables with `xmake run`.
 The feature demo is an interactive terminal application with six tabs:
 Map generators, FOV, Path finding, Distance map, Scheduler, and Calendar.
 Use `1`–`6`, Tab, or click a tab to switch. In Map generators, select a
-generator with Up/Down, Home/End, PageUp/PageDown, the mouse wheel, or a
-click; Enter regenerates it. `R` regenerates any map demo, and `h/j/k/l`
+generator with Up/Down, Home/End, PageUp/PageDown, or a click; Enter
+regenerates it. The mouse wheel scrolls the map viewport. `R` regenerates any map demo, and `h/j/k/l`
 pans the map. In FOV, arrows or a floor click move the observer. In Distance
 map, click a floor to move the goal. Enter/Space steps the Scheduler or
 advances the Calendar by 30 minutes; `D` advances one day. `Q` or Escape
