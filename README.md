@@ -21,12 +21,32 @@ Xmake and depend on the `RTUI` target, which publicly depends on
 `RoguelikeLib`.
 
 The UI modules are `rtui.screen`, `rtui.windows`, `rtui.mouse`,
-`rtui.utf8`, and `rtui.map`; terminal colours are provided by `stc` in
+`rtui.utf8`, `rtui.terminal`, and `rtui.map`; terminal colours are provided by `stc` in
 `rtui/extern`. C++ types and functions retain their `RL` namespace.
 Import `rtui.map` and call `RL::PrintMap(map)` to print a map (previously
 `CMap::PrintMap()`). Import `rtui.utf8` explicitly when encoding glyphs;
 `rl.tile` no longer re-exports it. The core library can be used without
 terminal UI dependencies.
+
+`rtui.terminal` provides the POSIX terminal layer adapted from Roguevalley:
+`RL::CTerminal` owns raw input mode, the alternate screen, cursor visibility,
+mouse reporting, and restoration on destruction, exit, or termination signals.
+Only one terminal object can be active at a time, and stdin and stdout must
+both be terminals. `ReadKey(timeout_ms)` returns decoded Unicode keys, mouse
+reports, resize events, or closure; `getSize()` returns columns and rows.
+`DecodeKey()` can also decode buffered input without opening a terminal.
+
+```cpp
+import rtui.terminal;
+import rtui.screen;
+
+// Inside the application's main function:
+RL::CTerminal terminal;
+RL::CScreen screen(terminal.getSize());
+screen.Print(0, 0, "Hello from RTUI");
+terminal.Write(screen.Compose(true));
+const auto key = terminal.ReadKey();
+```
 
 Credits
 -------
