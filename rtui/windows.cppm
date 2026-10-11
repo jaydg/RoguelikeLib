@@ -1129,6 +1129,21 @@ public:
         }
     }
 
+    // Which window of the tab group a window is in shows: the one of them
+    // raised last, as its tab says. A window in no tab group shows itself.
+    // Nothing when it is not open.
+    [[nodiscard]] CWindow* getShownTab(const CWindow& window) const
+    {
+        const auto open = std::ranges::find(windows, &window);
+
+        if (open == windows.end()) {
+            return nullptr;
+        }
+
+        const std::vector<CWindow*> group = TabGroup(window);
+        return group.empty() ? *open : Active(group);
+    }
+
     // Closes a window, and all of the tab group it is in, if it is in one
     void CloseTabGroup(CWindow& window)
     {
