@@ -40,6 +40,7 @@ export module rtui.windows;
 export import rtui.mouse;
 export import rl.position;
 export import rtui.screen;
+export import rtui.terminal;
 import std;
 
 export namespace RL
@@ -145,6 +146,14 @@ public:
     {
         static_cast<void>(at);
         static_cast<void>(button);
+    }
+
+    // Keyboard input for the focused window. Return true when consumed;
+    // false lets the application handle shortcuts or other unhandled keys.
+    virtual bool HandleKey(const SKey& key)
+    {
+        static_cast<void>(key);
+        return false;
     }
 
     [[nodiscard]] const std::string& getTitle() const
@@ -832,6 +841,38 @@ public:
     [[nodiscard]] CWindow* Top() const
     {
         return windows.empty() ? nullptr : windows.back();
+    }
+
+    // Focus follows stacking order: opening, raising or clicking a window
+    // focuses it and selects its tab. Closing it focuses the next on top.
+    [[nodiscard]] CWindow* getFocused() const
+    {
+        return Top();
+    }
+
+    // Explicitly focuses an open window; closed windows stay closed.
+    bool Focus(CWindow& window)
+    {
+        if (!IsOpen(window)) {
+            return false;
+        }
+
+        Raise(window);
+        return true;
+    }
+
+    // Routes keyboard events only. Mouse, resize, closure and timeout
+    // events remain the application's responsibility. No key is reserved
+    // for switching focus, so widgets may use Tab or arrows themselves.
+    bool HandleKey(const SKey& key)
+    {
+        if (key.type == EKey::None || key.type == EKey::Mouse ||
+                key.type == EKey::Resize || key.type == EKey::Closed) {
+            return false;
+        }
+
+        CWindow* focused = getFocused();
+        return focused != nullptr && focused->HandleKey(key);
     }
 
     // Docks a window to an edge, as the innermost of those docked there.

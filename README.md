@@ -36,6 +36,14 @@ on a focus position and clamped to map edges. `OnScreen(area, origin, pos)`
 converts a map position to screen coordinates, returning `nullopt` outside
 the viewport. These viewport helpers are adapted from Roguevalley.
 
+Windows receive keyboard input by overriding `CWindow::HandleKey(const SKey&)`
+and returning whether they consumed it. Call `windows.HandleKey(key)` from
+the event loop; a false result lets the application handle global shortcuts.
+The focused window is `windows.getFocused()`: opening, raising, or clicking
+focuses a window and activates its tab; closing it falls back to the next
+window on top. `windows.Focus(window)` explicitly focuses an open window.
+Mouse, resize, closure, and timeout events are not routed as keyboard input.
+
 `rtui.terminal` provides the POSIX terminal layer adapted from Roguevalley:
 `RL::CTerminal` owns raw input mode, the alternate screen, cursor visibility,
 mouse reporting, and restoration on destruction, exit, or termination signals.
