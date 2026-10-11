@@ -133,7 +133,7 @@ int main(int argc, char* argv[])
     cout << endl << stc::underline << "Voronoi Wilderness" << stc::reset
          << " (difficulty 0 in the town, up to 9 in the hardest region)" << endl << endl;
 
-    const RL::SWildernessInfo wilderness = RL::CreateVoronoiWilderness(level, 24);
+    const RL::SWildernessInfo wilderness = RL::CreateVoronoiWilderness(level, 24, true);
     level.PrintMap();
 
     cout << wilderness.regions << " regions, " << wilderness.adjacency << " Delaunay edges";
@@ -141,6 +141,12 @@ int main(int argc, char* argv[])
     for (const RL::SLocation & location : wilderness.locations) {
         cout << ", town at (" << location.center.x << ", " << location.center.y
              << ") with radius " << location.radius;
+    }
+
+    for (const RL::SBuilding & building : wilderness.buildings) {
+        cout << ", building from (" << building.corner1.x << ", " << building.corner1.y
+             << ") to (" << building.corner2.x << ", " << building.corner2.y
+             << ") with its door at (" << building.door.x << ", " << building.door.y << ")";
     }
 
     cout << endl;

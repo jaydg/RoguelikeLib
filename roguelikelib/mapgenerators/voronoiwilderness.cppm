@@ -9,7 +9,7 @@ module;
 // flood fill over that graph turns the distance from a starting region
 // into a difficulty between 0 and 9. The difficulty decides the terrain of
 // a region, and the terrain decides the tiles: open ground scattered with
-// point terrain, the starting town as a building at difficulty 0,
+// point terrain, the starting town at difficulty 0 with a building if asked for,
 // farmland walled in by hedges and left a single gate, rolling hills with
 // crags on their tops, mountains and high snow rounded and worn to a
 // fractal outline, and lakes and chasms dropped in only where
@@ -25,7 +25,7 @@ export module rl.mapgenerators.voronoiwilderness;
 
 export import rl.connectivity;
 export import rl.locations;
-import rl.map;
+export import rl.map;
 import rl.matrix;
 import rl.position;
 import rl.randomness;
@@ -45,10 +45,17 @@ struct SWildernessInfo {
 
     // The places of significance the generator laid out, in the shape the
     // forest generator hands its clearings back in: the starting town, as
-    // the middle of the part of its building that is actually drawn,
-    // with roughly half the longer side of that part as radius. Empty
-    // when no cell of the map belongs to the town region.
+    // the deepest cell of the town region, with that cell's distance to
+    // the region's edge as radius. Empty when no cell of the map belongs
+    // to the town region.
     std::vector<SLocation> locations;
+
+    // The buildings, when they were asked for: the rectangle of each
+    // one's outer walls, corners included, with floor inside, and the
+    // position of its single door, a wall cell other than a corner. Every
+    // building stands wholly on its town, with a ring of open ground
+    // around it, so the door always opens onto walkable ground.
+    std::vector<SBuilding> buildings;
 
     // The difficulty of every cell: 0 in the town, 9 in the hardest
     // region. Opening the map up afterwards (see WildernessOpenings)
@@ -348,7 +355,7 @@ bool PassableGraphConnected(const std::vector<Region>& regions,
 class CWilderness
 {
 public:
-    CWilderness(const int width, const int height, const int num_regions);
+    CWilderness(const int width, const int height, const int num_regions, const bool with_buildings);
 
     // Fill the map, and report what it was divided into
     [[nodiscard]] SWildernessInfo Apply(CMap & level) const;
@@ -356,6 +363,7 @@ public:
 private:
     int width_;
     int height_;
+    bool with_buildings_;
 
     // The noise the point terrain of the open regions is cut from
     std::uint64_t noise_seed_ = 0;
@@ -395,8 +403,8 @@ private:
     [[nodiscard]] std::string_view TileAt(const int x, const int y) const;
 };
 
-CWilderness::CWilderness(const int width, const int height, const int num_regions)
-    : width_(width), height_(height)
+CWilderness::CWilderness(const int width, const int height, const int num_regions, const bool with_buildings)
+    : width_(width), height_(height), with_buildings_(with_buildings)
 {
     // One noise field for the whole map, drawn from the library's random
     // stream, so that the same seed gives the same wilderness again
@@ -561,8 +569,34 @@ CWilderness::CWilderness(const int width, const int height, const int num_region
     }
 
     // 4. Flood fill the difficulties from a random vertex, then normalise
-    // them to the 0 to 9 the terrain is picked from
-    const std::size_t start = Random(regions_.size());
+    // them to the 0 to 9 the terrain is picked from. The start becomes the
+    // town, so it is picked among the regions deep enough to hold the
+    // smallest building with open ground around it; failing that, among
+    // those that own a cell of the map at all.
+    constexpr int town_depth = 15;    // five cells, in thirds of a cell
+    std::vector<std::size_t> owned(regions_.size(), 0);
+
+    for (const int id : region_id_) {
+        ++owned[id];
+    }
+
+    std::vector<std::size_t> candidates;
+
+    constexpr std::array<int, 2> depths = {town_depth, 0};
+
+    for (const int depth : depths) {
+        for (std::size_t i = 0; i < regions_.size(); ++i) {
+            if (owned[i] > 0 && regions_[i].max_edge >= depth) {
+                candidates.push_back(i);
+            }
+        }
+
+        if (!candidates.empty()) {
+            break;
+        }
+    }
+
+    const std::size_t start = candidates.empty() ? Random(regions_.size()) : candidates[Random(candidates.size())];
     std::queue<int> queue;
     queue.push(static_cast<int>(start));
     regions_[start].bfs = 0;
@@ -708,7 +742,7 @@ void CWilderness::PlaceFeatures()
             if (!borders.empty()) {
                 region.gate = borders[Random(borders.size())];
             }
-        } else if (region.terrain == Ter::Town) {
+        } else if (region.terrain == Ter::Town && with_buildings_) {
             region.has_building = PlaceTown(region, i);
         }
     }
@@ -716,110 +750,102 @@ void CWilderness::PlaceFeatures()
 
 bool CWilderness::PlaceTown(Region & region, const std::size_t id)
 {
-    int x0 = width_;
-    int y0 = height_;
-    int x1 = 0;
-    int y1 = 0;
-    bool any = false;
-
-    for (int y = 0; y < height_; ++y) {
-        for (int x = 0; x < width_; ++x) {
-            if (region_id_[Index(x, y)] == static_cast<int>(id)) {
-                x0 = std::min(x0, x);
-                x1 = std::max(x1, x);
-                y0 = std::min(y0, y);
-                y1 = std::max(y1, y);
-                any = true;
-            }
-        }
-    }
-
-    if (!any) {
-        return false;   // no cell of the map belongs to the town region
-    }
-
-    // The building takes about half of the region's bounding box
-    const int bw = std::max(4, (x1 - x0 + 1) / 2);
-    const int bh = std::max(3, (y1 - y0 + 1) / 2);
-
-    region.rect_x0 = x0 + static_cast<int>(Random(static_cast<std::size_t>(std::max(x0, x1 - bw) - x0 + 1)));
-    region.rect_x1 = std::min(width_ - 1, region.rect_x0 + bw);
-    region.rect_y0 = y0 + static_cast<int>(Random(static_cast<std::size_t>(std::max(y0, y1 - bh) - y0 + 1)));
-    region.rect_y1 = std::min(height_ - 1, region.rect_y0 + bh);
-
-    // Only where the rectangle lies on cells of the town region is there a
-    // building at all: only those cells are drawn as one
-    bool covered = false;
-
-    for (int y = region.rect_y0; y <= region.rect_y1 && !covered; ++y) {
-        for (int x = region.rect_x0; x <= region.rect_x1 && !covered; ++x) {
-            covered = region_id_[Index(x, y)] == static_cast<int>(id);
-        }
-    }
-
-    if (!covered) {
-        return false;
-    }
-
-    // A door on a random perimeter position that belongs to the town. The
-    // rectangle may overhang the region, so not every perimeter cell does;
-    // should chance miss them all, take the first one that does rather
-    // than leave the building without a way in.
-    for (int attempt = 0; attempt < 64 && region.door < 0; ++attempt) {
-        int x = region.rect_x0;
-        int y = region.rect_y0;
-
-        switch (Random(4)) {
-        case 0:
-            x = region.rect_x0 + static_cast<int>(Random(static_cast<std::size_t>(region.rect_x1 - region.rect_x0 + 1)));
-            y = region.rect_y0;
-            break;
-
-        case 1:
-            x = region.rect_x0 + static_cast<int>(Random(static_cast<std::size_t>(region.rect_x1 - region.rect_x0 + 1)));
-            y = region.rect_y1;
-            break;
-
-        case 2:
-            y = region.rect_y0 + static_cast<int>(Random(static_cast<std::size_t>(region.rect_y1 - region.rect_y0 + 1)));
-            x = region.rect_x0;
-            break;
-
-        default:
-            y = region.rect_y0 + static_cast<int>(Random(static_cast<std::size_t>(region.rect_y1 - region.rect_y0 + 1)));
-            x = region.rect_x1;
-            break;
-        }
-
-        if (region_id_[Index(x, y)] == static_cast<int>(id)) {
-            region.door = Index(x, y);
-        }
-    }
-
-    if (region.door >= 0) {
-        return true;
-    }
-
-    const auto owned = [&](const int x, const int y) {
+    const auto town = [&](const int x, const int y) {
         return x >= 0 && y >= 0 && x < width_ && y < height_ &&
                region_id_[Index(x, y)] == static_cast<int>(id);
     };
 
-    for (int x = region.rect_x0; x <= region.rect_x1 && region.door < 0; ++x) {
-        if (owned(x, region.rect_y0)) {
-            region.door = Index(x, region.rect_y0);
-        } else if (owned(x, region.rect_y1)) {
-            region.door = Index(x, region.rect_y1);
+    int x0 = width_;
+    int y0 = height_;
+    int x1 = -1;
+    int y1 = -1;
+
+    for (int y = 0; y < height_; ++y) {
+        for (int x = 0; x < width_; ++x) {
+            if (town(x, y)) {
+                x0 = std::min(x0, x);
+                x1 = std::max(x1, x);
+                y0 = std::min(y0, y);
+                y1 = std::max(y1, y);
+            }
         }
     }
 
-    for (int y = region.rect_y0; y <= region.rect_y1 && region.door < 0; ++y) {
-        if (owned(region.rect_x0, y)) {
-            region.door = Index(region.rect_x0, y);
-        } else if (owned(region.rect_x1, y)) {
-            region.door = Index(region.rect_x1, y);
+    if (x1 < 0) {
+        return false;   // no cell of the map belongs to the town region
+    }
+
+    // The walls and a ring of open ground around them all have to stand on
+    // the town: no part of the building is then drawn as another region,
+    // and the door always opens onto the town's own ground
+    const auto fits = [&](const int left, const int top, const int right, const int bottom) {
+        for (int y = top - 1; y <= bottom + 1; ++y) {
+            for (int x = left - 1; x <= right + 1; ++x) {
+                if (!town(x, y)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    };
+
+    // At most half of the region's bounding box, and smaller until it
+    // fits, down to a floor of 3 by 2 inside the walls
+    constexpr int min_w = 5;
+    constexpr int min_h = 4;
+    int w = std::max(min_w, (x1 - x0 + 1) / 2);
+    int h = std::max(min_h, (y1 - y0 + 1) / 2);
+
+    while (true) {
+        std::vector<std::pair<int, int>> spots;
+
+        for (int top = y0; top + h - 1 <= y1; ++top) {
+            for (int left = x0; left + w - 1 <= x1; ++left) {
+                if (fits(left, top, left + w - 1, top + h - 1)) {
+                    spots.emplace_back(left, top);
+                }
+            }
+        }
+
+        if (!spots.empty()) {
+            const auto[left, top] = spots[Random(spots.size())];
+            region.rect_x0 = left;
+            region.rect_y0 = top;
+            region.rect_x1 = left + w - 1;
+            region.rect_y1 = top + h - 1;
+            break;
+        }
+
+        if (w == min_w && h == min_h) {
+            return false;   // the town region is too narrow for a building
+        }
+
+        // Shrink the side that is longer for its minimum
+        if (w * min_h >= h * min_w && w > min_w) {
+            --w;
+        } else if (h > min_h) {
+            --h;
+        } else {
+            --w;
         }
     }
+
+    // A door on a random wall cell other than a corner: a door in a corner
+    // could only be passed diagonally, out of the corner of the floor
+    std::vector<int> walls;
+
+    for (int x = region.rect_x0 + 1; x < region.rect_x1; ++x) {
+        walls.push_back(Index(x, region.rect_y0));
+        walls.push_back(Index(x, region.rect_y1));
+    }
+
+    for (int y = region.rect_y0 + 1; y < region.rect_y1; ++y) {
+        walls.push_back(Index(region.rect_x0, y));
+        walls.push_back(Index(region.rect_x1, y));
+    }
+
+    region.door = walls[Random(walls.size())];
 
     return true;
 }
@@ -939,8 +965,8 @@ std::string_view CWilderness::TileAt(const int x, const int y) const
 
     case Ter::Town:
 
-        // The building, standing in the middle of the town region
-        if (x >= region.rect_x0 && x <= region.rect_x1 &&
+        // The building, standing wholly on the town region
+        if (region.has_building && x >= region.rect_x0 && x <= region.rect_x1 &&
                 y >= region.rect_y0 && y <= region.rect_y1) {
             if (cell == region.door) {
                 return "door_open";
@@ -976,38 +1002,34 @@ SWildernessInfo CWilderness::Apply(CMap & level) const
     for (std::size_t i = 0; i < regions_.size(); ++i) {
         const Region & region = regions_[i];
 
-        if (region.terrain != Ter::Town || !region.has_building) {
+        if (region.terrain != Ter::Town) {
             continue;
         }
 
-        // Only the cells of the rectangle the town region owns are drawn
-        // as the building; the rest of the rectangle stands on other
-        // regions and looks like them. So the location is the middle of
-        // what is drawn, reaching as far as its longest half: a
-        // rectangle reaches that far along its long sides and less along
-        // the short ones, which is what the rough radius of an
-        // SLocation is for.
-        int x0 = region.rect_x1;
-        int y0 = region.rect_y1;
-        int x1 = region.rect_x0;
-        int y1 = region.rect_y0;
+        // The town is where its region lies deepest
+        int deepest = -1;
 
-        for (int y = region.rect_y0; y <= region.rect_y1; ++y) {
-            for (int x = region.rect_x0; x <= region.rect_x1; ++x) {
-                if (region_id_[Index(x, y)] == static_cast<int>(i)) {
-                    x0 = std::min(x0, x);
-                    x1 = std::max(x1, x);
-                    y0 = std::min(y0, y);
-                    y1 = std::max(y1, y);
-                }
+        for (std::size_t cell = 0; cell < region_id_.size(); ++cell) {
+            if (region_id_[cell] == static_cast<int>(i) && (deepest < 0 || edge_dist_[cell] > edge_dist_[deepest])) {
+                deepest = static_cast<int>(cell);
             }
         }
 
-        info.locations.push_back({ELocationType::Town,
-                                  Position(static_cast<std::size_t>((x0 + x1) / 2),
-                                           static_cast<std::size_t>((y0 + y1) / 2)),
-                                  static_cast<std::size_t>(std::max((x1 - x0) / 2, (y1 - y0) / 2))
-                                 });
+        if (deepest >= 0) {
+            info.locations.push_back({ELocationType::Town,
+                                      Position(static_cast<std::size_t>(deepest % width_),
+                                               static_cast<std::size_t>(deepest / width_)),
+                                      static_cast<std::size_t>(std::max(1, edge_dist_[deepest] / 3))
+                                     });
+        }
+
+        if (region.has_building) {
+            SBuilding building;
+            building.corner1 = Position(static_cast<std::size_t>(region.rect_x0), static_cast<std::size_t>(region.rect_y0));
+            building.corner2 = Position(static_cast<std::size_t>(region.rect_x1), static_cast<std::size_t>(region.rect_y1));
+            building.door = Position(static_cast<std::size_t>(region.door % width_), static_cast<std::size_t>(region.door / width_));
+            info.buildings.push_back(building);
+        }
     }
 
     return info;
@@ -1043,15 +1065,17 @@ inline constexpr std::array<SOpening, 3> WildernessOpenings = {{
 // first time this runs; a game that registered a type of one of those
 // names itself keeps its own.
 //
-// @param level         The map to fill. An empty one is left alone.
-// @param num_regions   How many Voronoi regions to scatter, at least 4.
+// @param level           The map to fill. An empty one is left alone.
+// @param num_regions     How many Voronoi regions to scatter, at least 4.
 // At 0 one region is asked for per 200 cells of the
 // map, between 10 and 400 of them.
+// @param with_buildings  Whether to put up a building in the town. It is
+// left out where the town region is too narrow for one.
 //
 // @return The regions and their adjacency edges, the locations the
 // generator laid out - the starting town, as an SLocation of type
-// Town - and the difficulty of every cell.
-SWildernessInfo CreateVoronoiWilderness(CMap & level, int num_regions = 0)
+// Town - the buildings, and the difficulty of every cell.
+SWildernessInfo CreateVoronoiWilderness(CMap & level, int num_regions = 0, bool with_buildings = false)
 {
     const int width = static_cast<int>(level.getWidth());
     const int height = static_cast<int>(level.getHeight());
@@ -1068,7 +1092,7 @@ SWildernessInfo CreateVoronoiWilderness(CMap & level, int num_regions = 0)
         num_regions = std::clamp(num_regions, 4, 800);
     }
 
-    const voronoiwilderness_detail::CWilderness wilderness(width, height, num_regions);
+    const voronoiwilderness_detail::CWilderness wilderness(width, height, num_regions, with_buildings);
     SWildernessInfo info = wilderness.Apply(level);
 
     // Whatever the connectivity of the regions guaranteed, a gate may

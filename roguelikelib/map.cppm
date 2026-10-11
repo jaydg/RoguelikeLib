@@ -73,4 +73,10 @@ struct SRoom {
     }
 };
 
+// A room walled in on all sides, with a way in: the corners are those of
+// the walls, and the door is one of the wall's cells
+struct SBuilding : SRoom {
+    Position door;
+};
+
 } // end of namespace RL
