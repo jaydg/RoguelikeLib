@@ -24,7 +24,8 @@
 // inner edge                      resizes it
 // dragging its title              floats it again
 // double-clicking the title       makes it large, or small again
-// clicking ×                      closes it
+// clicking ×                      closes it - or all of its tab
+// group, as the window's options say
 // clicking a tab                  shows its window, in place of the
 // others of its tab group
 // the wheel                       scrolls it, if it scrolls
@@ -55,13 +56,16 @@ enum class EDock {
 };
 
 // Restrictions can be combined with bitwise OR. None keeps the default
-// movable, resizable and closable behavior.
+// movable, resizable and closable behavior. CloseTabGroup has the close
+// button of a window in a tab group close all of the group, as one window
+// of several tabs.
 enum class EWindowOptions : unsigned {
     None = 0,
     NoResize = 1 << 0,
     NoMove = 1 << 1,
     NoClose = 1 << 2,
-    NoUndock = 1 << 3
+    NoUndock = 1 << 3,
+    CloseTabGroup = 1 << 4
 };
 
 constexpr EWindowOptions operator|(EWindowOptions a, EWindowOptions b)
@@ -800,7 +804,11 @@ private:
 
         if (pos.y == frame.corner.y && pos.x + 2 == frame.Right()) {
             if (!window.hasOption(EWindowOptions::NoClose) && (allow_tab_closing || window.tab_group == 0)) {
-                Close(window);
+                if (window.hasOption(EWindowOptions::CloseTabGroup)) {
+                    CloseTabGroup(window);
+                } else {
+                    Close(window);
+                }
             }
 
             return;
@@ -1119,6 +1127,16 @@ public:
         if (title_click && title_click->window == &window) {
             title_click.reset();
         }
+    }
+
+    // Closes a window, and all of the tab group it is in, if it is in one
+    void CloseTabGroup(CWindow& window)
+    {
+        for (CWindow* tab : TabGroup(window)) {
+            Close(*tab);
+        }
+
+        Close(window);
     }
 
     void Toggle(CWindow& window)
