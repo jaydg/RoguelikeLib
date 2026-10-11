@@ -1,6 +1,7 @@
 // A selectable, scrolling list for menus such as a generator browser. Its
 // items are literal text, or, if it is told so, text with colour markup as
-// the screen prints it (see rtui.screen).
+// the screen prints it (see rtui.screen). An item may be disabled: it shows
+// dimmed, and can be selected, to look at it, but not activated.
 module;
 
 export module rtui.list;
@@ -25,6 +26,12 @@ private:
     // text; and the widest of them, as drawn last
     bool markup = false;
     std::size_t widest = 0;
+
+    // Which items are disabled, by index
+    std::vector<bool> disabled;
+
+    // How bright a disabled item shows, per cent of its colours
+    static constexpr int disabled_brightness = 50;
 
     // An item as markup the screen prints: as it is, or, literal, with its
     // '<' written as "<<"
@@ -83,6 +90,7 @@ public:
     void setItems(std::vector<std::string> labels)
     {
         items = std::move(labels);
+        disabled.assign(items.size(), false);
         selected = items.empty() ? std::nullopt : std::optional<std::size_t> {0};
         first = 0;
         horizontal = 0;
@@ -91,6 +99,20 @@ public:
     [[nodiscard]] const std::vector<std::string>& getItems() const
     {
         return items;
+    }
+
+    // Disables an item, or enables it again; one that is not there is left
+    // as it is. A new list of items has them all enabled.
+    void setEnabled(std::size_t index, bool enabled)
+    {
+        if (index < disabled.size()) {
+            disabled[index] = !enabled;
+        }
+    }
+
+    [[nodiscard]] bool isEnabled(std::size_t index) const
+    {
+        return index < disabled.size() && !disabled[index];
     }
 
     // Whether the items are text with colour markup - "<#ffd24a>", or the
@@ -129,9 +151,11 @@ public:
         on_activate = std::move(callback);
     }
 
+    // Activates the selected item, unless it is disabled; returns whether
+    // it did
     bool Activate()
     {
-        if (!selected || !on_activate) {
+        if (!selected || !on_activate || !isEnabled(*selected)) {
             return false;
         }
 
@@ -163,8 +187,16 @@ public:
                 screen.Put(inside.corner.x + x, inside.corner.y + row, U' ', screen.getTextColour(), false, inverse);
             }
 
-            screen.Print(inside.corner.x, inside.corner.y + row, Markup(items[index]), horizontal, screen.getTextColour(), false,
-                         inverse);
+            const std::size_t end = screen.Print(inside.corner.x, inside.corner.y + row, Markup(items[index]), horizontal,
+                                                 screen.getTextColour(), false, inverse);
+
+            // A disabled item dimmed, as far as it was drawn
+            if (!isEnabled(index) && inside.corner.y + row < screen.getSize().y) {
+                for (std::size_t x = inside.corner.x; x < std::min({end, inside.corner.x + view.x, screen.getSize().x}); ++x) {
+                    const SCell cell = screen.At(x, inside.corner.y + row);
+                    screen.Put(x, inside.corner.y + row, cell.glyph, Dim(cell.rgb, disabled_brightness), cell.bold, cell.inverse);
+                }
+            }
         }
     }
 

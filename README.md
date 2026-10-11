@@ -50,7 +50,10 @@ optional index; empty lists have no selection. `Select(index)` allows
 programmatic selection, and `setItems(labels)` replaces the list and resets
 selection. Labels are literal UTF-8 text, clipped to the content width;
 after `setMarkup(true)` they are text with colour markup, as `CScreen`
-prints it, and keep their colours when scrolled sideways.
+prints it, and keep their colours when scrolled sideways. `setEnabled(index,
+false)` disables an item: it shows dimmed, and can be selected to look at
+it, but Enter and clicks do not activate it; `isEnabled(index)` tells.
+`setItems` enables all items again.
 
 Windows can override `getScrollInfo()` to report `SScrollInfo{content,
 viewport, offset}` in cells. The manager draws proportional position

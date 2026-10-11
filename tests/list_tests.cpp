@@ -37,3 +37,39 @@ void TestListMarkup()
     Check(Row(screen, 0) == U"defghijklmno" && screen.At(0, 0).rgb == 0x00A6A6,
           "scrolled sideways, an item keeps its colour");
 }
+
+// A disabled item shows dimmed, and can be selected, but not activated
+void TestListDisabled()
+{
+    RL::CScreen screen(RL::Size(12, 3));
+    const RL::SRect inside{RL::Position(0, 0), RL::Size(12, 3)};
+    RL::CListWindow list("Items", inside, {"one", "two", "three"});
+    std::vector<std::size_t> activated;
+    list.setOnActivate([&](std::size_t index) {
+        activated.push_back(index);
+    });
+
+    list.setEnabled(1, false);
+    list.setEnabled(7, false);
+    Check(list.isEnabled(0) && !list.isEnabled(1) && list.isEnabled(2) && !list.isEnabled(7),
+          "an item is disabled; one that is not there, never enabled");
+
+    list.Draw(screen, inside);
+    Check(screen.At(0, 1).rgb == RL::Dim(screen.getTextColour(), 50) && screen.At(0, 0).rgb == screen.getTextColour(),
+          "a disabled item shows dimmed");
+
+    Check(list.HandleKey(RL::SKey{RL::EKey::Down, 0, {}}) && list.getSelected() == std::optional<std::size_t>(1),
+          "it can be selected, to look at it");
+    Check(!list.HandleKey(RL::SKey{RL::EKey::Enter, 0, {}}) && activated.empty(), "but Enter does not activate it");
+    list.Click(RL::Position(0, 1), RL::EMouseButton::Left);
+    Check(activated.empty() && list.getSelected() == std::optional<std::size_t>(1), "nor does a click");
+    list.Click(RL::Position(0, 2), RL::EMouseButton::Left);
+    Check(activated == std::vector<std::size_t> {2}, "an enabled one is activated");
+
+    list.setEnabled(1, true);
+    list.Select(1);
+    Check(list.Activate() && activated.back() == 1, "enabled again, it is activated too");
+    list.setEnabled(0, false);
+    list.setItems({"new", "items"});
+    Check(list.isEnabled(0) && list.isEnabled(1), "a new list of items has them all enabled");
+}
