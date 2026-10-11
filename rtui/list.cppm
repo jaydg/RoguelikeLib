@@ -49,8 +49,9 @@ private:
 public:
     // Labels are literal text, not colour markup. The first item is
     // selected initially; an empty list has no selection.
-    CListWindow(std::string title, const SRect& floating, std::vector<std::string> labels = {})
-        : CWindow(std::move(title), floating)
+    CListWindow(std::string title, const SRect& floating, std::vector<std::string> labels = {},
+                EWindowOptions options = EWindowOptions::None)
+        : CWindow(std::move(title), floating, options)
     {
         setItems(std::move(labels));
     }

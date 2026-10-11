@@ -54,6 +54,32 @@ enum class EDock {
     Right
 };
 
+// Restrictions can be combined with bitwise OR. None keeps the default
+// movable, resizable and closable behavior.
+enum class EWindowOptions : unsigned {
+    None = 0,
+    NoResize = 1 << 0,
+    NoMove = 1 << 1,
+    NoClose = 1 << 2,
+    NoUndock = 1 << 3
+};
+
+constexpr EWindowOptions operator|(EWindowOptions a, EWindowOptions b)
+{
+    return static_cast<EWindowOptions>(static_cast<unsigned>(a) | static_cast<unsigned>(b));
+}
+
+constexpr EWindowOptions operator&(EWindowOptions a, EWindowOptions b)
+{
+    return static_cast<EWindowOptions>(static_cast<unsigned>(a) & static_cast<unsigned>(b));
+}
+
+constexpr EWindowOptions& operator|=(EWindowOptions& a, EWindowOptions b)
+{
+    a = a | b;
+    return a;
+}
+
 struct SWindowStyle {
     std::uint32_t frame = 0x707070;
     std::uint32_t title = 0xA0A0A0;
@@ -83,6 +109,9 @@ struct SWindowLayout {
     // group share a frame and show as tabs of it, 0 for none
     std::uint64_t tab_group = 0;
 
+    // Zero spans the available width (top/bottom) or height (left/right).
+    std::size_t dock_cross_size = 0;
+
     bool operator==(const SWindowLayout&) const = default;
 };
 
@@ -105,8 +134,10 @@ private:
     std::optional<std::string> frame_title;
     SRect floating;
     Size min_size;
+    EWindowOptions options;
     EDock dock = EDock::None;
     std::size_t dock_size = 0;
+    std::size_t dock_cross_size = 0;
 
     // When it was docked: windows docked first are laid out nearest to
     // the edge
@@ -127,10 +158,26 @@ private:
 public:
     // A window that floats at first where it is given, and is never made
     // smaller than its minimum size, frame included
-    CWindow(std::string a_title, const SRect& a_floating, Size a_min_size = Size(12, 3))
+    CWindow(std::string a_title, const SRect& a_floating, Size a_min_size = Size(12, 3),
+            EWindowOptions a_options = EWindowOptions::None)
         : title(std::move(a_title)), floating(a_floating),
-          min_size(std::max<std::size_t>(a_min_size.x, 5), std::max<std::size_t>(a_min_size.y, 3))
+          min_size(std::max<std::size_t>(a_min_size.x, 5), std::max<std::size_t>(a_min_size.y, 3)), options(a_options)
     {
+    }
+
+    CWindow(std::string title, const SRect& floating, EWindowOptions options, Size min_size = Size(12, 3))
+        : CWindow(std::move(title), floating, min_size, options)
+    {
+    }
+
+    [[nodiscard]] bool hasOption(EWindowOptions option) const
+    {
+        return (options & option) != EWindowOptions::None;
+    }
+
+    [[nodiscard]] EWindowOptions getOptions() const
+    {
+        return options;
     }
 
     CWindow(const CWindow&) = delete;
@@ -259,7 +306,8 @@ private:
         ResizeRight,
         ResizeBottom,
         ResizeCorner,
-        ResizeDock
+        ResizeDock,
+        ResizeDockCross
     };
 
     // A window being dragged, and where it was taken hold of, from the
@@ -564,30 +612,45 @@ private:
         const bool left = pos.x == frame.corner.x;
         const bool right = pos.x + 1 == frame.Right();
 
+        const bool resizable = !window.hasOption(EWindowOptions::NoResize);
+
         if (window.dock == EDock::None) {
-            if (top) {
-                return EGrab::Move;
-            }
-
-            if (bottom && right) {
-                return EGrab::ResizeCorner;
-            }
-
-            if (right) {
+            // Keep a resize target at the top-right corner too: the side
+            // border may contain an interactive scrollbar.
+            if (resizable && top && right) {
                 return EGrab::ResizeRight;
             }
 
-            if (bottom) {
+            if (top) {
+                return window.hasOption(EWindowOptions::NoMove) ? std::nullopt : std::optional(EGrab::Move);
+            }
+
+            if (resizable && bottom && right) {
+                return EGrab::ResizeCorner;
+            }
+
+            if (resizable && right) {
+                return EGrab::ResizeRight;
+            }
+
+            if (resizable && bottom) {
                 return EGrab::ResizeBottom;
             }
 
             return std::nullopt;
         }
 
+        // A docked window may shrink across its edge without becoming
+        // floating. Corners remain available when scrollbars occupy sides.
+        if (resizable && ((Vertical(window.dock) && right) || (!Vertical(window.dock) && bottom))) {
+            return EGrab::ResizeDockCross;
+        }
+
         // A docked window is taken by its title to float it again, and by
         // its inner edge to resize it
         if (top && pos.x > frame.corner.x && pos.x < frame.corner.x + 3 + window.getFrameTitle().size()) {
-            if (!allow_tab_undocking && window.tab_group != 0) {
+            if (window.hasOption(EWindowOptions::NoUndock) || window.hasOption(EWindowOptions::NoMove) ||
+                    (!allow_tab_undocking && window.tab_group != 0)) {
                 return std::nullopt;
             }
 
@@ -597,7 +660,7 @@ private:
         const bool inner = (window.dock == EDock::Bottom && top) || (window.dock == EDock::Top && bottom) ||
                            (window.dock == EDock::Left && right) || (window.dock == EDock::Right && left);
 
-        return inner ? std::optional(EGrab::ResizeDock) : std::nullopt;
+        return inner && resizable ? std::optional(EGrab::ResizeDock) : std::nullopt;
     }
 
     // Off the area, the mouse is taken to be at its edge
@@ -646,6 +709,10 @@ private:
     // - and a small one large, filling the area.
     void ToggleSize(CWindow& window)
     {
+        if (window.hasOption(EWindowOptions::NoResize)) {
+            return;
+        }
+
         if (window.dock == EDock::None) {
             const SRect& frame = window.frame;
             const bool wide = frame.size.x >= area.size.x;
@@ -732,7 +799,7 @@ private:
         }
 
         if (pos.y == frame.corner.y && pos.x + 2 == frame.Right()) {
-            if (allow_tab_closing || window.tab_group == 0) {
+            if (!window.hasOption(EWindowOptions::NoClose) && (allow_tab_closing || window.tab_group == 0)) {
                 Close(window);
             }
 
@@ -828,6 +895,21 @@ private:
             floating = Clamp(floating, window.min_size);
             break;
 
+        case EGrab::ResizeDockCross: {
+            const bool vertical = Vertical(window.dock);
+            const std::size_t at = vertical ? pos.x : pos.y;
+            const std::size_t corner = vertical ? window.frame.corner.x : window.frame.corner.y;
+            const std::size_t least = vertical ? window.min_size.x : window.min_size.y;
+            const std::size_t size = std::max(at + 1, corner + least) - corner;
+            window.dock_cross_size = size;
+
+            for (CWindow* member : TabGroup(window)) {
+                member->dock_cross_size = size;
+            }
+
+            break;
+        }
+
         case EGrab::ResizeDock: {
             const SRect& frame = window.frame;
             std::size_t size = 0;
@@ -892,10 +974,10 @@ private:
         screen.Put(frame.corner.x, frame.corner.y, U'┌', colour);
         screen.Put(right, frame.corner.y, U'┐', colour);
         screen.Put(frame.corner.x, bottom, U'└', colour);
-        screen.Put(right, bottom, window.dock == EDock::None ? U'◢' : U'┘', colour);
+        screen.Put(right, bottom, window.dock == EDock::None && !window.hasOption(EWindowOptions::NoResize) ? U'◢' : U'┘', colour);
 
         // Reserve room for the close button only when closing is enabled.
-        const bool closable = allow_tab_closing || window.tab_group == 0;
+        const bool closable = !window.hasOption(EWindowOptions::NoClose) && (allow_tab_closing || window.tab_group == 0);
 
         if (closable) {
             screen.Put(right - 1, frame.corner.y, U'×', colour);
@@ -1104,6 +1186,7 @@ public:
     void Dock(CWindow& window, EDock dock, std::size_t size)
     {
         window.dock = dock;
+        window.dock_cross_size = 0;
         window.dock_size = std::max(size, Vertical(dock) ? window.min_size.y : window.min_size.x);
         window.docked_at = next_docked_at++;
     }
@@ -1134,13 +1217,14 @@ public:
     // Where a window is and how it is shown
     [[nodiscard]] SWindowLayout getLayout(const CWindow& window) const
     {
-        return {IsOpen(window), window.dock, window.dock_size, window.docked_at, window.floating, window.tab_group};
+        return {IsOpen(window), window.dock, window.dock_size, window.docked_at, window.floating, window.tab_group, window.dock_cross_size};
     }
 
     // Puts a window where a layout says, opening or closing it
     void setLayout(CWindow& window, const SWindowLayout& layout)
     {
         window.floating = layout.floating;
+        window.dock_cross_size = layout.dock_cross_size;
         window.dock = layout.dock;
         window.dock_size = layout.dock == EDock::None ? layout.dock_size :
                            std::max(layout.dock_size, Vertical(layout.dock) ? window.min_size.y : window.min_size.x);
@@ -1199,11 +1283,13 @@ public:
             std::size_t least = 0;
             std::size_t least_across = 0;
             std::size_t wanted = 0;
+            std::size_t wanted_across = 0;
 
             for (CWindow* member : slot) {
                 least = std::max(least, vertical ? member->min_size.y : member->min_size.x);
                 least_across = std::max(least_across, vertical ? member->min_size.x : member->min_size.y);
                 wanted = std::max(wanted, member->dock_size);
+                wanted_across = std::max(wanted_across, member->dock_cross_size == 0 ? across : member->dock_cross_size);
             }
 
             // No room for it: it is not shown until there is
@@ -1222,28 +1308,29 @@ public:
             }
 
             const std::size_t size = std::min(wanted, room);
+            const std::size_t cross_size = std::min(std::max(wanted_across, least_across), across);
             SRect frame{free.corner, Size(0, 0)};
 
             switch (window->dock) {
             case EDock::Top:
-                frame = {free.corner, Size(free.size.x, size)};
+                frame = {free.corner, Size(cross_size, size)};
                 free.corner.y += size;
                 free.size.y -= size;
                 break;
 
             case EDock::Bottom:
-                frame = {Position(free.corner.x, free.Bottom() - size), Size(free.size.x, size)};
+                frame = {Position(free.corner.x, free.Bottom() - size), Size(cross_size, size)};
                 free.size.y -= size;
                 break;
 
             case EDock::Left:
-                frame = {free.corner, Size(size, free.size.y)};
+                frame = {free.corner, Size(size, cross_size)};
                 free.corner.x += size;
                 free.size.x -= size;
                 break;
 
             case EDock::Right:
-                frame = {Position(free.Right() - size, free.corner.y), Size(size, free.size.y)};
+                frame = {Position(free.Right() - size, free.corner.y), Size(size, cross_size)};
                 free.size.x -= size;
                 break;
 

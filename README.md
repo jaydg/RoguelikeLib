@@ -63,6 +63,16 @@ The list widget and feature demo's map views support dragging both axes.
 Dragging a list's vertical thumb keeps its selection within the visible
 rows without activating it; horizontal dragging reveals clipped labels.
 
+Window constructors accept `EWindowOptions`, combined with `|`, for
+`NoResize`, `NoMove`, `NoClose`, and `NoUndock`. For example,
+`CWindow(title, rect, EWindowOptions::NoResize | EWindowOptions::NoClose)`.
+Existing constructor calls retain unrestricted behavior. `CListWindow`
+accepts these options after its labels. Full-width windows remain
+resizable: use the right border or top-right corner (outside scrollbar
+tracks). Docked windows can shrink across their dock edge while retaining
+their tab group; `NoResize` disables resize drags and title double-click
+resizing. Explicit layout changes remain available.
+
 Windows receive keyboard input by overriding `CWindow::HandleKey(const SKey&)`
 and returning whether they consumed it. Call `windows.HandleKey(key)` from
 the event loop; a false result lets the application handle global shortcuts.
