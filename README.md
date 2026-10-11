@@ -55,6 +55,9 @@ Mouse, resize, closure, and timeout events are not routed as keyboard input.
 Call `windows.setAllowTabUndocking(false)` to prevent dragging a docked
 tab's title out of its group. This option defaults to true; the feature
 demo disables it. Tab selection and explicit layout changes still work.
+`windows.setAllowTabClosing(false)` hides close buttons for tab-group
+windows and disables clicks on their former positions. It defaults to true;
+the feature demo disables it. Explicit `Close`/`Toggle` calls still work.
 
 `rtui.terminal` provides the POSIX terminal layer adapted from Roguevalley:
 `RL::CTerminal` owns raw input mode, the alternate screen, cursor visibility,

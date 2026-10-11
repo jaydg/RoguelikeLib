@@ -211,6 +211,7 @@ private:
 
     SWindowStyle style;
     bool allow_tab_undocking = true;
+    bool allow_tab_closing = true;
     std::uint64_t next_docked_at = 1;
     std::uint64_t next_tab_group = 1;
 
@@ -587,7 +588,10 @@ private:
         }
 
         if (pos.y == frame.corner.y && pos.x + 2 == frame.Right()) {
-            Close(window);
+            if (allow_tab_closing || window.tab_group == 0) {
+                Close(window);
+            }
+
             return;
         }
 
@@ -746,9 +750,14 @@ private:
         screen.Put(frame.corner.x, bottom, U'└', colour);
         screen.Put(right, bottom, window.dock == EDock::None ? U'◢' : U'┘', colour);
 
-        // The title, cut short before the ×
-        screen.Put(right - 1, frame.corner.y, U'×', colour);
-        screen.setClip({Position(frame.corner.x + 1, frame.corner.y), Size(frame.size.x - 3, 1)});
+        // Reserve room for the close button only when closing is enabled.
+        const bool closable = allow_tab_closing || window.tab_group == 0;
+
+        if (closable) {
+            screen.Put(right - 1, frame.corner.y, U'×', colour);
+        }
+
+        screen.setClip({Position(frame.corner.x + 1, frame.corner.y), Size(frame.size.x - (closable ? 3 : 2), 1)});
         screen.Print(frame.corner.x + 1, frame.corner.y, " " + window.title + " ", focused ? style.focused_title : style.title);
         screen.resetClip();
     }
@@ -796,6 +805,18 @@ private:
     }
 
 public:
+    // Whether tab-group windows show and respond to a close button.
+    // Enabled by default. Explicit Close/Toggle calls remain available.
+    void setAllowTabClosing(bool allow)
+    {
+        allow_tab_closing = allow;
+    }
+
+    [[nodiscard]] bool getAllowTabClosing() const
+    {
+        return allow_tab_closing;
+    }
+
     // Whether dragging a docked tab's title can tear it out of its group.
     // Enabled by default. Explicit Dock/Untab calls remain available.
     void setAllowTabUndocking(bool allow)
