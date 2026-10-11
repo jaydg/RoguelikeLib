@@ -136,7 +136,9 @@ regenerates it. The mouse wheel scrolls the map viewport. `R` regenerates any ma
 pans the map. In FOV, arrows or a floor click move the observer. In Distance
 map, click a floor to move the goal. Enter/Space steps the Scheduler or
 advances the Calendar by 30 minutes; `D` advances one day. `Q` or Escape
-quits. Resize the terminal to change the viewport. All tab labels fit at
+quits. Resize the terminal to change the viewport. Maps remain at least 79
+columns wide and expand to fill wider map viewports; a change in map width
+regenerates the map. Map height remains 50 rows. All tab labels fit at
 about 105 columns; keyboard selection works on smaller terminals too.
 
 Pass a seed with `xmake run demo-features 123` for a reproducible sequence

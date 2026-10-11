@@ -298,11 +298,6 @@ public:
             return;
         }
 
-        if (!ready) {
-            Generate();
-        }
-
-        screen.Print(inside.corner.x, inside.corner.y, detail);
         map_area = {Position(inside.corner.x, inside.corner.y + 1), Size(inside.size.x, inside.size.y - 1)};
         list_area = {};
 
@@ -314,6 +309,20 @@ public:
             map_area.size.x -= std::min(width + 1, map_area.size.x);
         }
 
+        // Keep the default map on small terminals; wide viewports use all
+        // available columns. A changed width needs a newly generated map.
+        const std::size_t map_width = std::max<std::size_t>(79, map_area.size.x);
+
+        if (level.getWidth() != map_width) {
+            level = CMap(Size(map_width, 50));
+            ready = false;
+        }
+
+        if (!ready) {
+            Generate();
+        }
+
+        screen.Print(inside.corner.x, inside.corner.y, detail);
         origin = scroll_origin.value_or(CameraOrigin(level.getSize(), map_area.size, focus));
         origin.x = std::min(origin.x, level.getWidth() > map_area.size.x ? level.getWidth() - map_area.size.x : 0);
         origin.y = std::min(origin.y, level.getHeight() > map_area.size.y ? level.getHeight() - map_area.size.y : 0);
