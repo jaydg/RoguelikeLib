@@ -41,27 +41,42 @@ export namespace RL
     return Position(area.corner.x + (pos.x - origin.x), area.corner.y + (pos.y - origin.y));
 }
 
+// Draws a map of a size from origin into area, each position as `cell`
+// says: the cell to put there, or nothing, which leaves the screen as it
+// is there - for what is not known, say. It is asked only about positions
+// on the map, in the area, and on the screen. Respects the screen's
+// existing clip. What the map shows is up to the caller: light, what is
+// remembered, who stands where.
+void DrawMap(CScreen& screen, Size map, const SRect& area, Position origin,
+             const std::function<std::optional<SCell>(Position)>& cell)
+{
+    const Size size = screen.getSize();
+
+    if (origin.x >= map.x || origin.y >= map.y || area.corner.x >= size.x || area.corner.y >= size.y) {
+        return;
+    }
+
+    const std::size_t width = std::min({area.size.x, map.x - origin.x, size.x - area.corner.x});
+    const std::size_t height = std::min({area.size.y, map.y - origin.y, size.y - area.corner.y});
+
+    for (std::size_t y = 0; y < height; ++y) {
+        for (std::size_t x = 0; x < width; ++x) {
+            if (const auto shown = cell(Position(origin.x + x, origin.y + y))) {
+                screen.Put(area.corner.x + x, area.corner.y + y, shown->glyph, shown->rgb, shown->bold, shown->inverse);
+            }
+        }
+    }
+}
+
 // Draws tiles from origin into area, using their glyphs and colours.
 // Respects the screen's existing clip. Cells outside the map are left
 // untouched; the caller can clear the screen or draw a background first.
 void DrawMap(CScreen& screen, const CMap& map, const SRect& area, Position origin = Position(0, 0))
 {
-    const Size size = screen.getSize();
-
-    if (origin.x >= map.getWidth() || origin.y >= map.getHeight() ||
-            area.corner.x >= size.x || area.corner.y >= size.y) {
-        return;
-    }
-
-    const std::size_t width = std::min({area.size.x, map.getWidth() - origin.x, size.x - area.corner.x});
-    const std::size_t height = std::min({area.size.y, map.getHeight() - origin.y, size.y - area.corner.y});
-
-    for (std::size_t y = 0; y < height; ++y) {
-        for (std::size_t x = 0; x < width; ++x) {
-            const auto& tile = map.get(origin.x + x, origin.y + y);
-            screen.Put(area.corner.x + x, area.corner.y + y, tile.getGlyph(), tile.getColor());
-        }
-    }
+    DrawMap(screen, map.getSize(), area, origin, [&map](Position pos) {
+        const auto& tile = map.get(pos.x, pos.y);
+        return std::optional<SCell>(SCell{tile.getGlyph(), tile.getColor()});
+    });
 }
 
 void PrintMap(const CMap& map)
