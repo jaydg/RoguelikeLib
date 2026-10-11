@@ -1,7 +1,9 @@
 // A selectable, scrolling list for menus such as a generator browser. Its
 // items are literal text, or, if it is told so, text with colour markup as
 // the screen prints it (see rtui.screen). An item may be disabled: it shows
-// dimmed, and can be selected, to look at it, but not activated.
+// dimmed, and can be selected, to look at it, but not activated. An item
+// may have a key of its own, a letter, say, shown before it, which selects
+// and activates it.
 module;
 
 export module rtui.list;
@@ -32,6 +34,29 @@ private:
 
     // Which items are disabled, by index
     std::vector<bool> disabled;
+
+    // The key of each item, by index, 0 for none; and whether every new
+    // list of items is given the letters a to z, then A to Z
+    std::vector<char32_t> shortcuts;
+    bool letters = false;
+
+    // The columns before the items, for their keys, if they have any
+    [[nodiscard]] std::size_t KeyColumns() const
+    {
+        return std::ranges::any_of(shortcuts, [](char32_t key) {
+            return key != 0;
+        }) ? 2 : 0;
+    }
+
+    // The letters a to z, then A to Z, as keys of the items, in order
+    void GiveLetters()
+    {
+        const std::u32string_view alphabet = U"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+        for (std::size_t index = 0; index < shortcuts.size(); ++index) {
+            shortcuts[index] = index < alphabet.size() ? alphabet[index] : 0;
+        }
+    }
 
     // How bright a disabled item shows, per cent of its colours
     static constexpr int disabled_brightness = 50;
@@ -105,6 +130,12 @@ public:
     {
         items = std::move(labels);
         disabled.assign(items.size(), false);
+        shortcuts.assign(items.size(), 0);
+
+        if (letters) {
+            GiveLetters();
+        }
+
         selected = items.empty() ? std::nullopt : std::optional<std::size_t> {0};
         first = 0;
         horizontal = 0;
@@ -128,6 +159,32 @@ public:
     [[nodiscard]] bool isEnabled(std::size_t index) const
     {
         return index < disabled.size() && !disabled[index];
+    }
+
+    // Gives an item a key that selects and activates it - a letter, say -
+    // shown before it; 0 takes the key away. A new list of items has none,
+    // unless it is given letters.
+    void setShortcut(std::size_t index, char32_t key)
+    {
+        if (index < shortcuts.size()) {
+            shortcuts[index] = key;
+        }
+    }
+
+    [[nodiscard]] char32_t getShortcut(std::size_t index) const
+    {
+        return index < shortcuts.size() ? shortcuts[index] : 0;
+    }
+
+    // Gives the items, and every new list of them, the letters a to z, then
+    // A to Z, in order, as their keys; or no longer gives them letters
+    void setLetterShortcuts(bool give = true)
+    {
+        letters = give;
+
+        if (letters) {
+            GiveLetters();
+        }
     }
 
     // Whether the items are text with colour markup - "<#ffd24a>", or the
@@ -204,23 +261,32 @@ public:
         KeepSelectionVisible();
         setScrollOffset(Position(horizontal, first));
 
+        // The keys of the items in a column of their own, which stays where
+        // it is when the items are scrolled sideways
+        const std::size_t keys = KeyColumns();
+
         for (std::size_t row = 0; row < view.y && row < items.size() - first; ++row) {
             const std::size_t index = first + row;
             const bool inverse = selected == index;
+            const std::size_t y = inside.corner.y + row;
 
             // Fill the row so the highlight extends through trailing blanks.
             for (std::size_t x = 0; x < view.x; ++x) {
-                screen.Put(inside.corner.x + x, inside.corner.y + row, U' ', screen.getTextColour(), false, inverse);
+                screen.Put(inside.corner.x + x, y, U' ', screen.getTextColour(), false, inverse);
             }
 
-            const std::size_t end = screen.Print(inside.corner.x, inside.corner.y + row, Markup(items[index]), horizontal,
-                                                 screen.getTextColour(), false, inverse);
+            if (keys > 0 && shortcuts[index] != 0) {
+                screen.Put(inside.corner.x, y, shortcuts[index], screen.getTextColour(), true, inverse);
+            }
 
-            // A disabled item dimmed, as far as it was drawn
-            if (!isEnabled(index) && inside.corner.y + row < screen.getSize().y) {
+            const std::size_t end = keys < view.x ? screen.Print(inside.corner.x + keys, y, Markup(items[index]), horizontal,
+                                                                 screen.getTextColour(), false, inverse) : inside.corner.x + keys;
+
+            // A disabled item dimmed, its key with it, as far as it was drawn
+            if (!isEnabled(index) && y < screen.getSize().y) {
                 for (std::size_t x = inside.corner.x; x < std::min({end, inside.corner.x + view.x, screen.getSize().x}); ++x) {
-                    const SCell cell = screen.At(x, inside.corner.y + row);
-                    screen.Put(x, inside.corner.y + row, cell.glyph, Dim(cell.rgb, disabled_brightness), cell.bold, cell.inverse);
+                    const SCell cell = screen.At(x, y);
+                    screen.Put(x, y, cell.glyph, Dim(cell.rgb, disabled_brightness), cell.bold, cell.inverse);
                 }
             }
         }
@@ -228,7 +294,7 @@ public:
 
     [[nodiscard]] std::optional<SScrollInfo> getScrollInfo() const override
     {
-        return SScrollInfo{Size(widest, items.size()), view, Position(horizontal, first)};
+        return SScrollInfo{Size(widest + KeyColumns(), items.size()), view, Position(horizontal, first)};
     }
 
     [[nodiscard]] bool supportsScrollDragging() const override
@@ -253,6 +319,20 @@ public:
     {
         if (!selected) {
             return false;
+        }
+
+        // An item's own key selects it, and activates it unless it is
+        // disabled
+        if (key.type == EKey::Char && key.ch != 0) {
+            const auto found = std::ranges::find(shortcuts, key.ch);
+
+            if (found == shortcuts.end()) {
+                return false;
+            }
+
+            Select(static_cast<std::size_t>(found - shortcuts.begin()));
+            Activate();
+            return true;
         }
 
         switch (key.type) {

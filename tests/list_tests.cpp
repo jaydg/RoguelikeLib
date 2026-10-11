@@ -107,3 +107,51 @@ void TestListFollowed()
     list.setItems({});
     Check(followed == std::vector<std::size_t> {0}, "a new list is followed from its first item; an empty one has none");
 }
+
+// Items with keys of their own: typed, a key selects its item, and
+// activates it unless it is disabled
+void TestListShortcuts()
+{
+    RL::CScreen screen(RL::Size(10, 3));
+    const RL::SRect inside{RL::Position(0, 0), RL::Size(10, 3)};
+    RL::CListWindow list("Items", inside, {"one", "two", "three"});
+    std::vector<std::size_t> activated;
+    list.setOnActivate([&](std::size_t index) {
+        activated.push_back(index);
+    });
+    const auto type = [&](char32_t key) {
+        return list.HandleKey(RL::SKey{RL::EKey::Char, key, {}});
+    };
+
+    list.Draw(screen, inside);
+    Check(Row(screen, 0) == U"one       " && list.getShortcut(0) == 0 && !type(U'a'),
+          "without keys, items show as they are, and a letter is not taken");
+
+    list.setLetterShortcuts();
+    list.setEnabled(2, false);
+    list.Draw(screen, inside);
+    Check(list.getShortcut(0) == U'a' && list.getShortcut(2) == U'c' && Row(screen, 1) == U"b two     " &&
+          screen.At(0, 1).bold && !screen.At(2, 1).bold, "given letters, they show their keys before them");
+    Check(type(U'b') && list.getSelected() == std::optional<std::size_t>(1) && activated == std::vector<std::size_t> {1},
+          "a key typed selects and activates its item");
+    Check(type(U'c') && list.getSelected() == std::optional<std::size_t>(2) && activated.size() == 1,
+          "a disabled one it only selects");
+    Check(!type(U'z') && list.getSelected() == std::optional<std::size_t>(2), "a key no item has is not taken");
+
+    list.setShortcut(0, U'x');
+    Check(type(U'x') && activated.back() == 0 && !type(U'a'), "an item can be given a key of its own");
+
+    list.setItems({"new", "long item, wider than the list"});
+    Check(list.getShortcut(0) == U'a' && list.getShortcut(1) == U'b', "a new list is given letters again");
+
+    // Scrolled sideways, the keys stay where they are
+    list.Draw(screen, inside);
+    list.setScrollOffset(RL::Position(5, 0));
+    list.Draw(screen, inside);
+    Check(Row(screen, 1).substr(0, 7) == U"b item," && list.getScrollInfo()->content.x == 32,
+          "scrolled sideways, the keys stay, and only the items move");
+
+    list.setLetterShortcuts(false);
+    list.setItems({"plain"});
+    Check(list.getShortcut(0) == 0, "no longer given letters, a new list has no keys");
+}

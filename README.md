@@ -57,6 +57,11 @@ it, but Enter and clicks do not activate it; `isEnabled(index)` tells.
 the callback is told the index of every item selected, by the keys, the
 wheel, a click, dragging the scroll bar or `Select()`, and of the first
 item of every new list - to show the selected item beside the list, say.
+`setShortcut(index, key)` gives an item a key of its own, shown in bold in a
+column before the items, which stays when they scroll sideways; typed, it
+selects the item and activates it, unless it is disabled. A key no item
+has is not taken. `setLetterShortcuts()` gives the items, and every new
+list of them, the letters a to z, then A to Z.
 
 Windows can override `getScrollInfo()` to report `SScrollInfo{content,
 viewport, offset}` in cells. The manager draws proportional position
