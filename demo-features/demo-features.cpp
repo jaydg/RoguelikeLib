@@ -127,6 +127,7 @@ private:
     CListWindow list{"Generators", {Position(0, 0), Size(30, 10)}};
     CMap level{Size(79, 50)};
     bool ready = false;
+    bool paused = false;
     std::size_t generated = 0;
     Position focus{0, 0};
     Position origin{0, 0};
@@ -229,6 +230,18 @@ private:
     }
 
 public:
+    [[nodiscard]] bool IsRunning() const
+    {
+        return mode >= 4 && !paused;
+    }
+
+    void Tick()
+    {
+        if (IsRunning()) {
+            Step();
+        }
+    }
+
     CFeatureWindow(std::string title, int a_mode)
         : CWindow(std::move(title),
     {
@@ -273,7 +286,7 @@ public:
 
         if (mode >= 4) {
             if (mode == 4) {
-                screen.Print(inside.corner.x, inside.corner.y, "Enter/Space: next actor | hare 50, fox 100, snail 400 ticks");
+                screen.Print(inside.corner.x, inside.corner.y, std::format("{} | Enter/Space: {} | one actor/second", paused ? "Paused" : "Running", paused ? "continue" : "pause"));
                 const std::size_t rows = inside.size.y - 1;
                 const std::size_t first = history.size() > rows ? history.size() - rows : 0;
 
@@ -283,7 +296,7 @@ public:
             } else {
                 const SDate date = calendar.DateOf(clock.Day());
                 const std::vector<std::string> lines = {
-                    "Enter/Space: advance 30 minutes | D: advance one day",
+                    std::format("{} | Enter/Space: {} | 30 minutes/second | D: next day", paused ? "Paused" : "Running", paused ? "continue" : "pause"),
                     std::format("Year {}, {} of {}", date.year, Ordinal(date.day), calendar.PartName(date.part)),
                     std::format("Time: {} ({})", clock.ToString(), phases.At(clock)),
                     std::format("Elapsed: {} days / {} minutes", clock.Day(), clock.Minutes()),
@@ -393,7 +406,7 @@ public:
         }
 
         if (mode >= 4 && (key.type == EKey::Enter || (key.type == EKey::Char && key.ch == U' '))) {
-            Step();
+            paused = !paused;
             return true;
         }
 
@@ -511,11 +524,29 @@ int main(int argc, char* argv[])
 
         windows.Focus(*tabs.front());
         std::size_t active = 0;
+        CFeatureWindow* ticking = nullptr;
+        auto next_tick = std::chrono::steady_clock::now();
 
         for (;;) {
             screen.Resize(terminal.getSize());
             screen.Clear();
             const Size size = screen.getSize();
+            CFeatureWindow* visible_timer = nullptr;
+
+            if (size.x >= 40 && size.y >= 10 && tabs[active]->IsRunning() && windows.getFocused() == tabs[active].get()) {
+                visible_timer = tabs[active].get();
+            }
+
+            const auto now = std::chrono::steady_clock::now();
+
+            if (visible_timer != ticking) {
+                ticking = visible_timer;
+                next_tick = now + std::chrono::seconds(1);
+            } else if (ticking != nullptr && now >= next_tick) {
+                ticking->Tick();
+                next_tick = now + std::chrono::seconds(1);
+            }
+
 
             if (size.x < 40 || size.y < 10) {
                 screen.Print(0, 0, "Resize to at least 40x10; Q quits");
@@ -527,7 +558,9 @@ int main(int argc, char* argv[])
 
             terminal.Write(screen.Compose(false, displayed ? &*displayed : nullptr));
             displayed = screen;
-            const SKey key = terminal.ReadKey();
+            const int timeout_ms = ticking == nullptr ? -1 : static_cast<int>(std::max<std::int64_t>(1,
+                                                                                                     std::chrono::duration_cast<std::chrono::milliseconds>(next_tick - std::chrono::steady_clock::now()).count()));
+            const SKey key = terminal.ReadKey(timeout_ms);
 
             if (key.type == EKey::Closed || key.type == EKey::Escape ||
                     (key.type == EKey::Char && (key.ch == U'q' || key.ch == U'Q' || key.ch == 3))) {

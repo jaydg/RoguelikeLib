@@ -149,8 +149,11 @@ Use `1`–`6`, Tab, or click a tab to switch. In Map generators, select a
 generator with Up/Down, Home/End, PageUp/PageDown, or a click; Enter
 regenerates it. The mouse wheel scrolls the map viewport. `R` regenerates any map demo, and `h/j/k/l`
 pans the map. In FOV, arrows or a floor click move the observer. In Distance
-map, click a floor to move the goal. Enter/Space steps the Scheduler or
-advances the Calendar by 30 minutes; `D` advances one day. `Q` or Escape
+map, click a floor to move the goal. Scheduler and Calendar advance automatically once per second while
+visible. Enter/Space toggles pause/continue independently for each tab;
+Calendar advances 30 minutes per tick, and `D` advances one day. Hidden
+tabs and tabs obscured by the small-terminal message do not advance.
+Resuming starts a fresh one-second interval without catching up. `Q` or Escape
 quits. Resize the terminal to change the viewport. Maps remain at least 79
 columns wide and expand to fill wider map viewports; a change in map width
 regenerates the map. Map height remains 50 rows. All tab labels fit at
