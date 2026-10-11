@@ -20,6 +20,7 @@ void TestDoubleClick();
 void TestNarrowTabs();
 void TestListMarkup();
 void TestListDisabled();
+void TestListFollowed();
 
 int main(int argc, char* argv[])
 {
@@ -41,7 +42,8 @@ int main(int argc, char* argv[])
         {"DoubleClick", TestDoubleClick},
         {"NarrowTabs", TestNarrowTabs},
         {"ListMarkup", TestListMarkup},
-        {"ListDisabled", TestListDisabled}
+        {"ListDisabled", TestListDisabled},
+        {"ListFollowed", TestListFollowed}
     };
     const std::vector<std::string_view> named(argv + 1, argv + argc);
 

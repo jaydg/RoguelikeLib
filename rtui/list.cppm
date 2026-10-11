@@ -22,6 +22,9 @@ private:
     Size view{0, 0};
     std::function<void(std::size_t)> on_activate;
 
+    // Who follows the selection, told of each item selected
+    std::function<void(std::size_t)> on_select;
+
     // Whether the items are text with colour markup, rather than literal
     // text; and the widest of them, as drawn last
     bool markup = false;
@@ -48,6 +51,17 @@ private:
         }
 
         return text;
+    }
+
+    // Tells whoever follows the selection of the item selected now, if it
+    // is another than before - or, for a new list, whichever it is
+    void Followed(std::optional<std::size_t> before, bool new_items = false)
+    {
+        if (selected && (new_items || selected != before) && on_select) {
+            // The callback may replace items or the callback itself.
+            const auto callback = on_select;
+            callback(*selected);
+        }
     }
 
     void KeepSelectionVisible()
@@ -94,6 +108,7 @@ public:
         selected = items.empty() ? std::nullopt : std::optional<std::size_t> {0};
         first = 0;
         horizontal = 0;
+        Followed(std::nullopt, true);
     }
 
     [[nodiscard]] const std::vector<std::string>& getItems() const
@@ -139,9 +154,20 @@ public:
             return false;
         }
 
+        const auto before = selected;
         selected = index;
         KeepSelectionVisible();
+        Followed(before);
         return true;
+    }
+
+    // Follows the selection: the callback is told of every item selected,
+    // by the keys, the wheel, a click, dragging the scroll bar or Select(),
+    // and of the first of every new list of items - to show what it is,
+    // say, beside the list
+    void setOnSelect(std::function<void(std::size_t)> callback)
+    {
+        on_select = std::move(callback);
     }
 
     // Enter or a left click activates the selected item. Navigation only
@@ -217,7 +243,9 @@ public:
         first = std::min(offset.y, items.size() > view.y ? items.size() - view.y : 0);
 
         if (selected && view.y > 0) {
+            const auto before = selected;
             selected = std::clamp(*selected, first, first + std::min(view.y, items.size() - first) - 1);
+            Followed(before);
         }
     }
 

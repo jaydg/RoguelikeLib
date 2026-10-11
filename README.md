@@ -53,7 +53,10 @@ after `setMarkup(true)` they are text with colour markup, as `CScreen`
 prints it, and keep their colours when scrolled sideways. `setEnabled(index,
 false)` disables an item: it shows dimmed, and can be selected to look at
 it, but Enter and clicks do not activate it; `isEnabled(index)` tells.
-`setItems` enables all items again.
+`setItems` enables all items again. `setOnSelect(callback)` follows the selection:
+the callback is told the index of every item selected, by the keys, the
+wheel, a click, dragging the scroll bar or `Select()`, and of the first
+item of every new list - to show the selected item beside the list, say.
 
 Windows can override `getScrollInfo()` to report `SScrollInfo{content,
 viewport, offset}` in cells. The manager draws proportional position

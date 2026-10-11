@@ -73,3 +73,37 @@ void TestListDisabled()
     list.setItems({"new", "items"});
     Check(list.isEnabled(0) && list.isEnabled(1), "a new list of items has them all enabled");
 }
+
+// Whoever follows the selection is told of every item selected, however
+void TestListFollowed()
+{
+    const RL::SRect inside{RL::Position(0, 0), RL::Size(12, 3)};
+    RL::CListWindow list("Items", inside, {"zero", "one", "two", "three", "four", "five"});
+    std::vector<std::size_t> followed;
+    list.setOnSelect([&](std::size_t index) {
+        followed.push_back(index);
+    });
+
+    RL::CScreen screen(RL::Size(12, 3));
+    list.Draw(screen, inside);
+    list.HandleKey(RL::SKey{RL::EKey::Down, 0, {}});
+    list.HandleKey(RL::SKey{RL::EKey::End, 0, {}});
+    list.Scroll(-1);
+    list.Click(RL::Position(0, 0), RL::EMouseButton::Left);
+    list.Select(5);
+    Check(followed == std::vector<std::size_t> {1, 5, 4, 3, 5}, "keys, the wheel, a click and Select() are followed");
+
+    followed.clear();
+    list.Select(5);
+    list.Select(9);
+    list.HandleKey(RL::SKey{RL::EKey::Down, 0, {}});
+    Check(followed.empty(), "selecting what is selected already, or nothing, is not");
+
+    list.setScrollOffset(RL::Position(0, 0));
+    Check(followed == std::vector<std::size_t> {2}, "the scroll bar dragged away from the selection takes it along, and that is followed too");
+
+    followed.clear();
+    list.setItems({"new", "items"});
+    list.setItems({});
+    Check(followed == std::vector<std::size_t> {0}, "a new list is followed from its first item; an empty one has none");
+}
