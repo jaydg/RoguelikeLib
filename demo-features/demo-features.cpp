@@ -491,6 +491,7 @@ int main(int argc, char* argv[])
         CTileData::RegisterTile("pond", {U'≈', 0x3399FF, true, false});
         CTerminal terminal;
         CScreen screen;
+        std::optional<CScreen> displayed;
         CWindowManager windows;
         windows.setAllowTabUndocking(false);
         windows.setAllowTabClosing(false);
@@ -524,7 +525,8 @@ int main(int argc, char* argv[])
                 screen.Print(0, size.y - 1, "1-6/Tab: tabs | R: regenerate | hjkl: pan | Q: quit");
             }
 
-            terminal.Write(screen.Compose(false));
+            terminal.Write(screen.Compose(false, displayed ? &*displayed : nullptr));
+            displayed = screen;
             const SKey key = terminal.ReadKey();
 
             if (key.type == EKey::Closed || key.type == EKey::Escape ||

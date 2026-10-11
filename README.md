@@ -28,6 +28,11 @@ Import `rtui.map` and call `RL::PrintMap(map)` to print a map (previously
 `rl.tile` no longer re-exports it. The core library can be used without
 terminal UI dependencies.
 
+`CScreen::Compose(true_color, &previous_screen)` can emit only changed
+cells compared with the last displayed frame. Identical frames emit nothing;
+changed dimensions trigger a full redraw. The feature demo uses this to
+keep wheel scrolling responsive and avoid output at viewport boundaries.
+
 `rtui.map` also provides `DrawMap(screen, map, area, origin)`, which draws
 map tiles into a screen rectangle from a map offset (default `(0, 0)`).
 It respects the screen's clip and leaves cells outside the map untouched.

@@ -295,9 +295,15 @@ public:
     // top left corner. Colours go out as 24-bit values or as the nearest
     // of 256, and only when they change, which keeps a frame small enough
     // to be written at once; bold and inverse likewise, as escape sequences
-    // of their own.
-    [[nodiscard]] std::string Compose(bool true_color) const
+    // of their own. When a previous displayed screen is supplied, only
+    // changed cells are emitted; a size change forces a complete redraw.
+    [[nodiscard]] std::string Compose(bool true_color, const CScreen* previous = nullptr) const
     {
+        if (previous && previous->size == size && previous->cells == cells) {
+            return {};
+        }
+
+        const bool incremental = previous && previous->size == size;
         std::ostringstream out;
         out << (true_color ? stc::true_color : stc::color_256);
 
@@ -306,10 +312,20 @@ public:
         bool inverse = false;
 
         for (std::size_t y = 0; y < size.y; ++y) {
-            out << "\x1b[" << y + 1 << ";1H";
+            bool contiguous = false;
 
             for (std::size_t x = 0; x < size.x; ++x) {
                 const SCell& cell = cells[y * size.x + x];
+
+                if (incremental && cell == previous->cells[y * size.x + x]) {
+                    contiguous = false;
+                    continue;
+                }
+
+                if (!contiguous) {
+                    out << "\x1b[" << y + 1 << ';' << x + 1 << 'H';
+                    contiguous = true;
+                }
 
                 if (cell.bold != bold || cell.inverse != inverse) {
                     // An attribute taken off has to be reset, and a reset
