@@ -210,6 +210,7 @@ private:
     SRect area;
 
     SWindowStyle style;
+    bool allow_tab_undocking = true;
     std::uint64_t next_docked_at = 1;
     std::uint64_t next_tab_group = 1;
 
@@ -441,6 +442,10 @@ private:
         // A docked window is taken by its title to float it again, and by
         // its inner edge to resize it
         if (top && pos.x > frame.corner.x && pos.x < frame.corner.x + 3 + window.title.size()) {
+            if (!allow_tab_undocking && window.tab_group != 0) {
+                return std::nullopt;
+            }
+
             return EGrab::Undock;
         }
 
@@ -791,6 +796,22 @@ private:
     }
 
 public:
+    // Whether dragging a docked tab's title can tear it out of its group.
+    // Enabled by default. Explicit Dock/Untab calls remain available.
+    void setAllowTabUndocking(bool allow)
+    {
+        allow_tab_undocking = allow;
+
+        if (!allow && drag && drag->grab == EGrab::Undock && drag->window->tab_group != 0) {
+            drag.reset();
+        }
+    }
+
+    [[nodiscard]] bool getAllowTabUndocking() const
+    {
+        return allow_tab_undocking;
+    }
+
     void setStyle(const SWindowStyle& a_style)
     {
         style = a_style;

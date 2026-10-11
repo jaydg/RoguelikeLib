@@ -455,6 +455,7 @@ int main(int argc, char* argv[])
         CTerminal terminal;
         CScreen screen;
         CWindowManager windows;
+        windows.setAllowTabUndocking(false);
         std::vector<std::unique_ptr<CFeatureWindow>> tabs;
         const std::array titles = {"Map generators", "FOV", "Path finding", "Distance map", "Scheduler", "Calendar"};
 

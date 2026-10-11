@@ -52,6 +52,9 @@ The focused window is `windows.getFocused()`: opening, raising, or clicking
 focuses a window and activates its tab; closing it falls back to the next
 window on top. `windows.Focus(window)` explicitly focuses an open window.
 Mouse, resize, closure, and timeout events are not routed as keyboard input.
+Call `windows.setAllowTabUndocking(false)` to prevent dragging a docked
+tab's title out of its group. This option defaults to true; the feature
+demo disables it. Tab selection and explicit layout changes still work.
 
 `rtui.terminal` provides the POSIX terminal layer adapted from Roguevalley:
 `RL::CTerminal` owns raw input mode, the alternate screen, cursor visibility,
