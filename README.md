@@ -21,7 +21,7 @@ Xmake and depend on the `RTUI` target, which publicly depends on
 `RoguelikeLib`.
 
 The UI modules are `rtui.screen`, `rtui.windows`, `rtui.mouse`,
-`rtui.utf8`, `rtui.terminal`, and `rtui.map`; terminal colours are provided by `stc` in
+`rtui.utf8`, `rtui.terminal`, `rtui.list`, and `rtui.map`; terminal colours are provided by `stc` in
 `rtui/extern`. C++ types and functions retain their `RL` namespace.
 Import `rtui.map` and call `RL::PrintMap(map)` to print a map (previously
 `CMap::PrintMap()`). Import `rtui.utf8` explicitly when encoding glyphs;
@@ -35,6 +35,15 @@ It respects the screen's clip and leaves cells outside the map untouched.
 on a focus position and clamped to map edges. `OnScreen(area, origin, pos)`
 converts a map position to screen coordinates, returning `nullopt` outside
 the viewport. These viewport helpers are adapted from Roguevalley.
+
+`rtui.list` provides `CListWindow(title, floating_rect, labels)`, a selectable
+list that can be docked and focused through `CWindowManager`. Up/Down,
+Home/End and PageUp/PageDown move selection and keep it visible; the mouse
+wheel moves selection too. Enter or a left click activates an item through
+`setOnActivate(callback)`, passing its index. `getSelected()` returns an
+optional index; empty lists have no selection. `Select(index)` allows
+programmatic selection, and `setItems(labels)` replaces the list and resets
+selection. Labels are literal UTF-8 text, clipped to the content width.
 
 Windows receive keyboard input by overriding `CWindow::HandleKey(const SKey&)`
 and returning whether they consumed it. Call `windows.HandleKey(key)` from
