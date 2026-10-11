@@ -6,7 +6,9 @@
 //
 // Text can carry its colours as markup: "<#ffd24a>" switches to a colour
 // given outright, "<name>" to one registered with RegisterTag(), and "<<"
-// is a literal '<'. Anything else in angle brackets stays as written.
+// is a literal '<'. Anything else in angle brackets stays as written. Text
+// with markup is wrapped to a width between words, keeping its colour
+// across the breaks.
 //
 // A cell is bold or inverse on top of its colour, for text that has to
 // stand out from the rest: an inverse space is a filled cell.
@@ -150,6 +152,34 @@ private:
         return std::nullopt;
     }
 
+    // The last tag of a colour in text with markup, as written; or the one
+    // given, if there is none
+    [[nodiscard]] std::string LastTag(std::string_view markup, std::string before) const
+    {
+        std::size_t pos = markup.find('<');
+
+        while (pos != std::string_view::npos) {
+            if (markup.substr(pos, 2) == "<<") {
+                pos = markup.find('<', pos + 2);
+                continue;
+            }
+
+            const std::size_t close = markup.find('>', pos + 1);
+
+            if (close == std::string_view::npos) {
+                break;
+            }
+
+            if (TagColour(markup.substr(pos + 1, close - pos - 1))) {
+                before = std::string(markup.substr(pos, close - pos + 1));
+            }
+
+            pos = markup.find('<', pos + 1);
+        }
+
+        return before;
+    }
+
     // Walks through text with markup and calls `put` with each glyph and
     // the colour it is to be drawn in
     template <typename Put>
@@ -240,6 +270,46 @@ public:
         });
 
         return width;
+    }
+
+    // Breaks text with markup into lines no wider than given, between
+    // words. A line starts in the colour the one before it ended in, so a
+    // colour carries on across the break. A word wider than the width has a
+    // line of its own.
+    [[nodiscard]] std::vector<std::string> WrapText(std::string_view markup, std::size_t width) const
+    {
+        std::vector<std::string> lines;
+        std::string line;
+
+        // The colour the lines so far ended in, as its tag
+        std::string colour;
+        std::size_t pos = 0;
+
+        while (pos < markup.size()) {
+            const std::size_t end = std::min(markup.find(' ', pos), markup.size());
+            const std::string_view word = markup.substr(pos, end - pos);
+            pos = end + 1;
+
+            if (word.empty()) {
+                continue;
+            }
+
+            const std::string candidate = line.empty() ? std::string(word) : line + ' ' + std::string(word);
+
+            if (!line.empty() && TextWidth(candidate) > width) {
+                lines.push_back(line);
+                colour = LastTag(line, colour);
+                line = colour + std::string(word);
+            } else {
+                line = candidate;
+            }
+        }
+
+        if (!line.empty()) {
+            lines.push_back(line);
+        }
+
+        return lines;
     }
 
     [[nodiscard]] const SCell& At(std::size_t x, std::size_t y) const
