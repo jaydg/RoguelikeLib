@@ -523,26 +523,80 @@ private:
         std::size_t size = 0;  // cells the box takes, the ┌┐ included
     };
 
+    // How many columns text takes: its characters, which UTF-8 makes of
+    // one byte or several
+    [[nodiscard]] static std::size_t Columns(std::string_view text)
+    {
+        return static_cast<std::size_t>(std::ranges::count_if(text, [](char c) {
+            return (static_cast<unsigned char>(c) & 0xC0) != 0x80;
+        }));
+    }
+
     // Where each tab of a group is drawn. A tab is its window's title in
-    // a box, with a space after the frame before it and one between tabs;
-    // one that does not fit whole is shortened, one that does not fit at
-    // all is left out
+    // a box, a space either side of it, with a space after the frame before
+    // the first tab and one between tabs. When they do not all fit so, the
+    // strip is shared evenly: a tab shorter than its share keeps its size,
+    // and leaves the rest to the others, which are shortened alike. When
+    // even three columns a tab - a letter in its box - do not fit with the
+    // spaces, the spaces go; only then are the last left out.
     [[nodiscard]] std::vector<STab> TabsIn(const std::vector<CWindow*>& group, const SRect& frame) const
     {
-        std::vector<STab> tabs;
-        const std::size_t last = frame.Right() - 2;  // the last column the strip has
-        std::size_t x = frame.corner.x + 2;          // the frame's side, then a space
+        const std::size_t first = frame.corner.x + 1;  // the first column inside the frame
+        const std::size_t last = frame.Right() - 2;    // the last column the strip has
+        const std::size_t strip = last >= first ? last - first + 1 : 0;
+        const std::size_t count = group.size();
+        std::vector<std::size_t> sizes;
 
-        for (CWindow* window : group) {
-            const std::size_t room = x <= last ? last - x + 1 : 0;
-            const std::size_t size = std::min(window->title.size() + 4, room);
+        for (const CWindow* window : group) {
+            sizes.push_back(Columns(window->title) + 4);
+        }
 
-            if (size < 3) {
-                break;
+        // The spaces before and between the tabs, while there is room
+        // for them
+        const std::size_t spaced = count;
+        const bool spaces = strip >= spaced + 3 * count;
+        const std::size_t gaps = spaces ? spaced : 0;
+        const std::size_t room = strip > gaps ? strip - gaps : 0;
+        const std::size_t shown = std::min(count, room / 3);
+        std::size_t wanted = 0;
+
+        for (std::size_t index = 0; index < shown; ++index) {
+            wanted += sizes[index];
+        }
+
+        if (wanted > room) {
+            // Shared evenly, the shortest first, each keeping what it
+            // needs of its share
+            std::vector<std::size_t> order(shown);
+            std::iota(order.begin(), order.end(), std::size_t{0});
+            std::ranges::stable_sort(order, {}, [&sizes](std::size_t index) {
+                return sizes[index];
+            });
+            std::size_t left = room;
+
+            for (std::size_t taken = 0; taken < shown; ++taken) {
+                const std::size_t index = order[taken];
+                sizes[index] = std::min(sizes[index], left / (shown - taken));
+                left -= sizes[index];
             }
 
-            tabs.push_back({window, x, size});
-            x += size + 1;
+            // What the shares leave over, a column each to those shortened
+            for (std::size_t taken = shown; taken > 0 && left > 0; --taken) {
+                const std::size_t index = order[taken - 1];
+
+                if (sizes[index] < Columns(group[index]->title) + 4) {
+                    ++sizes[index];
+                    --left;
+                }
+            }
+        }
+
+        std::vector<STab> tabs;
+        std::size_t x = first + (spaces ? 1 : 0);
+
+        for (std::size_t index = 0; index < shown; ++index) {
+            tabs.push_back({group[index], x, sizes[index]});
+            x += sizes[index] + (spaces ? 1 : 0);
         }
 
         return tabs;
@@ -1060,8 +1114,14 @@ private:
             // that it stands out from the others of the strip
             const bool active = tab.window == &showing;
 
+            // A tab shortened shows as much of its title as fits, without
+            // the spaces around it, or with the one before it while there
+            // is room for that
+            const std::size_t title = Columns(tab.window->title);
+            const std::string text = tab.size >= title + 4 ? " " + tab.window->title + " " :
+                                     tab.size == title + 3 ? " " + tab.window->title : tab.window->title;
             screen.setClip({Position(tab.x + 1, strip), Size(tab.size - 2, 1)});
-            screen.Print(tab.x + 1, strip, " " + tab.window->title + " ",
+            screen.Print(tab.x + 1, strip, text,
                          active && focused ? style.focused_title : style.title, active, active);
             screen.resetClip();
 
