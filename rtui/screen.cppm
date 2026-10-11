@@ -361,6 +361,26 @@ public:
         return Print(x, y, markup, text_colour);
     }
 
+    // Prints text with markup from a character of it on, the ones before
+    // left out, as when it is scrolled sideways: what is printed is in the
+    // colour the text has there
+    std::size_t Print(std::size_t x, std::size_t y, std::string_view markup, std::size_t skip, std::uint32_t rgb,
+                      bool bold = false, bool inverse = false)
+    {
+        std::size_t skipped = 0;
+
+        ForEachGlyph(markup, rgb, [&](char32_t glyph, std::uint32_t colour) {
+            if (skipped < skip) {
+                ++skipped;
+                return;
+            }
+
+            Put(x++, y, glyph, colour, bold, inverse);
+        });
+
+        return x;
+    }
+
     // Everything needed to show the whole screen on a terminal, from the
     // top left corner. Colours go out as 24-bit values or as the nearest
     // of 256, and only when they change, which keeps a frame small enough

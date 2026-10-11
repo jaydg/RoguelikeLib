@@ -48,7 +48,9 @@ wheel moves selection too. Enter or a left click activates an item through
 `setOnActivate(callback)`, passing its index. `getSelected()` returns an
 optional index; empty lists have no selection. `Select(index)` allows
 programmatic selection, and `setItems(labels)` replaces the list and resets
-selection. Labels are literal UTF-8 text, clipped to the content width.
+selection. Labels are literal UTF-8 text, clipped to the content width;
+after `setMarkup(true)` they are text with colour markup, as `CScreen`
+prints it, and keep their colours when scrolled sideways.
 
 Windows can override `getScrollInfo()` to report `SScrollInfo{content,
 viewport, offset}` in cells. The manager draws proportional position

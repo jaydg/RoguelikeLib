@@ -18,6 +18,7 @@ void TestRectangles();
 void TestWindowManager();
 void TestDoubleClick();
 void TestNarrowTabs();
+void TestListMarkup();
 
 int main(int argc, char* argv[])
 {
@@ -37,7 +38,8 @@ int main(int argc, char* argv[])
         {"Rectangles", TestRectangles},
         {"WindowManager", TestWindowManager},
         {"DoubleClick", TestDoubleClick},
-        {"NarrowTabs", TestNarrowTabs}
+        {"NarrowTabs", TestNarrowTabs},
+        {"ListMarkup", TestListMarkup}
     };
     const std::vector<std::string_view> named(argv + 1, argv + argc);
 

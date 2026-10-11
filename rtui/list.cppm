@@ -1,10 +1,11 @@
-// A selectable, scrolling list for menus such as a generator browser.
+// A selectable, scrolling list for menus such as a generator browser. Its
+// items are literal text, or, if it is told so, text with colour markup as
+// the screen prints it (see rtui.screen).
 module;
 
 export module rtui.list;
 
 export import rtui.windows;
-import rtui.utf8;
 import std;
 
 export namespace RL
@@ -19,6 +20,28 @@ private:
     std::size_t horizontal = 0;
     Size view{0, 0};
     std::function<void(std::size_t)> on_activate;
+
+    // Whether the items are text with colour markup, rather than literal
+    // text; and the widest of them, as drawn last
+    bool markup = false;
+    std::size_t widest = 0;
+
+    // An item as markup the screen prints: as it is, or, literal, with its
+    // '<' written as "<<"
+    [[nodiscard]] std::string Markup(std::string_view label) const
+    {
+        if (markup) {
+            return std::string(label);
+        }
+
+        std::string text;
+
+        for (const char c : label) {
+            text += c == '<' ? std::string("<<") : std::string(1, c);
+        }
+
+        return text;
+    }
 
     void KeepSelectionVisible()
     {
@@ -47,7 +70,7 @@ private:
     }
 
 public:
-    // Labels are literal text, not colour markup. The first item is
+    // Labels are literal text, unless told to be markup. The first item is
     // selected initially; an empty list has no selection.
     CListWindow(std::string title, const SRect& floating, std::vector<std::string> labels = {},
                 EWindowOptions options = EWindowOptions::None)
@@ -68,6 +91,18 @@ public:
     [[nodiscard]] const std::vector<std::string>& getItems() const
     {
         return items;
+    }
+
+    // Whether the items are text with colour markup - "<#ffd24a>", or the
+    // name of a tag the screen knows - rather than literal text
+    void setMarkup(bool a_markup)
+    {
+        markup = a_markup;
+    }
+
+    [[nodiscard]] bool getMarkup() const
+    {
+        return markup;
     }
 
     [[nodiscard]] std::optional<std::size_t> getSelected() const
@@ -110,6 +145,12 @@ public:
     void Draw(CScreen& screen, const SRect& inside) override
     {
         view = inside.size;
+        widest = 0;
+
+        for (const auto& item : items) {
+            widest = std::max(widest, screen.TextWidth(Markup(item)));
+        }
+
         KeepSelectionVisible();
         setScrollOffset(Position(horizontal, first));
 
@@ -122,39 +163,14 @@ public:
                 screen.Put(inside.corner.x + x, inside.corner.y + row, U' ', screen.getTextColour(), false, inverse);
             }
 
-            std::string_view label = items[index];
-
-            for (std::size_t skipped = 0; skipped < horizontal && !label.empty(); ++skipped) {
-                label.remove_prefix(DecodeUTF8(label).length);
-            }
-
-            for (std::size_t x = 0; x < view.x && !label.empty(); ++x) {
-                const auto decoded = DecodeUTF8(label);
-                screen.Put(inside.corner.x + x, inside.corner.y + row, decoded.code_point,
-                           screen.getTextColour(), false, inverse);
-                label.remove_prefix(decoded.length);
-            }
-
+            screen.Print(inside.corner.x, inside.corner.y + row, Markup(items[index]), horizontal, screen.getTextColour(), false,
+                         inverse);
         }
     }
 
     [[nodiscard]] std::optional<SScrollInfo> getScrollInfo() const override
     {
-        std::size_t width = 0;
-
-        for (const auto& item : items) {
-            std::string_view text = item;
-            std::size_t columns = 0;
-
-            while (!text.empty()) {
-                text.remove_prefix(DecodeUTF8(text).length);
-                ++columns;
-            }
-
-            width = std::max(width, columns);
-        }
-
-        return SScrollInfo{Size(width, items.size()), view, Position(horizontal, first)};
+        return SScrollInfo{Size(widest, items.size()), view, Position(horizontal, first)};
     }
 
     [[nodiscard]] bool supportsScrollDragging() const override
