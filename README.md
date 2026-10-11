@@ -28,6 +28,14 @@ Import `rtui.map` and call `RL::PrintMap(map)` to print a map (previously
 `rl.tile` no longer re-exports it. The core library can be used without
 terminal UI dependencies.
 
+`rtui.map` also provides `DrawMap(screen, map, area, origin)`, which draws
+map tiles into a screen rectangle from a map offset (default `(0, 0)`).
+It respects the screen's clip and leaves cells outside the map untouched.
+`CameraOrigin(map.getSize(), area.size, focus)` calculates an offset centred
+on a focus position and clamped to map edges. `OnScreen(area, origin, pos)`
+converts a map position to screen coordinates, returning `nullopt` outside
+the viewport. These viewport helpers are adapted from Roguevalley.
+
 `rtui.terminal` provides the POSIX terminal layer adapted from Roguevalley:
 `RL::CTerminal` owns raw input mode, the alternate screen, cursor visibility,
 mouse reporting, and restoration on destruction, exit, or termination signals.
