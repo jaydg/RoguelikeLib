@@ -49,10 +49,14 @@ Windows can override `getScrollInfo()` to report `SScrollInfo{content,
 viewport, offset}` in cells. The manager draws proportional position
 indicators on the right and bottom frame borders only when that axis
 overflows. The thumb is an inverse-video space, using ordinary terminal
-attributes. These are indicators, not draggable controls; scrolling and
-resizing retain their existing behavior. The list widget reports its
-content automatically, and the feature demo's map tabs report their
-camera viewport and offset.
+attributes. To enable interaction, override `supportsScrollDragging()` to return true
+and `setScrollOffset(Position)` to apply the requested viewport origin.
+Dragging the thumb scrolls; clicking the track pages toward that position.
+Scrollbar tracks take precedence over border resizing, while corner resize
+grips remain available. Windows that do not opt in keep visual indicators.
+The list widget and feature demo's map views support dragging both axes.
+Dragging a list's vertical thumb keeps its selection within the visible
+rows without activating it; horizontal dragging reveals clipped labels.
 
 Windows receive keyboard input by overriding `CWindow::HandleKey(const SKey&)`
 and returning whether they consumed it. Call `windows.HandleKey(key)` from

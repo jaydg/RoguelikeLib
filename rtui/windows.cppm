@@ -170,6 +170,18 @@ public:
         return std::nullopt;
     }
 
+    [[nodiscard]] virtual bool supportsScrollDragging() const
+    {
+        return false;
+    }
+
+    // Called for thumb dragging and page clicks. The manager clamps the
+    // requested offset to the reported content and viewport dimensions.
+    virtual void setScrollOffset(Position offset)
+    {
+        static_cast<void>(offset);
+    }
+
     [[nodiscard]] const std::string& getTitle() const
     {
         return title;
@@ -252,6 +264,112 @@ private:
     };
 
     std::optional<SDrag> drag;
+
+    struct SScrollDrag {
+        CWindow* window;
+        bool vertical;
+        std::size_t grab;
+    };
+
+    std::optional<SScrollDrag> scroll_drag;
+
+    struct SScrollAxis {
+        std::size_t length;
+        std::size_t thumb;
+        std::size_t start;
+        std::size_t maximum;
+    };
+
+    static SScrollAxis ScrollAxis(std::size_t length, std::size_t content, std::size_t viewport, std::size_t offset)
+    {
+        if (length == 0 || viewport == 0 || content <= viewport) {
+            return {length, 0, 0, 0};
+        }
+
+        const std::size_t thumb = std::clamp(static_cast<std::size_t>(
+                                                 static_cast<long double>(viewport) / content * length), std::size_t{1}, length);
+        const std::size_t maximum = content - viewport;
+        const std::size_t start = static_cast<std::size_t>(
+                                      static_cast<long double>(std::min(offset, maximum)) / maximum * (length - thumb));
+        return {length, thumb, start, maximum};
+    }
+
+    bool PressScroll(CWindow& window, const SMouse& mouse)
+    {
+        const auto info = window.getScrollInfo();
+        const SRect inside = ContentRect(window);
+
+        if (mouse.button != EMouseButton::Left || !window.supportsScrollDragging() || !info || inside.Empty()) {
+            return false;
+        }
+
+        const bool vertical = mouse.position.x == window.frame.Right() - 1 &&
+                              mouse.position.y >= inside.corner.y && mouse.position.y < inside.Bottom();
+        const bool horizontal = mouse.position.y == window.frame.Bottom() - 1 &&
+                                mouse.position.x >= inside.corner.x && mouse.position.x < inside.Right();
+
+        if (!vertical && !horizontal) {
+            return false;
+        }
+
+        const auto axis = ScrollAxis(vertical ? inside.size.y : inside.size.x,
+                                     vertical ? info->content.y : info->content.x,
+                                     vertical ? info->viewport.y : info->viewport.x,
+                                     vertical ? info->offset.y : info->offset.x);
+
+        if (axis.thumb == 0) {
+            return false;
+        }
+
+        Raise(window);
+        title_click.reset();
+        const std::size_t at = vertical ? mouse.position.y - inside.corner.y : mouse.position.x - inside.corner.x;
+
+        if (at >= axis.start && at - axis.start < axis.thumb) {
+            scroll_drag = SScrollDrag{&window, vertical, at - axis.start};
+        } else {
+            Position offset = info->offset;
+            std::size_t& value = vertical ? offset.y : offset.x;
+            value = std::min(value, axis.maximum);
+            const std::size_t page = vertical ? info->viewport.y : info->viewport.x;
+            value = at < axis.start ? value - std::min(page, value) : value + std::min(page, axis.maximum - value);
+            window.setScrollOffset(offset);
+        }
+
+        return true;
+    }
+
+    void DragScroll(Position pos)
+    {
+        CWindow& window = *scroll_drag->window;
+        const auto info = window.getScrollInfo();
+        const SRect inside = ContentRect(window);
+        const bool vertical = scroll_drag->vertical;
+
+        if (!info || inside.Empty() || !window.supportsScrollDragging()) {
+            scroll_drag.reset();
+            return;
+        }
+
+        const auto axis = ScrollAxis(vertical ? inside.size.y : inside.size.x,
+                                     vertical ? info->content.y : info->content.x,
+                                     vertical ? info->viewport.y : info->viewport.x,
+                                     vertical ? info->offset.y : info->offset.x);
+
+        if (axis.thumb == 0 || axis.length == axis.thumb) {
+            return;
+        }
+
+        const std::size_t coordinate = vertical ? pos.y : pos.x;
+        const std::size_t corner = vertical ? inside.corner.y : inside.corner.x;
+        const std::size_t relative = coordinate > corner ? coordinate - corner : 0;
+        const std::size_t start = std::min(relative - std::min(relative, scroll_drag->grab), axis.length - axis.thumb);
+        Position offset = info->offset;
+        (vertical ? offset.y : offset.x) = static_cast<std::size_t>(std::round(
+                                                                        static_cast<long double>(start) / (axis.length - axis.thumb) * axis.maximum));
+        window.setScrollOffset(offset);
+    }
+
 
     // Two clicks on a window's title within this time are a double-click
     static constexpr std::chrono::milliseconds double_click_time{400};
@@ -793,12 +911,9 @@ private:
                 return;
             }
 
-            // Ratios avoid multiplying potentially large content dimensions.
-            const std::size_t thumb = std::clamp(static_cast<std::size_t>(
-                                                     static_cast<long double>(viewport) / content * length), std::size_t{1}, length);
-            const std::size_t start = static_cast<std::size_t>(
-                                          static_cast<long double>(std::min(offset, content - viewport)) /
-                                          (content - viewport) * (length - thumb));
+            const auto geometry = ScrollAxis(length, content, viewport, offset);
+            const std::size_t thumb = geometry.thumb;
+            const std::size_t start = geometry.start;
 
             for (std::size_t index = 0; index < length; ++index) {
                 const bool selected = index >= start && index - start < thumb;
@@ -898,6 +1013,10 @@ public:
     void Close(CWindow& window)
     {
         std::erase(windows, &window);
+
+        if (scroll_drag && scroll_drag->window == &window) {
+            scroll_drag.reset();
+        }
 
         if (drag && drag->window == &window) {
             drag.reset();
@@ -1186,6 +1305,18 @@ public:
     {
         const Position pos = mouse.position;
 
+        if (scroll_drag) {
+            if (mouse.action == EMouseAction::Drag || mouse.action == EMouseAction::Release) {
+                DragScroll(pos);
+            }
+
+            if (mouse.action == EMouseAction::Release) {
+                scroll_drag.reset();
+            }
+
+            return true;
+        }
+
         if (drag) {
             if (area.Empty()) {
                 drag.reset();
@@ -1206,7 +1337,10 @@ public:
 
         switch (mouse.action) {
         case EMouseAction::Press:
-            Press(*window, mouse, now);
+            if (!PressScroll(*window, mouse)) {
+                Press(*window, mouse, now);
+            }
+
             break;
 
         case EMouseAction::ScrollUp:

@@ -16,6 +16,7 @@ private:
     std::vector<std::string> items;
     std::optional<std::size_t> selected;
     std::size_t first = 0;
+    std::size_t horizontal = 0;
     Size view{0, 0};
     std::function<void(std::size_t)> on_activate;
 
@@ -60,6 +61,7 @@ public:
         items = std::move(labels);
         selected = items.empty() ? std::nullopt : std::optional<std::size_t> {0};
         first = 0;
+        horizontal = 0;
     }
 
     [[nodiscard]] const std::vector<std::string>& getItems() const
@@ -108,6 +110,7 @@ public:
     {
         view = inside.size;
         KeepSelectionVisible();
+        setScrollOffset(Position(horizontal, first));
 
         for (std::size_t row = 0; row < view.y && row < items.size() - first; ++row) {
             const std::size_t index = first + row;
@@ -119,6 +122,10 @@ public:
             }
 
             std::string_view label = items[index];
+
+            for (std::size_t skipped = 0; skipped < horizontal && !label.empty(); ++skipped) {
+                label.remove_prefix(DecodeUTF8(label).length);
+            }
 
             for (std::size_t x = 0; x < view.x && !label.empty(); ++x) {
                 const auto decoded = DecodeUTF8(label);
@@ -146,7 +153,23 @@ public:
             width = std::max(width, columns);
         }
 
-        return SScrollInfo{Size(width, items.size()), view, Position(0, first)};
+        return SScrollInfo{Size(width, items.size()), view, Position(horizontal, first)};
+    }
+
+    [[nodiscard]] bool supportsScrollDragging() const override
+    {
+        return true;
+    }
+
+    void setScrollOffset(Position offset) override
+    {
+        const auto info = getScrollInfo().value();
+        horizontal = std::min(offset.x, info.content.x > view.x ? info.content.x - view.x : 0);
+        first = std::min(offset.y, items.size() > view.y ? items.size() - view.y : 0);
+
+        if (selected && view.y > 0) {
+            selected = std::clamp(*selected, first, first + std::min(view.y, items.size() - first) - 1);
+        }
     }
 
     bool HandleKey(const SKey& key) override

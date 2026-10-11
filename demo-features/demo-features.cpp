@@ -130,6 +130,7 @@ private:
     std::size_t generated = 0;
     Position focus{0, 0};
     Position origin{0, 0};
+    std::optional<Position> scroll_origin;
     Position start{0, 0};
     Position goal{0, 0};
     Position content_origin{0, 0};
@@ -164,6 +165,7 @@ private:
 
     void Generate()
     {
+        scroll_origin.reset();
         level.Clear();
         path.clear();
 
@@ -222,6 +224,7 @@ private:
 
         if (mode != 1 || level.get(next).isPassable()) {
             focus = next;
+            scroll_origin.reset();
         }
     }
 
@@ -311,7 +314,9 @@ public:
             map_area.size.x -= std::min(width + 1, map_area.size.x);
         }
 
-        origin = CameraOrigin(level.getSize(), map_area.size, focus);
+        origin = scroll_origin.value_or(CameraOrigin(level.getSize(), map_area.size, focus));
+        origin.x = std::min(origin.x, level.getWidth() > map_area.size.x ? level.getWidth() - map_area.size.x : 0);
+        origin.y = std::min(origin.y, level.getHeight() > map_area.size.y ? level.getHeight() - map_area.size.y : 0);
         DrawMap(screen, level, map_area, origin);
 
         if (mode == 1 || mode == 3) {
@@ -427,6 +432,7 @@ public:
             if (level.inside(pos) && level.get(pos).isPassable()) {
                 if (mode == 1) {
                     focus = pos;
+                    scroll_origin.reset();
                 } else {
                     goal = pos;
                 }
@@ -441,6 +447,17 @@ public:
         }
 
         return std::nullopt;
+    }
+
+    [[nodiscard]] bool supportsScrollDragging() const override
+    {
+        return mode < 4;
+    }
+
+    void setScrollOffset(Position offset) override
+    {
+        scroll_origin = offset;
+        origin = offset;
     }
 
     void Scroll(int lines) override
