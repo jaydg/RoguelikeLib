@@ -22,6 +22,7 @@ void TestListMarkup();
 void TestListDisabled();
 void TestListFollowed();
 void TestListShortcuts();
+void TestInput();
 
 int main(int argc, char* argv[])
 {
@@ -45,7 +46,8 @@ int main(int argc, char* argv[])
         {"ListMarkup", TestListMarkup},
         {"ListDisabled", TestListDisabled},
         {"ListFollowed", TestListFollowed},
-        {"ListShortcuts", TestListShortcuts}
+        {"ListShortcuts", TestListShortcuts},
+        {"Input", TestInput}
     };
     const std::vector<std::string_view> named(argv + 1, argv + argc);
 

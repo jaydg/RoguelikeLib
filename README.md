@@ -63,6 +63,13 @@ selects the item and activates it, unless it is disabled. A key no item
 has is not taken. `setLetterShortcuts()` gives the items, and every new
 list of them, the letters a to z, then A to Z.
 
+`rtui.input` provides `CInputWindow(title, floating_rect, longest)`, a
+window to type a line of text into, after a prompt (`setPrompt`, as
+markup): typed characters are added up to `longest`, Backspace takes the
+last away, Enter enters the text and Escape cancels. `TakeEntered()` and
+`TakeCancelled()` give what happened once; `setText` and `getText` set
+and read what is typed, as UTF-8.
+
 Windows can override `getScrollInfo()` to report `SScrollInfo{content,
 viewport, offset}` in cells. The manager draws proportional position
 indicators on the right and bottom frame borders only when that axis
