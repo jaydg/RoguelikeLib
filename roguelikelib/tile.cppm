@@ -9,9 +9,6 @@ import std;
 
 export module rl.tile;
 
-// Glyphs are code points, and printing them needs EncodeUTF8()
-export import rl.utf8;
-
 namespace RL
 {
 

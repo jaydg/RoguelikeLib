@@ -15,7 +15,7 @@
 
 module;
 
-export module rl.mouse;
+export module rtui.mouse;
 
 export import rl.position;
 import std;

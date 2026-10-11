@@ -14,10 +14,10 @@
 
 module;
 
-export module rl.screen;
+export module rtui.screen;
 
 export import rl.position;
-import rl.utf8;
+import rtui.utf8;
 import stc;
 import std;
 

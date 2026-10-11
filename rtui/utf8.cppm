@@ -5,7 +5,7 @@
 
 module;
 
-export module rl.utf8;
+export module rtui.utf8;
 
 import std;
 

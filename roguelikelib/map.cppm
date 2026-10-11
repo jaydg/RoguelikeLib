@@ -9,9 +9,7 @@ export module rl.map;
 import rl.matrix;
 import rl.position;
 import rl.tile;
-import rl.utf8;
 import std;
-import stc;
 
 export namespace RL
 {
@@ -45,17 +43,7 @@ public:
         return SetCell(pos.x, pos.y, element);
     }
 
-    void PrintMap() const
-    {
-        for (std::size_t y = 0; y < getHeight(); ++y) {
-            for (std::size_t x = 0; x < getWidth(); ++x) {
-                auto tile = get(x, y);
-                std::cout << stc::rgb_fg(tile.getColor()) << EncodeUTF8(tile.getGlyph());
-            }
 
-            std::cout << stc::reset << std::endl;
-        }
-    }
 };
 
 struct SRoom {

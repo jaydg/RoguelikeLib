@@ -35,11 +35,11 @@
 
 module;
 
-export module rl.windows;
+export module rtui.windows;
 
-export import rl.mouse;
+export import rtui.mouse;
 export import rl.position;
-export import rl.screen;
+export import rtui.screen;
 import std;
 
 export namespace RL

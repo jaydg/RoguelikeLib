@@ -12,6 +12,22 @@ and abandoned many years ago.
 
 Licensed under the BSD License.
 
+Terminal UI
+-----------
+
+Reusable terminal UI code lives in `rtui` (Roguelike Terminal UI), separate
+from the core algorithms in `roguelikelib`. Include both directories in
+Xmake and depend on the `RTUI` target, which publicly depends on
+`RoguelikeLib`.
+
+The UI modules are `rtui.screen`, `rtui.windows`, `rtui.mouse`,
+`rtui.utf8`, and `rtui.map`; terminal colours are provided by `stc` in
+`rtui/extern`. C++ types and functions retain their `RL` namespace.
+Import `rtui.map` and call `RL::PrintMap(map)` to print a map (previously
+`CMap::PrintMap()`). Import `rtui.utf8` explicitly when encoding glyphs;
+`rl.tile` no longer re-exports it. The core library can be used without
+terminal UI dependencies.
+
 Credits
 -------
 
@@ -41,7 +57,7 @@ xmake build
 for the demo game and the following commands for the feature demo:
 
 ```sh
-cd demo-feature
+cd demo-features
 xmake config
 xmake build
 ```

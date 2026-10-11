@@ -6,7 +6,7 @@ module;
 
 export module demo_game.io;
 
-import rl.tile;
+import rtui.utf8;
 import std;
 
 // internal state variables for notcurses

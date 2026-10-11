@@ -10,7 +10,9 @@ import rl.position;
 import rl.randomness;
 import rl.scheduler;
 import rl.tile;
-import rl.windows;
+import rtui.windows;
+import rtui.map;
+import rtui.utf8;
 import std;
 import stc;
 
@@ -73,54 +75,54 @@ int main(int argc, char* argv[])
 
     cout << stc::underline << "Standard Dungeon" << stc::reset << endl << endl;
     RL::CreateStandardDungeon(level, 20);
-    level.PrintMap();
+    RL::PrintMap(level);
 
     cout << endl << stc::underline << "Ant's Nest" << stc::reset << endl << endl;
     RL::CreateAntNest(level, true);
-    level.PrintMap();
+    RL::PrintMap(level);
 
     cout << endl << stc::underline << "Mines" << stc::reset << endl << endl;
     RL::CreateMines(level, 25);
-    level.PrintMap();
+    RL::PrintMap(level);
 
     cout << endl << stc::underline << "Caves Sharp" << stc::reset << endl << endl;
     RL::CreateCaves(level, 1, 0.75);
-    level.PrintMap();
+    RL::PrintMap(level);
 
     cout << endl << stc::underline << "Caves Soft" << stc::reset << endl << endl;
     RL::CreateCaves(level, 3);
-    level.PrintMap();
+    RL::PrintMap(level);
 
     for (const auto& name : RL::GetDelvePresets()) {
         cout << endl << stc::underline << "Delve - " << name << stc::reset << endl << endl;
 
         RL::CreateDelve(level, name);
-        level.PrintMap();
+        RL::PrintMap(level);
     }
 
     cout << endl << stc::underline << "Space shuttle" << stc::reset << endl << endl;
     RL::CreateSpaceShuttle(level, 25);
-    level.PrintMap();
+    RL::PrintMap(level);
 
     cout << endl << stc::underline << "Castle" << stc::reset << endl << endl;
     RL::CreateSpaceShuttle(level, 25);
-    level.PrintMap();
+    RL::PrintMap(level);
 
     cout << endl << stc::underline << "Forest" << stc::reset << endl << endl;
     RL::GenerateForest(level);
-    level.PrintMap();
+    RL::PrintMap(level);
 
     cout << endl << stc::underline << "Cave and Glade - Cave" << stc::reset << endl << endl;
     RL::CreateCaveAndGlade(level, "wall", "room", RL::CaveShape, RL::CaveWater);
-    level.PrintMap();
+    RL::PrintMap(level);
 
     cout << endl << stc::underline << "Cave and Glade - Small cave without water" << stc::reset << endl << endl;
     RL::CreateCaveAndGlade(level, "wall", "room", {.min_areas = 7, .max_areas = 11, .scale = 2}, {.shallow = {}});
-    level.PrintMap();
+    RL::PrintMap(level);
 
     cout << endl << stc::underline << "Cave and Glade - Glade" << stc::reset << endl << endl;
     RL::CreateCaveAndGlade(level, "tree", "grass", RL::GladeShape, RL::GladeWater);
-    level.PrintMap();
+    RL::PrintMap(level);
 
     // Tiles can be registered at runtime, with any Unicode symbol as glyph
     RL::CTileData::RegisterTile("pine", {U'♣', 0x2E7D32, false, false});
@@ -128,13 +130,13 @@ int main(int argc, char* argv[])
 
     cout << endl << stc::underline << "Cave and Glade - Glade with Unicode glyphs" << stc::reset << endl << endl;
     RL::CreateCaveAndGlade(level, "pine", "grass", RL::GladeShape, {.shallow = "pond", .level = 12, .deep_level = 35, .grain = 20});
-    level.PrintMap();
+    RL::PrintMap(level);
 
     cout << endl << stc::underline << "Voronoi Wilderness" << stc::reset
          << " (difficulty 0 in the town, up to 9 in the hardest region)" << endl << endl;
 
     const RL::SWildernessInfo wilderness = RL::CreateVoronoiWilderness(level, 24, true);
-    level.PrintMap();
+    RL::PrintMap(level);
 
     cout << wilderness.regions << " regions, " << wilderness.adjacency << " Delaunay edges";
 
@@ -153,7 +155,7 @@ int main(int argc, char* argv[])
 
     cout << endl << stc::underline << "Simple City with 15 buildings" << stc::reset << endl << endl;
     RL::CreateSimpleCity(level, 15);
-    level.PrintMap();
+    RL::PrintMap(level);
 
     //////////////////////////////////////////////////////////////////////////
     // Field of view testing
@@ -205,7 +207,7 @@ int main(int argc, char* argv[])
 
     cout << endl << stc::underline << "Maze" << stc::reset << endl << endl;
     RL::CreateMaze(level);
-    level.PrintMap();
+    RL::PrintMap(level);
 
     cout << endl << stc::underline << "Path in this maze" << stc::reset << " '+' (from top-left to bottom-right corner)" << endl << endl;
 
@@ -239,7 +241,7 @@ int main(int argc, char* argv[])
         level.get(path[index].x, path[index].y).setType("door_closed");
     }
 
-    level.PrintMap();
+    RL::PrintMap(level);
 
     //////////////////////////////////////////////////////////////////////////
     // Distance map: the way from everywhere to the nearest goal

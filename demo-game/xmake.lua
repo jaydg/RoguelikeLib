@@ -11,6 +11,7 @@ add_requires(
 
 -- include the library
 includes("../roguelikelib")
+includes("../rtui")
 
 target("demo-game")
     set_kind("binary")
@@ -18,4 +19,4 @@ target("demo-game")
     add_files("*.cppm")
     add_files("*.cpp")
     add_packages("notcurses")
-    add_deps("RoguelikeLib")
+    add_deps("RTUI")
