@@ -121,6 +121,23 @@ others, as listed in [AUTHORS](AUTHORS):
   * Adam Milazzo wrote the field of view algorithm (`rl.fov`).
   * illyigan wrote the terminal colours code (stc).
 
+Tests
+-----
+
+The tests of RoguelikeLib and RTUI are in `tests`, one binary with every
+test, which [Xmake](https://xmake.io/) runs test by test:
+
+```sh
+cd tests
+xmake test
+```
+
+`xmake test roguelikelib-tests/Screen` runs one test, and
+`xmake test "roguelikelib-tests/*Tabs"` those whose names match. The tests
+are those `tests/main.cpp` lists; `xmake.lua` finds their names there.
+`xmake run roguelikelib-tests Screen Clock` runs some of them at once, and
+tells of every failed check.
+
 Demos
 -----
 
