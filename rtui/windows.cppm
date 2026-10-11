@@ -102,6 +102,7 @@ private:
     friend class CWindowManager;
 
     std::string title;
+    std::optional<std::string> frame_title;
     SRect floating;
     Size min_size;
     EDock dock = EDock::None;
@@ -190,6 +191,17 @@ public:
     void setTitle(std::string a_title)
     {
         title = std::move(a_title);
+    }
+
+    // An optional frame heading independent of the window's tab label.
+    void setFrameTitle(std::string heading)
+    {
+        frame_title = std::move(heading);
+    }
+
+    [[nodiscard]] const std::string& getFrameTitle() const
+    {
+        return frame_title ? *frame_title : title;
     }
 
     // Where the window was laid out last, frame included
@@ -574,7 +586,7 @@ private:
 
         // A docked window is taken by its title to float it again, and by
         // its inner edge to resize it
-        if (top && pos.x > frame.corner.x && pos.x < frame.corner.x + 3 + window.title.size()) {
+        if (top && pos.x > frame.corner.x && pos.x < frame.corner.x + 3 + window.getFrameTitle().size()) {
             if (!allow_tab_undocking && window.tab_group != 0) {
                 return std::nullopt;
             }
@@ -890,7 +902,7 @@ private:
         }
 
         screen.setClip({Position(frame.corner.x + 1, frame.corner.y), Size(frame.size.x - (closable ? 3 : 2), 1)});
-        screen.Print(frame.corner.x + 1, frame.corner.y, " " + window.title + " ", focused ? style.focused_title : style.title);
+        screen.Print(frame.corner.x + 1, frame.corner.y, " " + window.getFrameTitle() + " ", focused ? style.focused_title : style.title);
         screen.resetClip();
     }
 

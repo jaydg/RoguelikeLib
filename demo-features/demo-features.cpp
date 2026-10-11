@@ -490,6 +490,7 @@ int main(int argc, char* argv[])
 
         for (std::size_t index = 0; index < titles.size(); ++index) {
             tabs.push_back(std::make_unique<CFeatureWindow>(titles[index], static_cast<int>(index)));
+            tabs.back()->setFrameTitle("RoguelikeLib features demo");
             windows.Open(*tabs.back());
             windows.Dock(*tabs.back(), EDock::Top, 1000);
 
