@@ -37,6 +37,52 @@ void CheckBuildings(const RL::CMap& map, const RL::SWildernessInfo& info)
     Check(bounded, "each Voronoi house side measures 4–7 tiles including walls");
     Check(faithful, "building metadata matches non-overlapping town footprints and doors");
     Check(clearance, "every house has open clearance around its walls and entrance");
+    bool facing = true;
+    for (const auto& b : info.buildings) {
+        const double cx = (b.corner1.x + b.corner2.x) / 2.0, cy = (b.corner1.y + b.corner2.y) / 2.0;
+        const RL::SBuilding* neighbor = nullptr;
+        double nearest = std::numeric_limits<double>::max();
+        for (const auto& other : info.buildings) {
+            if (&other == &b) { continue; }
+            const double dx = (other.corner1.x + other.corner2.x) / 2.0 - cx;
+            const double dy = (other.corner1.y + other.corner2.y) / 2.0 - cy;
+            if (dx * dx + dy * dy < nearest) {
+                nearest = dx * dx + dy * dy;
+                neighbor = &other;
+            }
+        }
+        if (neighbor) {
+            const double dx = (neighbor->corner1.x + neighbor->corner2.x) / 2.0 - cx;
+            const double dy = (neighbor->corner1.y + neighbor->corner2.y) / 2.0 - cy;
+            const int nx = b.door.x == b.corner1.x ? -1 : b.door.x == b.corner2.x ? 1 : 0;
+            const int ny = b.door.y == b.corner1.y ? -1 : b.door.y == b.corner2.y ? 1 : 0;
+            facing &= nx * dx + ny * dy > 0;
+        }
+    }
+    Check(facing, "entrances face the nearest neighbouring house");
+    if (!info.buildings.empty()) {
+        const auto root = info.buildings.front().door;
+        std::vector<bool> seen(map.getWidth() * map.getHeight());
+        std::vector<RL::Position> queue{root};
+        seen[root.y * map.getWidth() + root.x] = true;
+        for (std::size_t index = 0; index < queue.size(); ++index) {
+            const auto cell = queue[index];
+            for (int dy = -1; dy <= 1; ++dy) {
+                for (int dx = -1; dx <= 1; ++dx) {
+                    const auto x = cell.x + dx, y = cell.y + dy;
+                    if (x >= map.getWidth() || y >= map.getHeight()) { continue; }
+                    const auto type = map.get(x, y).getType();
+                    if (!seen[y * map.getWidth() + x] && (type == "corridor" || type == "bridge" || type == "door_open" || type == "field" || type == "plant")) {
+                        seen[y * map.getWidth() + x] = true;
+                        queue.emplace_back(x, y);
+                    }
+                }
+            }
+        }
+        Check(std::ranges::all_of(info.buildings, [&](const auto& b) { return seen[b.door.y * map.getWidth() + b.door.x]; }),
+              "every entrance joins the shared path network without walking through rooms");
+    }
+
 }
 }
 
@@ -108,4 +154,56 @@ void TestVoronoiChasms()
         Check(brightness[0] / counts[0] > brightness[1] / counts[1] && brightness[1] / counts[1] > brightness[2] / counts[2],
               "ravines become progressively darker from the rim into the depths");
     }
+}
+
+void TestVoronoiFields()
+{
+    std::size_t checked = 0;
+    for (unsigned seed = 0; seed < 64; ++seed) {
+        RL::InitRandomness(seed);
+        RL::CMap map(seed % 2 == 0 ? RL::Size(79, 50) : RL::Size(120, 80));
+        const auto info = RL::CreateVoronoiWilderness(map, 0, seed % 3 != 0);
+        if (info.field_gates.empty() || info.locations.empty()) { continue; }
+        RL::Position root;
+        if (!info.buildings.empty()) {
+            root = info.buildings.front().door;
+        } else {
+            std::size_t best = std::numeric_limits<std::size_t>::max();
+            for (std::size_t y = 0; y < map.getHeight(); ++y) {
+                for (std::size_t x = 0; x < map.getWidth(); ++x) {
+                    if (map.get(x, y).getType() == "corridor" && RL::Position(x, y).Distance(info.locations.front().center) < best) {
+                        best = RL::Position(x, y).Distance(info.locations.front().center);
+                        root = RL::Position(x, y);
+                    }
+                }
+            }
+        }
+        Check(map.inside(root), "the village has a road anchor even without a house");
+        if (!map.inside(root)) { continue; }
+        std::vector<bool> seen(map.getWidth() * map.getHeight());
+        std::vector<RL::Position> queue{root};
+        seen[root.y * map.getWidth() + root.x] = true;
+        for (std::size_t index = 0; index < queue.size(); ++index) {
+            const auto at = queue[index];
+            for (int dy = -1; dy <= 1; ++dy) {
+                for (int dx = -1; dx <= 1; ++dx) {
+                    const RL::Position next(at.x + dx, at.y + dy);
+                    if (!map.inside(next)) { continue; }
+                    const auto cell = next.y * map.getWidth() + next.x;
+                    const auto type = map.get(next).getType();
+                    if (!seen[cell] && (type == "corridor" || type == "bridge" || type == "door_open" || type == "field" || type == "plant")) {
+                        seen[cell] = true;
+                        queue.push_back(next);
+                    }
+                }
+            }
+        }
+        for (auto gate : info.field_gates) {
+            ++checked;
+            Check(map.get(gate).getType() == "door_open", "field gates remain entrances rather than being paved over");
+            Check(seen[gate.y * map.getWidth() + gate.x], std::format("field entrance ({},{}) connects to village, seed {}", gate.x, gate.y, seed));
+        }
+        CheckBuildings(map, info);
+    }
+    Check(checked > 0, "generated fields exercise their village connections");
 }

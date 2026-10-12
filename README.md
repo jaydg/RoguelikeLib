@@ -324,3 +324,22 @@ Broken rocky rims (`#` and `^`) fade through descending faces (`:`) into
 subdued depths (`·`). Depth shading follows the actual ravine edges.
 `chasm_rim`, `chasm_wall` and `chasm` are all impassable and are never
 opened by wilderness connectivity repairs.
+
+Voronoi town doors face the closest neighbouring building. Their outside
+approaches are joined by a shared network of narrow paths, routed around
+all building footprints. Paths stay within the town where possible and
+can follow repaired walkable terrain around fragmented town regions.
+
+Field entrances face the village and connect to its shared road network
+using `BuildWindingPath`, with safe routing around buildings, hedges and
+impassable terrain. Roads merge with earlier connections and bridge water
+where necessary. Crossings leave cultivated field tiles unchanged and
+continue beyond the field. Gate positions are returned in
+`SWildernessInfo::field_gates`.
+
+Road variants in `rl.maputils`: `BuildZigzagPath`/`AddZigzagRoad` produce
+angular random routes; `BuildSigsagPath`/`AddSigsagRoad` cut their one-cell
+corners but retain large zigzag bends. `BuildWindingPath`/`AddWindingRoad`
+perturb spaced waypoints with turn-angle limits, producing gentler winding
+roads even between endpoints on the same row or column. The build helpers
+return tiles for terrain-aware placement; the add helpers overwrite terrain.

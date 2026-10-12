@@ -27,6 +27,7 @@ export import rl.connectivity;
 export import rl.locations;
 export import rl.map;
 import rl.matrix;
+import rl.maputils;
 import rl.position;
 import rl.randomness;
 import rl.tile;
@@ -58,6 +59,9 @@ struct SWildernessInfo {
     // building stands wholly on its town, with a ring of open ground
     // around it, so the door always opens onto walkable ground.
     std::vector<SBuilding> buildings;
+
+    // Field entrances, facing the village and linked to its road network.
+    std::vector<Position> field_gates;
 
     // The difficulty of every cell: 0 in the town, 9 in the hardest
     // region. Opening the map up afterwards (see WildernessOpenings)
@@ -362,6 +366,8 @@ public:
 
     // Fill the map, and report what it was divided into
     [[nodiscard]] SWildernessInfo Apply(CMap & level) const;
+    void ConnectTownDoors(CMap& level) const;
+    void ConnectFieldRoads(CMap& level) const;
 
 private:
     int width_;
@@ -831,7 +837,7 @@ void CWilderness::PlaceFeatures()
         Region & region = regions_[i];
 
         if (region.terrain == Ter::Field) {
-            // A gate on a random boundary cell
+            // Prefer a boundary opening on the side facing the village.
             std::vector<int> borders;
 
             for (int y = 0; y < height_; ++y) {
@@ -845,7 +851,26 @@ void CWilderness::PlaceFeatures()
             }
 
             if (!borders.empty()) {
-                region.gate = borders[Random(borders.size())];
+                const auto village = std::ranges::find_if(regions_, [](const auto& r) { return r.terrain == Ter::Town; });
+                double best = std::numeric_limits<double>::max();
+                for (int cell : borders) {
+                    const int x = cell % width_, y = cell / width_;
+                    bool faces = false, exit = false;
+                    for (const auto [dx, dy] : std::array<std::pair<int, int>, 4>{{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}}) {
+                        const int nx = x + dx, ny = y + dy;
+                        if (nx < 0 || ny < 0 || nx >= width_ || ny >= height_) { continue; }
+                        const int next = region_id_[Index(nx, ny)];
+                        if (next == static_cast<int>(i) || !IsPassable(regions_[next].terrain)) { continue; }
+                        const auto outside = TileAt(nx, ny);
+                        if (!CTileData::get(outside).second.passable && outside != "tree") { continue; }
+                        exit = true;
+                        faces |= dx * (village->center.x - region.center.x) + dy * (village->center.y - region.center.y) > 0;
+                    }
+                    if (!exit) { continue; }
+                    const double dx = x - village->center.x, dy = y - village->center.y;
+                    const double score = dx * dx + dy * dy + (faces ? 0 : width_ * width_ + static_cast<double>(height_) * height_);
+                    if (score < best) { best = score; region.gate = cell; }
+                }
             }
         } else if (region.terrain == Ter::Town && with_buildings_) {
             PlaceTown(region, i);
@@ -909,6 +934,35 @@ void CWilderness::PlaceTown(Region& region, std::size_t id)
             }
         }
     }
+    // Aim each entrance towards the closest neighbouring house. Choose
+    // the facing wall first, then align the door along that wall.
+    for (auto& building : region.buildings) {
+        const double cx = (building.corner1.x + building.corner2.x) / 2.0;
+        const double cy = (building.corner1.y + building.corner2.y) / 2.0;
+        const SBuilding* neighbor = nullptr;
+        double nearest = std::numeric_limits<double>::max();
+        for (const auto& other : region.buildings) {
+            if (&other == &building) { continue; }
+            const double dx = (other.corner1.x + other.corner2.x) / 2.0 - cx;
+            const double dy = (other.corner1.y + other.corner2.y) / 2.0 - cy;
+            const double distance = dx * dx + dy * dy;
+            if (distance < nearest) {
+                nearest = distance;
+                neighbor = &other;
+            }
+        }
+        if (!neighbor) { continue; }
+        const double tx = (neighbor->corner1.x + neighbor->corner2.x) / 2.0;
+        const double ty = (neighbor->corner1.y + neighbor->corner2.y) / 2.0;
+        if (std::abs(tx - cx) >= std::abs(ty - cy)) {
+            building.door = Position(tx > cx ? building.corner2.x : building.corner1.x,
+                                     std::clamp(static_cast<std::size_t>(std::lround(ty)), building.corner1.y + 1, building.corner2.y - 1));
+        } else {
+            building.door = Position(std::clamp(static_cast<std::size_t>(std::lround(tx)), building.corner1.x + 1, building.corner2.x - 1),
+                                     ty > cy ? building.corner2.y : building.corner1.y);
+        }
+    }
+
 }
 
 double CWilderness::HeightAt(const int x, const int y) const
@@ -1177,6 +1231,207 @@ void CWilderness::AddHillFeatures(CMap& level) const
     }
 }
 
+// Connect entrance approaches to a shared path network. Run after terrain
+// repair so every reachable town pocket can be joined without cutting walls.
+void CWilderness::ConnectTownDoors(CMap& level) const
+{
+    std::vector<bool> buildings(width_ * height_);
+    for (const auto& region : regions_) {
+        for (const auto& b : region.buildings) {
+            for (auto y = b.corner1.y; y <= b.corner2.y; ++y) {
+                for (auto x = b.corner1.x; x <= b.corner2.x; ++x) { buildings[Index(x, y)] = true; }
+            }
+        }
+    }
+    for (std::size_t id = 0; id < regions_.size(); ++id) {
+        const auto& houses = regions_[id].buildings;
+        if (houses.empty()) { continue; }
+        std::vector<bool> network(width_ * height_);
+        for (const auto& b : houses) {
+            const auto door = b.door;
+            const Position approach = door.x == b.corner1.x ? Position(door.x - 1, door.y) :
+                                      door.x == b.corner2.x ? Position(door.x + 1, door.y) :
+                                      door.y == b.corner1.y ? Position(door.x, door.y - 1) : Position(door.x, door.y + 1);
+            const int start = Index(approach.x, approach.y);
+            if (&b == &houses.front()) {
+                network[start] = true;
+                level.SetCell(approach, "corridor");
+                continue;
+            }
+            std::vector<int> parent;
+            int end = -1;
+            // Prefer cardinal paths inside the town. A fallback may follow
+            // repaired walkable ground outside it to join fragmented regions.
+            for (int pass = 0; pass < 2 && end < 0; ++pass) {
+                parent.assign(width_ * height_, -1);
+                parent[start] = start;
+                std::vector<int> queue{start};
+                for (std::size_t index = 0; index < queue.size() && end < 0; ++index) {
+                    const int cell = queue[index];
+                    if (network[cell]) { end = cell; break; }
+                    for (int dy = -1; dy <= 1; ++dy) {
+                        for (int dx = -1; dx <= 1; ++dx) {
+                            if ((dx == 0 && dy == 0) || (pass == 0 && dx != 0 && dy != 0)) { continue; }
+                            const int x = cell % width_ + dx, y = cell / width_ + dy;
+                            if (x < 0 || y < 0 || x >= width_ || y >= height_) { continue; }
+                            const int next = Index(x, y);
+                            if (parent[next] >= 0 || buildings[next] || !level.get(x, y).isPassable() ||
+                                    (pass == 0 && region_id_[next] != static_cast<int>(id))) { continue; }
+                            parent[next] = cell;
+                            queue.push_back(next);
+                        }
+                    }
+                }
+            }
+            if (end < 0) { continue; }
+            for (int cell = end;; cell = parent[cell]) {
+                network[cell] = true;
+                const auto type = level.get(cell % width_, cell / width_).getType();
+                const bool cultivated = regions_[region_id_[cell]].terrain == Ter::Field;
+                if (!cultivated && type != "bridge" && type != "door_open" && type != "corridor") {
+                    level.SetCell(cell % width_, cell / width_, "corridor");
+                }
+                if (cell == start) { break; }
+            }
+        }
+    }
+}
+
+// Generate gently winding field lanes, joining the first existing village road
+// they reach. Obstacles use safe waypoints rather than being overwritten.
+void CWilderness::ConnectFieldRoads(CMap& level) const
+{
+    std::vector<bool> protected_cell(width_ * height_), network(width_ * height_);
+    std::vector<Position> roads;
+    int anchor = -1;
+    for (const auto& region : regions_) {
+        for (const auto& b : region.buildings) {
+            for (auto y = b.corner1.y; y <= b.corner2.y; ++y) {
+                for (auto x = b.corner1.x; x <= b.corner2.x; ++x) { protected_cell[Index(x, y)] = true; }
+            }
+        }
+    }
+    for (int cell = 0; cell < width_ * height_; ++cell) {
+        if (regions_[region_id_[cell]].terrain != Ter::Town || protected_cell[cell]) { continue; }
+        const auto& tile = level.get(cell % width_, cell / width_);
+        if (tile.getType() == "corridor") {
+            network[cell] = true;
+            roads.emplace_back(cell % width_, cell / width_);
+        }
+        if (tile.isPassable() && (anchor < 0 || edge_dist_[cell] > edge_dist_[anchor])) { anchor = cell; }
+    }
+    if (roads.empty() && anchor >= 0) {
+        level.SetCell(anchor % width_, anchor / width_, "corridor");
+        network[anchor] = true;
+        roads.emplace_back(anchor % width_, anchor / width_);
+    }
+    if (roads.empty()) { return; }
+    auto cost = [&](Position p) {
+        if (!level.inside(p) || protected_cell[Index(p.x, p.y)]) { return 0; }
+        const auto& tile = level.get(p);
+        if (tile.getType() == "tree") { return 4; }
+        if (tile.getType() == "water") { return 6; }
+        return tile.isPassable() ? 1 : 0;
+    };
+    auto append_winding = [&](std::vector<Position>& path, Position start, Position end) {
+        std::vector<Position> points;
+        BuildWindingPath(points, level, start, end, 8);
+        for (auto point : points) {
+            if (path.empty() || path.back() != point) { path.push_back(point); }
+        }
+    };
+    for (std::size_t id = 0; id < regions_.size(); ++id) {
+        const auto& field = regions_[id];
+        if (field.terrain != Ter::Field || field.gate < 0) { continue; }
+        const Position gate(field.gate % width_, field.gate / width_);
+        const auto target = *std::ranges::min_element(roads, [&](Position a, Position b) {
+            return gate.Distance(a) < gate.Distance(b);
+        });
+        Position approach;
+        auto best = std::numeric_limits<std::size_t>::max();
+        for (const auto [dx, dy] : std::array<std::pair<int, int>, 4>{{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}}) {
+            const Position next(gate.x + dx, gate.y + dy);
+            if (cost(next) > 0 && region_id_[Index(next.x, next.y)] != static_cast<int>(id) && next.Distance(target) < best) {
+                best = next.Distance(target);
+                approach = next;
+            }
+        }
+        if (approach.x == Position::invalid) { continue; }
+        std::vector<Position> path;
+        for (int attempt = 0; attempt < 6; ++attempt) {
+            path.clear();
+            append_winding(path, approach, target);
+            const auto joined = std::ranges::find_if(path, [&](Position p) { return network[Index(p.x, p.y)]; });
+            if (joined != path.end()) { path.erase(joined + 1, path.end()); }
+            if (std::ranges::all_of(path, [&](Position p) { return cost(p) > 0; })) { break; }
+            path.clear();
+        }
+        if (path.empty()) {
+            // Route around hedges, buildings, mountains and ravines. Each
+            // simplify the safe route before winding each longer segment.
+            std::vector<int> distance(width_ * height_, std::numeric_limits<int>::max());
+            std::vector<int> parent(width_ * height_, -1);
+            using Entry = std::pair<int, int>;
+            std::priority_queue<Entry, std::vector<Entry>, std::greater<Entry>> pending;
+            const int start = Index(approach.x, approach.y);
+            distance[start] = 0;
+            pending.emplace(0, start);
+            int end = -1;
+            while (!pending.empty()) {
+                const auto [value, cell] = pending.top(); pending.pop();
+                if (value != distance[cell]) { continue; }
+                if (network[cell]) { end = cell; break; }
+                for (int dy = -1; dy <= 1; ++dy) {
+                    for (int dx = -1; dx <= 1; ++dx) {
+                        if (dx == 0 && dy == 0) { continue; }
+                        const Position next(cell % width_ + dx, cell / width_ + dy);
+                        const int step = cost(next);
+                        if (step == 0) { continue; }
+                        const int index = Index(next.x, next.y);
+                        if (value + step < distance[index]) {
+                            distance[index] = value + step;
+                            parent[index] = cell;
+                            pending.emplace(value + step, index);
+                        }
+                    }
+                }
+            }
+            if (end < 0) { continue; }
+            std::vector<Position> waypoints;
+            for (int cell = end; cell >= 0; cell = parent[cell]) { waypoints.emplace_back(cell % width_, cell / width_); }
+            std::reverse(waypoints.begin(), waypoints.end());
+            for (std::size_t i = 0; i + 1 < waypoints.size();) {
+                // Remove point-by-point search turns using clear sightlines.
+                auto next = std::min(i + 24, waypoints.size() - 1);
+                std::vector<Position> straight;
+                for (; next > i; --next) {
+                    straight = waypoints[i].BuildBresenhamLine(waypoints[next]);
+                    if (std::ranges::all_of(straight, [&](Position p) { return cost(p) > 0; })) { break; }
+                }
+                std::vector<Position> segment;
+                append_winding(segment, waypoints[i], waypoints[next]);
+                if (!std::ranges::all_of(segment, [&](Position p) { return cost(p) > 0; })) {
+                    segment = straight; // Tight obstacles leave no room to bend.
+                }
+                for (auto p : segment) {
+                    if (path.empty() || path.back() != p) { path.push_back(p); }
+                }
+                i = next;
+            }
+            if (waypoints.size() == 1) { path = waypoints; }
+        }
+        for (auto p : path) {
+            const int cell = Index(p.x, p.y);
+            const auto type = level.get(p).getType();
+            const bool cultivated = regions_[region_id_[cell]].terrain == Ter::Field;
+            if (!cultivated && type != "door_open" && type != "corridor" && type != "bridge") {
+                level.SetCell(p, type == "water" ? "bridge" : "corridor");
+            }
+            if (!network[cell]) { roads.push_back(p); network[cell] = true; }
+        }
+    }
+}
+
 SWildernessInfo CWilderness::Apply(CMap & level) const
 {
     SWildernessInfo info;
@@ -1232,6 +1487,9 @@ SWildernessInfo CWilderness::Apply(CMap & level) const
     for (std::size_t i = 0; i < regions_.size(); ++i) {
         const Region & region = regions_[i];
 
+        if (region.terrain == Ter::Field && region.gate >= 0) {
+            info.field_gates.emplace_back(region.gate % width_, region.gate / width_);
+        }
         if (region.terrain != Ter::Town) {
             continue;
         }
@@ -1324,6 +1582,8 @@ SWildernessInfo CreateVoronoiWilderness(CMap & level, int num_regions = 0, bool 
     // still lead into a hedge and a forest may still be too dense to
     // cross. Open up whatever pockets are left, the cheapest way first.
     MakeReachable(level, WildernessOpenings);
+    wilderness.ConnectTownDoors(level);
+    wilderness.ConnectFieldRoads(level);
 
     return info;
 }

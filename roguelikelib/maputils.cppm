@@ -651,61 +651,57 @@ void DrawRectangleOnMap(CMap &level, const Position& p1, const Position& p2, std
  *
  */
 
-/** Generates a winding road without sharp turns.
+/** Build a gently winding path using spaced, perturbed waypoints.
  *
- * The road winds regardless of the relative location
- * of endpoints (unless it is too short).
- *
- * @param pertamt controls the degree of perturbation the initially straight
- *        road is subjected to; typical values of 5-50 give decent results.
- * @param tile_type defines the @ref CTile type.
- * @return Whether the road generation was successful.
+ * Unlike a zigzag/sigsag path, it can wind even when its endpoints share
+ * a row or column. Waypoint turns are limited to 45 degrees. The returned
+ * tiles are eight-neighbour connected; raster stair steps still occur.
+ * The map supplies bounds only: callers must check terrain collisions.
+ * pertamt is a nonnegative perturbation amount (typically 5–50).
  */
-bool AddWindingRoad(CMap &level,
-                    const Position& start,
-                    const Position& end,
-                    int pertamt,
-                    std::string_view tile_type = "corridor")
+bool BuildWindingPath(std::vector<Position>& road, const CMap& level,
+                      const Position& start, const Position& end, int pertamt)
 {
-    if (!level.inside(start) || !level.inside(end)) {
+    road.clear();
+    if (!level.inside(start) || !level.inside(end) || pertamt < 0) {
         return false;
     }
-
-    std::vector<Position> waypts = start.BuildBresenhamLine(end);
-
-    std::vector<Position> road;
-
-    if (waypts.size() < 5) {
-        road = waypts;
-    } else {
-        std::vector<Position> sampled_waypts;
-
-        for (std::size_t i = 0; i < waypts.size();) {
-            sampled_waypts.push_back(waypts[i]);
-
-            if (i < waypts.size() - 5) {
-                i += 2 + Random(2);
-            } else if (i == waypts.size() - 5) {
-                i += 2;
-            } else {
-                i = waypts.size() - 1;
-            }
-        }
-
-        waypts = sampled_waypts;
-
-        detail::PerturbPath(waypts, level, 2, 5, pertamt);
-        detail::ConnectWaypoints(road, waypts);
-        detail::CutCorners(road);
+    const auto straight = start.BuildBresenhamLine(end);
+    if (straight.size() < 5) {
+        road = straight;
+        return true;
     }
+    std::vector<Position> waypoints{straight.front()};
+    for (std::size_t i = 2 + Random(2); i + 2 < straight.size(); i += 2 + Random(2)) {
+        waypoints.push_back(straight[i]);
+    }
+    // Append the endpoint once. The old sampler repeatedly selected the
+    // last index without advancing, so paths of five tiles or more hung.
+    waypoints.push_back(straight.back());
+    detail::PerturbPath(waypoints, level, 2, 5, pertamt);
+    detail::ConnectWaypoints(road, waypoints);
+    detail::CutCorners(road);
+    return true;
+}
 
+/** Draw a winding road without large sharp turns.
+ *
+ * Uses BuildWindingPath; pertamt typically ranges from 5 to 50. This
+ * drawing helper overwrites terrain and leaves the outer map edge alone.
+ */
+bool AddWindingRoad(CMap& level, const Position& start, const Position& end,
+                    int pertamt, std::string_view tile_type = "corridor")
+{
+    std::vector<Position> road;
+    if (!BuildWindingPath(road, level, start, end, pertamt)) {
+        return false;
+    }
     for (const auto& pos : road) {
         if (pos.x >= 1 && pos.x < level.getWidth() - 1 &&
                 pos.y >= 1 && pos.y < level.getHeight() - 1) {
             level.SetCell(pos.x, pos.y, tile_type);
         }
     }
-
     return true;
 }
 
@@ -782,7 +778,9 @@ void BuildZigzagPath(
     }
 }
 
-/** The same as @ref BuildZigzagPath, but without sharp corners.
+/** Build a zigzag route with individual grid corners cut diagonally.
+ * This trims one-cell corners; it does not smooth the larger zigzag bends.
+ * Use BuildWindingPath for gently winding routes with limited turn angles.
  */
 void BuildSigsagPath(
     std::vector<Position>& ret,
@@ -834,7 +832,8 @@ bool AddZigzagRoad(
 
 //////////////////////////////////////////////////////////////////////////
 
-/** The same as @ref AddZigzagRoad, but without sharp corners.
+/** Draw a zigzag route with individual grid corners cut diagonally.
+ * Large bends remain angular; use AddWindingRoad for gentle winding.
  */
 bool AddSigsagRoad(
     CMap &level,
