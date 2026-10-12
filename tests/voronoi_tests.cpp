@@ -65,3 +65,47 @@ void TestVoronoiScale()
     const auto huge_info = RL::CreateVoronoiWilderness(huge);
     Check(huge_info.regions == 450, "automatic segmentation continues beyond the old 400-region ceiling");
 }
+
+void TestVoronoiChasms()
+{
+    std::array<std::size_t, 3> counts{};
+    std::array<std::uint64_t, 3> brightness{};
+    for (unsigned seed = 0; seed < 8; ++seed) {
+        RL::CMap map(RL::Size(120, 80));
+        RL::InitRandomness(seed);
+        RL::CreateVoronoiWilderness(map, 40, true);
+        bool blocked = true;
+        std::string snapshot;
+        for (std::size_t y = 0; y < map.getHeight(); ++y) {
+            for (std::size_t x = 0; x < map.getWidth(); ++x) {
+                const auto& tile = map.get(x, y);
+                const int layer = tile.getType() == "chasm_rim" ? 0 : tile.getType() == "chasm_wall" ? 1 :
+                                  tile.getType() == "chasm" ? 2 : -1;
+                if (layer >= 0) {
+                    blocked &= !tile.isPassable();
+                    ++counts[layer];
+                    const auto colour = tile.getColor();
+                    brightness[layer] += ((colour >> 16) & 0xFF) + ((colour >> 8) & 0xFF) + (colour & 0xFF);
+                    Check(tile.getGlyph() != U'%', "ravines use rocky rims and subdued depth glyphs");
+                }
+                snapshot += std::format("{}:{}:{};", tile.getType(), tile.getColor(), static_cast<unsigned>(tile.getGlyph()));
+            }
+        }
+        Check(blocked, "rims, descending faces and deep chasms remain impassable after connectivity repairs");
+        RL::InitRandomness(seed);
+        RL::CreateVoronoiWilderness(map, 40, true);
+        std::string repeated;
+        for (std::size_t y = 0; y < map.getHeight(); ++y) {
+            for (std::size_t x = 0; x < map.getWidth(); ++x) {
+                const auto& tile = map.get(x, y);
+                repeated += std::format("{}:{}:{};", tile.getType(), tile.getColor(), static_cast<unsigned>(tile.getGlyph()));
+            }
+        }
+        Check(snapshot == repeated, "ravine shapes, rim glyphs and depth colours reproduce from the seed");
+    }
+    Check(std::ranges::all_of(counts, [](auto count) { return count > 0; }), "ravines contain rims, descending faces and deeper pockets");
+    if (std::ranges::all_of(counts, [](auto count) { return count > 0; })) {
+        Check(brightness[0] / counts[0] > brightness[1] / counts[1] && brightness[1] / counts[1] > brightness[2] / counts[2],
+              "ravines become progressively darker from the rim into the depths");
+    }
+}

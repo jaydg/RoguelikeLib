@@ -14,6 +14,7 @@ void TestDistanceMap();
 void TestNames();
 void TestGrowthTown();
 void TestVoronoiScale();
+void TestVoronoiChasms();
 void TestMapStamp();
 void TestTownRoads();
 void TestScreen();
@@ -43,6 +44,7 @@ int main(int argc, char* argv[])
         {"Names", TestNames},
         {"GrowthTown", TestGrowthTown},
         {"VoronoiScale", TestVoronoiScale},
+        {"VoronoiChasms", TestVoronoiChasms},
         {"MapStamp", TestMapStamp},
         {"TownRoads", TestTownRoads},
         {"Screen", TestScreen},

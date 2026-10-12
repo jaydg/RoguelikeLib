@@ -318,3 +318,9 @@ count. Voronoi town buildings are 4–7 tiles wide and 4–7 tiles high, includi
 walls; larger town regions hold multiple buildings, with one tile of open
 ground between houses and their neighbours. All buildings are returned in
 `SWildernessInfo::buildings`.
+
+Voronoi chasms are branching, curved ravines with open grassy shoulders.
+Broken rocky rims (`#` and `^`) fade through descending faces (`:`) into
+subdued depths (`·`). Depth shading follows the actual ravine edges.
+`chasm_rim`, `chasm_wall` and `chasm` are all impassable and are never
+opened by wilderness connectivity repairs.

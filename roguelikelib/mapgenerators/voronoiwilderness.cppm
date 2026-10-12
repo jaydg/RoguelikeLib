@@ -132,7 +132,9 @@ void RegisterWildernessTiles()
     add("fallen_log", {U'=', 0x8B6B43, true, true}); // low enough to step over
     add("fallen_log_vertical", {U'|', 0x8B6B43, true, true});
     add("peak", {U'*', 0xF5F5F5, false, false});    // snow-capped summit
-    add("chasm", {U'%', 0x444444, true, false});    // too deep to cross
+    add("chasm", {U'·', 0x28242E, true, false});   // subdued depths
+    add("chasm_rim", {U'#', 0x8E7862, true, false}); // broken cliff edge
+    add("chasm_wall", {U':', 0x625047, true, false}); // descending rock face
 }
 
 // Deterministic per-cell hash noise in [0, 1). The cheap value-noise base
@@ -372,6 +374,7 @@ private:
     std::vector<Region> regions_;
     std::vector<int> region_id_;        // which region each cell belongs to
     std::vector<int> edge_dist_;        // how far each cell is from its region's edge, in thirds of a cell
+    std::vector<int> chasm_depth_;     // distance from the irregular ravine rim
     std::vector<double> elevation_;     // that depth normalised to 0..1 and smoothed
     std::vector<std::vector<int>> touching_;   // which regions share a border on the map
     std::vector<std::vector<int>> adjacency_;
@@ -403,6 +406,7 @@ private:
     // What stands at one cell
     [[nodiscard]] std::string_view TileAt(const int x, const int y) const;
     void AddHillFeatures(CMap& level) const;
+    void ShapeChasms();
 };
 
 CWilderness::CWilderness(const int width, const int height, const int num_regions, const bool with_buildings)
@@ -628,6 +632,7 @@ CWilderness::CWilderness(const int width, const int height, const int num_region
     }
 
     AssignTerrain();
+    ShapeChasms();
     PlaceFeatures();
 }
 
@@ -718,6 +723,104 @@ void CWilderness::AssignTerrain()
                 PassableGraphConnected(regions_, touching_, static_cast<int>(i))) {
             regions_[i].terrain = Ter::Blocked;
             ++have_blocked;
+        }
+    }
+}
+
+// Carve a branching ravine inside each selected region rather than using
+// the whole Voronoi polygon as a uniformly blocked patch. Leave its outer
+// shoulder open, so the new shape adds no barriers to neighbouring regions.
+void CWilderness::ShapeChasms()
+{
+    std::vector<std::vector<int>> cells(regions_.size());
+    for (int cell = 0; cell < width_ * height_; ++cell) {
+        if (regions_[region_id_[cell]].terrain == Ter::Blocked) {
+            cells[region_id_[cell]].push_back(cell);
+        }
+    }
+    std::vector<bool> mask(width_ * height_);
+    for (std::size_t id = 0; id < cells.size(); ++id) {
+        if (cells[id].empty()) {
+            continue;
+        }
+        int centre = cells[id].front();
+        int x0 = width_, x1 = 0, y0 = height_, y1 = 0;
+        for (int cell : cells[id]) {
+            if (edge_dist_[cell] > edge_dist_[centre]) { centre = cell; }
+            x0 = std::min(x0, cell % width_);
+            x1 = std::max(x1, cell % width_);
+            y0 = std::min(y0, cell / width_);
+            y1 = std::max(y1, cell / width_);
+        }
+        const auto seed = noise_seed_ + 191 + id * 1013;
+        const double cx = centre % width_, cy = centre / width_;
+        const double angle = (x1 - x0 >= y1 - y0 ? 0 : 1.570796326794897) +
+                             (HashNoise(centre, 0, seed) - 0.5) * 0.60;
+        auto paint = [&](double px, double py, double radius) {
+            for (int y = std::max(0, static_cast<int>(std::floor(py - radius - 1)));
+                    y <= std::min(height_ - 1, static_cast<int>(std::ceil(py + radius + 1))); ++y) {
+                for (int x = std::max(0, static_cast<int>(std::floor(px - radius - 1)));
+                        x <= std::min(width_ - 1, static_cast<int>(std::ceil(px + radius + 1))); ++x) {
+                    const int cell = Index(x, y);
+                    if (region_id_[cell] != static_cast<int>(id) || edge_dist_[cell] == 0) { continue; }
+                    const double edge = radius + 0.30 * (Fbm(x * 0.35, y * 0.35, seed) - 0.5);
+                    if ((x - px) * (x - px) + (y - py) * (y - py) <= edge * edge) {
+                        mask[cell] = true;
+                    }
+                }
+            }
+        };
+        auto arm = [&](double direction, double length, int branch) {
+            const double bend = (HashNoise(centre, branch, seed) - 0.5) * length * 0.30;
+            const int steps = std::max(1, static_cast<int>(std::ceil(length * 2)));
+            for (int step = 0; step <= steps; ++step) {
+                const double t = static_cast<double>(step) / steps;
+                const double curve = std::sin(t * 3.141592653589793) * bend;
+                const double x = cx + std::cos(direction) * length * t - std::sin(direction) * curve;
+                const double y = cy + std::sin(direction) * length * t + std::cos(direction) * curve;
+                const int ix = static_cast<int>(std::lround(x)), iy = static_cast<int>(std::lround(y));
+                if (ix < 0 || iy < 0 || ix >= width_ || iy >= height_ ||
+                        region_id_[Index(ix, iy)] != static_cast<int>(id)) { break; }
+                const double radius = 1.05 + (1.0 - t) * 1.35 +
+                                      0.45 * Fbm(x * 0.22, y * 0.22, seed + branch);
+                paint(x, y, radius);
+            }
+        };
+        const double span = std::max(x1 - x0, y1 - y0);
+        arm(angle, span * 0.55, 1);
+        arm(angle + 3.141592653589793, span * 0.55, 2);
+        arm(angle + (HashNoise(centre, 3, seed) < 0.5 ? 1 : -1) * 1.15, span * 0.35, 4);
+    }
+    // Eight-neighbour distance shading follows the actual fissure edges,
+    // including bends and branches, rather than the original region shape.
+    chasm_depth_.assign(width_ * height_, 0);
+    std::queue<int> pending;
+    for (int cell = 0; cell < width_ * height_; ++cell) {
+        if (!mask[cell]) { continue; }
+        bool rim = false;
+        for (int dy = -1; dy <= 1; ++dy) {
+            for (int dx = -1; dx <= 1; ++dx) {
+                const int x = cell % width_ + dx, y = cell / width_ + dy;
+                rim |= x < 0 || y < 0 || x >= width_ || y >= height_ || !mask[Index(x, y)];
+            }
+        }
+        if (rim) {
+            chasm_depth_[cell] = 1;
+            pending.push(cell);
+        }
+    }
+    while (!pending.empty()) {
+        const int cell = pending.front(); pending.pop();
+        for (int dy = -1; dy <= 1; ++dy) {
+            for (int dx = -1; dx <= 1; ++dx) {
+                const int x = cell % width_ + dx, y = cell / width_ + dy;
+                if (x < 0 || y < 0 || x >= width_ || y >= height_) { continue; }
+                const int next = Index(x, y);
+                if (mask[next] && chasm_depth_[next] == 0) {
+                    chasm_depth_[next] = chasm_depth_[cell] + 1;
+                    pending.push(next);
+                }
+            }
         }
     }
 }
@@ -843,7 +946,10 @@ std::string_view CWilderness::TileAt(const int x, const int y) const
         return "water";
 
     case Ter::Blocked:
-        return "chasm";
+        if (chasm_depth_[cell] == 0) {
+            return "grass"; // Open shoulders around the ravine.
+        }
+        return chasm_depth_[cell] == 1 ? "chasm_rim" : chasm_depth_[cell] == 2 ? "chasm_wall" : "chasm";
 
     case Ter::Grass:            // open region: sparse point terrain
         if (noise > 0.88) {
@@ -1097,6 +1203,21 @@ SWildernessInfo CWilderness::Apply(CMap & level) const
                 }
                 auto data = CTileData::get(type).second;
                 data.rgb_color = GetJitteredColor(colour);
+                level.get(x, y) = CTile(type, data);
+            } else if (type == "chasm" || type == "chasm_rim" || type == "chasm_wall") {
+                auto data = CTileData::get(type).second;
+                const int depth = chasm_depth_[Index(x, y)];
+                const double shade = std::clamp((depth - 1) / 3.0, 0.0, 1.0);
+                std::uint32_t colour = 0;
+                constexpr std::uint32_t rim = 0x8E7862, deep = 0x211E28;
+                for (int shift : {16, 8, 0}) {
+                    const double channel = ((rim >> shift) & 0xFF) * (1.0 - shade) + ((deep >> shift) & 0xFF) * shade;
+                    colour |= static_cast<std::uint32_t>(std::lround(channel)) << shift;
+                }
+                data.rgb_color = GetJitteredColor(colour);
+                if (type == "chasm_rim" && HashNoise(x, y, noise_seed_ + 197) < 0.25) {
+                    data.glyph = U'^';
+                }
                 level.get(x, y) = CTile(type, data);
             } else {
                 level.SetCell(static_cast<std::size_t>(x), static_cast<std::size_t>(y), type);
