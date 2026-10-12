@@ -135,6 +135,7 @@ void RegisterWildernessTiles()
     add("animal_trail", {U'.', 0x929B70, true, true}); // faint worn ground
     add("fallen_log", {U'=', 0x8B6B43, true, true}); // low enough to step over
     add("fallen_log_vertical", {U'|', 0x8B6B43, true, true});
+    add("mountain_rock", {U'^', 0x888888, false, false}); // impassable mountain rock
     add("peak", {U'*', 0xF5F5F5, false, false});    // snow-capped summit
     add("chasm", {U'·', 0x28242E, true, false});   // subdued depths
     add("chasm_rim", {U'#', 0x8E7862, true, false}); // broken cliff edge
@@ -1070,7 +1071,7 @@ std::string_view CWilderness::TileAt(const int x, const int y) const
         const double height = HeightAt(x, y) + 0.4 * (noise - 0.5);
 
         if (height > 0.45) {
-            return "wall";
+            return "mountain_rock";
         }
 
         if (height > 0.25) {
@@ -1543,7 +1544,7 @@ inline constexpr std::array<SOpening, 3> WildernessOpenings = {{
 // at difficulty 0, the hardest peaks at 9, and lakes and chasms go in only
 // where the passable regions stay connected.
 //
-// The tile types field, hedge, slope, peak and chasm are registered the
+// The tile types field, hedge, slope, mountain_rock, peak and chasm are registered the
 // first time this runs; a game that registered a type of one of those
 // names itself keeps its own.
 //
