@@ -188,8 +188,12 @@ void TownRoad(CMap& map, Position from, Position to, int radius = 0)
 
 // Replaces the map with a walled market town. Returns at most the requested
 // number of buildings, with inclusive wall corners and street-facing doors.
-export std::vector<SBuilding> CreateGrowthTown(CMap& map, std::size_t number_of_buildings = 80)
+export std::vector<SBuilding> CreateGrowthTown(CMap& map, std::size_t number_of_buildings = 80,
+                                                  std::vector<Position>* town_gates = nullptr)
 {
+    if (town_gates) {
+        town_gates->clear();
+    }
     map.Clear("grass");
     const auto width = map.getWidth(), height = map.getHeight();
     if (width == 0 || height == 0) {
@@ -497,6 +501,38 @@ export std::vector<SBuilding> CreateGrowthTown(CMap& map, std::size_t number_of_
     for (const auto& square : squares) {
         if (square.side >= 3) {
             map.SetCell(square.centre, "well");
+        }
+    }
+    // Export the actual openings at the ramparts, rather than the temporary
+    // edge waypoints used to draw the roads. Leave no road stubs outside.
+    for (const auto edge : gates) {
+        Position opening;
+        std::size_t nearest = std::numeric_limits<std::size_t>::max();
+        for (std::size_t y = 1; y + 1 < height; ++y) {
+            for (std::size_t x = 1; x + 1 < width; ++x) {
+                if (!inside[y * width + x] || map.get(x, y).getType() != "corridor") {
+                    continue;
+                }
+                if (inside[y * width + x - 1] && inside[y * width + x + 1] &&
+                        inside[(y - 1) * width + x] && inside[(y + 1) * width + x]) {
+                    continue;
+                }
+                const auto distance = Position(x, y).Distance(edge);
+                if (distance < nearest) {
+                    nearest = distance;
+                    opening = Position(x, y);
+                }
+            }
+        }
+        if (town_gates && opening.x != Position::invalid) {
+            town_gates->push_back(opening);
+        }
+    }
+    for (std::size_t y = 0; y < height; ++y) {
+        for (std::size_t x = 0; x < width; ++x) {
+            if (!inside[y * width + x] && map.get(x, y).getType() == "corridor") {
+                map.SetCell(x, y, "grass");
+            }
         }
     }
     return buildings;

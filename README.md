@@ -234,3 +234,52 @@ rooms are reachable from the street using cardinal steps when doors are
 opened. This is a single-floor adaptation; it does not expose the paper's
 hierarchical zones or user-defined adjacency constraints. Select **Growth
 Town** in the feature demo to explore it.
+
+Map stamping
+------------
+
+`destination.Stamp(source, Position(x, y))` copies a map into another map,
+placing its top-left corner at `(x, y)`. It copies whole tiles, preserving
+colours, glyphs, transparency and movement properties. The source stays
+unchanged; overlapping self-stamps read a snapshot. Stamps are clipped at
+the destination's right and bottom edges. Off-map origins and empty maps
+are no-ops. Positions use the library's nonnegative coordinates.
+
+An optional list of tile types leaves the corresponding destination cells
+untouched. For example, keep wilderness under the grass outside a town:
+
+```cpp
+import rl.map;
+import rl.position;
+import rl.mapgenerators;
+import std;
+
+RL::CMap wilderness(RL::Size(500, 300));
+RL::CreateVoronoiWilderness(wilderness);
+RL::CMap town(RL::Size(79, 50));
+RL::CreateGrowthTown(town);
+const std::array<std::string_view, 1> skip{"grass"};
+wilderness.Stamp(town, RL::Position(210, 120), skip);
+```
+
+Omit `skip` to copy the entire rectangular map, including its grass.
+Stamping copies terrain; callers translate any returned building positions
+by the stamp offset when keeping that metadata. The feature demo includes
+**Town in Wilderness**, showing a Growth Town stamped over a forest.
+
+To connect a Growth Town to an existing wilderness road network, import
+`rl.maputils` and use the reported local gate positions:
+
+```cpp
+std::vector<RL::Position> gates;
+RL::CreateGrowthTown(town, 80, &gates);
+const auto connected = RL::StampTownWithRoads(wilderness, town,
+                                            RL::Position(210, 120), gates);
+```
+
+Town roads stop at the ramparts. `StampTownWithRoads` skips grass, preserves
+the stamped town, and routes single-tile connections from its gates to
+surviving wilderness `corridor` or `bridge` tiles. It prefers clear ground,
+can clear trees and rocks, and adds bridges over water when needed. It
+returns the number of gates connected; gates with no reachable road are
+left without external roads. The Town in Wilderness demo uses this helper.

@@ -148,14 +148,14 @@ void CheckUrbanForm(const RL::CMap& map, const std::vector<RL::SBuilding>& build
         }
     }
     Check(overlaps, "stepped ramparts overlap instead of leaving diagonal squeezing gaps");
-    bool broad_gates = true;
-    for (std::size_t offset = 0; offset < 3; ++offset) {
-        broad_gates &= map.get(w / 2 - 1 + offset, 0).getType() == "corridor" &&
-                       map.get(w / 2 - 1 + offset, h - 1).getType() == "corridor" &&
-                       map.get(0, h / 2 - 1 + offset).getType() == "corridor" &&
-                       map.get(w - 1, h / 2 - 1 + offset).getType() == "corridor";
+    bool no_stubs = true;
+    for (std::size_t x = 0; x < w; ++x) {
+        no_stubs &= map.get(x, 0).getType() != "corridor" && map.get(x, h - 1).getType() != "corridor";
     }
-    Check(broad_gates, "all four main roads have three-tile-wide approaches");
+    for (std::size_t y = 0; y < h; ++y) {
+        no_stubs &= map.get(0, y).getType() != "corridor" && map.get(w - 1, y).getType() != "corridor";
+    }
+    Check(no_stubs, "town roads stop at the ramparts instead of reaching the map edges");
     std::vector<bool> garden(w * h);
     for (std::size_t c = 0; c < w * h; ++c) {
         garden[c] = map.get(c % w, c / w).getType() == "plant";
@@ -195,7 +195,12 @@ void TestGrowthTown()
     std::size_t house_count = 0, total_width = 0, total_height = 0;
     for (unsigned seed = 0; seed < 100; ++seed) {
         RL::InitRandomness(seed);
-        const auto buildings = RL::CreateGrowthTown(map, 1000);
+        std::vector<RL::Position> gates;
+        const auto buildings = RL::CreateGrowthTown(map, 1000, &gates);
+        Check(gates.size() == 4, "reports four town gates for wilderness connections");
+        for (auto gate : gates) {
+            Check(map.get(gate).getType() == "corridor", "exported gate is an open road at the wall");
+        }
         Check(buildings.size() >= 30 && buildings.size() <= 1000, "fills a standard town with at least thirty buildings");
         CheckUrbanForm(map, buildings);
         std::string wells;

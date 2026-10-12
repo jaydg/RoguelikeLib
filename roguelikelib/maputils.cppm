@@ -868,3 +868,104 @@ bool AddSigsagRoad(
 //////////////////////////////////////////////////////////////////////////
 
 } // end of export namespace RL
+
+// Stamp a town (grass leaves the landscape intact), then join its local
+// gate positions to surviving corridor/bridge tiles in the landscape.
+// Returns the number of gates connected. No road network means no links.
+export namespace RL
+{
+std::size_t StampTownWithRoads(CMap& landscape, const CMap& town, Position origin,
+                              std::span<const Position> gates)
+{
+    if (!landscape.inside(origin) || town.getWidth() == 0 || town.getHeight() == 0) {
+        return 0;
+    }
+    if (&landscape == &town) {
+        const CMap snapshot(town);
+        return StampTownWithRoads(landscape, snapshot, origin, gates);
+    }
+    const auto width = landscape.getWidth(), height = landscape.getHeight();
+    const auto stamp_width = std::min(town.getWidth(), width - origin.x);
+    const auto stamp_height = std::min(town.getHeight(), height - origin.y);
+    std::vector<bool> protected_cell(width * height);
+    for (std::size_t y = 0; y < stamp_height; ++y) {
+        for (std::size_t x = 0; x < stamp_width; ++x) {
+            protected_cell[(origin.y + y) * width + origin.x + x] = town.get(x, y).getType() != "grass";
+        }
+    }
+    const int unreachable = std::numeric_limits<int>::max();
+    std::vector<int> distance(width * height, unreachable);
+    std::vector<std::size_t> parent(width * height, width * height);
+    using Entry = std::pair<int, std::size_t>;
+    std::priority_queue<Entry, std::vector<Entry>, std::greater<Entry>> pending;
+    for (std::size_t y = 0; y < height; ++y) {
+        for (std::size_t x = 0; x < width; ++x) {
+            const auto cell = y * width + x;
+            const auto type = landscape.get(x, y).getType();
+            if (!protected_cell[cell] && (type == "corridor" || type == "bridge")) {
+                distance[cell] = 0;
+                pending.emplace(0, cell);
+            }
+        }
+    }
+    const std::array<std::string_view, 1> skip{"grass"};
+    landscape.Stamp(town, origin, skip);
+    auto neighbors = [&](std::size_t cell) {
+        return std::array{cell % width > 0 ? cell - 1 : width * height,
+                          cell % width + 1 < width ? cell + 1 : width * height,
+                          cell >= width ? cell - width : width * height,
+                          cell + width < width * height ? cell + width : width * height};
+    };
+    // Prefer clear ground, clearing trees when necessary and bridging water
+    // only when useful. Buildings and the entire stamped town are protected.
+    while (!pending.empty()) {
+        const auto [cost, cell] = pending.top();
+        pending.pop();
+        if (cost != distance[cell]) {
+            continue;
+        }
+        for (auto next : neighbors(cell)) {
+            if (next >= width * height || protected_cell[next]) {
+                continue;
+            }
+            const auto type = landscape.get(next % width, next / width).getType();
+            const int step = type == "grass" || type == "corridor" || type == "bridge" ? 1 :
+                             type == "plant" ? 2 : type == "tree" ? 4 : type == "rock" ? 8 :
+                             type == "water" ? 12 : 0;
+            if (step == 0 || cost > unreachable - step || cost + step >= distance[next]) {
+                continue;
+            }
+            distance[next] = cost + step;
+            parent[next] = cell;
+            pending.emplace(distance[next], next);
+        }
+    }
+    std::size_t connected = 0;
+    for (auto gate : gates) {
+        if (gate.x >= stamp_width || gate.y >= stamp_height || town.get(gate).getType() != "corridor") {
+            continue;
+        }
+        const auto cell = (origin.y + gate.y) * width + origin.x + gate.x;
+        auto best = width * height;
+        for (auto next : neighbors(cell)) {
+            if (next < width * height && !protected_cell[next] && distance[next] != unreachable &&
+                    (best == width * height || distance[next] < distance[best])) {
+                best = next;
+            }
+        }
+        if (best == width * height) {
+            continue;
+        }
+        ++connected;
+        while (distance[best] > 0) {
+            const auto type = landscape.get(best % width, best / width).getType();
+            if (type == "corridor" || type == "bridge") {
+                break; // Join a link already laid by an earlier gate.
+            }
+            landscape.SetCell(best % width, best / width, type == "water" ? "bridge" : "corridor");
+            best = parent[best];
+        }
+    }
+    return connected;
+}
+}

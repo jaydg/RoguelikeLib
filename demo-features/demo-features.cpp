@@ -3,6 +3,7 @@ import rl.clock;
 import rl.distancemap;
 import rl.fov;
 import rl.mapgenerators;
+import rl.maputils;
 import rl.pathfinding;
 import rl.randomness;
 import rl.scheduler;
@@ -103,6 +104,17 @@ std::vector<SGenerator> Generators()
             "Growth Town", [](CMap & map)
             {
                 CreateGrowthTown(map);
+            }
+        },
+        {
+            "Town in Wilderness", [](CMap & map)
+            {
+                GenerateForest(map);
+                CMap town(Size(map.getWidth() * 2 / 3, map.getHeight() * 2 / 3));
+                std::vector<Position> gates;
+                CreateGrowthTown(town, 80, &gates);
+                StampTownWithRoads(map, town, Position((map.getWidth() - town.getWidth()) / 2,
+                                                      (map.getHeight() - town.getHeight()) / 2), gates);
             }
         },
         {
