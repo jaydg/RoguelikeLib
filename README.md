@@ -298,3 +298,15 @@ Voronoi wilderness forests use a lighter mix comparable to the forest
 generator: scattered trees, passable underbrush (`plant`), open grass and
 occasional rocks. Density varies gradually across each forest, creating
 thickets and thinner patches rather than continuous blocks of trees.
+
+Walkable Voronoi hills use the plains' grass glyph, shaded continuously
+from green low ground to muted ochre at higher elevations. They contain
+patches of passable `scrub`, occasional flowering `heather`, and about 2%
+scattered rocks. The ground keeps its `slope` tile type for terrain rules.
+
+Some larger hills have short, faint animal trails (`animal_trail`, `.`),
+with long gentle stretches and occasional bends. Only about 30% of eligible
+hills get a trail, limited to 6–16 tiles; most hills remain undisturbed. Occasional fallen logs span
+2–3 tiles, shown as `=` horizontally or `|` vertically. Trails and logs
+are passable; logs do not overwrite trails, rocks, buildings or other biomes.
+Both features follow the map seed.

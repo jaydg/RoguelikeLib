@@ -129,7 +129,12 @@ void RegisterWildernessTiles()
 
     add("field", {U',', 0xD9C463, true, true});     // farmland
     add("hedge", {U'#', 0x2E7D32, false, false});   // what walls a field in
-    add("slope", {U':', 0x9C8C6E, true, true});     // walkable hillside
+    add("slope", {CTileData::get("grass").second.glyph, 0xA7CC7C, true, true}); // elevation-tinted grass
+    add("scrub", {U'&', 0x84945A, false, true});   // low hillside bushes
+    add("heather", {U'*', 0xB889B4, true, true}); // sparse flowering ground cover
+    add("animal_trail", {U'.', 0x929B70, true, true}); // faint worn ground
+    add("fallen_log", {U'=', 0x8B6B43, true, true}); // low enough to step over
+    add("fallen_log_vertical", {U'|', 0x8B6B43, true, true});
     add("peak", {U'*', 0xF5F5F5, false, false});    // snow-capped summit
     add("chasm", {U'%', 0x444444, true, false});    // too deep to cross
 }
@@ -401,6 +406,7 @@ private:
 
     // What stands at one cell
     [[nodiscard]] std::string_view TileAt(const int x, const int y) const;
+    void AddHillFeatures(CMap& level) const;
 };
 
 CWilderness::CWilderness(const int width, const int height, const int num_regions, const bool with_buildings)
@@ -930,20 +936,20 @@ std::string_view CWilderness::TileAt(const int x, const int y) const
         return noise > 0.90 ? "plant" : "field";
 
     case Ter::Hills: {
-        // Rolling ground: the region rises towards its middle and the
-        // noise puts hillocks on it. Only the crags on the tops are rock,
-        // so hills never ring anything in.
-        const double height = 0.5 * HeightAt(x, y) + 0.5 * Fbm(x * 0.15, y * 0.15, noise_seed_ + 99);
-
-        if (height > 0.68) {
+        // Sparse rocks do not turn the hilltops into continuous barriers.
+        // Scrub and flowering heather favour coherent vegetation patches.
+        const double scatter = HashNoise(x, y, noise_seed_ + 163);
+        const double cover = Fbm(x * 0.10, y * 0.10, noise_seed_ + 167);
+        if (scatter < 0.02) {
             return "rock";
         }
-
-        if (height > 0.50) {
-            return "slope";
+        if (scatter < 0.04 && cover > 0.55) {
+            return "heather";
         }
-
-        return "grass";
+        if (scatter < 0.10 + 0.10 * cover) {
+            return "scrub";
+        }
+        return "slope";
     }
 
     case Ter::Mountain: {
@@ -997,6 +1003,122 @@ std::string_view CWilderness::TileAt(const int x, const int y) const
     return "wall";
 }
 
+// Small trails wander through each hillside, following its contours and
+// staying within the region. Logs are sparse short objects, not scatter
+// noise; neither feature blocks movement or replaces other biomes.
+void CWilderness::AddHillFeatures(CMap& level) const
+{
+    std::vector<std::vector<int>> cells(regions_.size());
+    for (int cell = 0; cell < width_ * height_; ++cell) {
+        const auto id = region_id_[cell];
+        if (regions_[id].terrain == Ter::Hills) {
+            cells[id].push_back(cell);
+        }
+    }
+    auto ground = [&](int cell) {
+        const auto type = level.get(cell % width_, cell / width_).getType();
+        return type == "slope" || type == "scrub" || type == "heather";
+    };
+    constexpr std::array<std::pair<int, int>, 4> directions{{{1, 0}, {0, 1}, {-1, 0}, {0, -1}}};
+    std::vector<bool> visited(width_ * height_);
+    for (std::size_t id = 0; id < cells.size(); ++id) {
+        if (cells[id].size() < 12) {
+            continue;
+        }
+        const auto seed = noise_seed_ + 179 + id * 1009;
+        int start = -1;
+        for (int cell : cells[id]) {
+            if (ground(cell) && (start < 0 || edge_dist_[cell] > edge_dist_[start])) {
+                start = cell;
+            }
+        }
+        if (start < 0) {
+            continue;
+        }
+        int heading = static_cast<int>(HashNoise(start, 0, seed) * 4);
+        int current = start;
+        std::vector<int> trail{start};
+        visited[start] = true;
+        // Only some larger hills have a short, faint trail. Most remain
+        // undisturbed instead of drawing a path through every region.
+        const bool has_trail = cells[id].size() >= 80 && HashNoise(start, 5, seed) < 0.30;
+        const int length = has_trail ? std::clamp(static_cast<int>(0.75 * std::sqrt(cells[id].size())), 6, 16) : 0;
+        for (int step = 1; step < length; ++step) {
+            int best = -1, best_direction = heading;
+            double lowest = std::numeric_limits<double>::max();
+            for (int d = 0; d < 4; ++d) {
+                if (d == (heading + 2) % 4) {
+                    continue; // Never curl back into a tight zigzag.
+                }
+                const int x = current % width_ + directions[d].first;
+                const int y = current / width_ + directions[d].second;
+                if (x < 0 || y < 0 || x >= width_ || y >= height_) {
+                    continue;
+                }
+                const int cell = Index(x, y);
+                if (region_id_[cell] != static_cast<int>(id) || visited[cell] || !ground(cell)) {
+                    continue;
+                }
+                const double turn = step % 4 == 0 ? 0.20 : 0.80;
+                const double score = 0.45 * HashNoise(x, y, seed + step) + (d == heading ? 0 : turn) +
+                                     2 * std::abs(elevation_[cell] - elevation_[current]);
+                if (score < lowest) {
+                    lowest = score;
+                    best = cell;
+                    best_direction = d;
+                }
+            }
+            if (best < 0) {
+                break;
+            }
+            current = best;
+            heading = best_direction;
+            visited[current] = true;
+            trail.push_back(current);
+        }
+        if (trail.size() >= 6) {
+            for (int cell : trail) {
+                level.SetCell(cell % width_, cell / width_, "animal_trail");
+            }
+        }
+        // About one short log per 300 hillside tiles. Candidate ordering
+        // and orientation are seeded, so the same map remains reproducible.
+        int remaining = std::max(1, static_cast<int>(cells[id].size() / 300));
+        if (HashNoise(start, 1, seed) < 0.35) {
+            continue; // Some hills are entirely free of fallen timber.
+        }
+        for (int cell : cells[id]) {
+            if (remaining == 0) {
+                break;
+            }
+            if (HashNoise(cell, 2, seed) > 0.03 || !ground(cell)) {
+                continue;
+            }
+            const bool vertical = HashNoise(cell, 3, seed) < 0.5;
+            const int size = HashNoise(cell, 4, seed) < 0.5 ? 2 : 3;
+            std::vector<int> log;
+            for (int offset = 0; offset < size; ++offset) {
+                const int x = cell % width_ + (vertical ? 0 : offset);
+                const int y = cell / width_ + (vertical ? offset : 0);
+                if (x >= width_ || y >= height_) {
+                    break;
+                }
+                const int next = Index(x, y);
+                if (region_id_[next] != static_cast<int>(id) || !ground(next)) {
+                    break;
+                }
+                log.push_back(next);
+            }
+            if (log.size() == static_cast<std::size_t>(size)) {
+                for (int next : log) {
+                    level.SetCell(next % width_, next / width_, vertical ? "fallen_log_vertical" : "fallen_log");
+                }
+                --remaining;
+            }
+        }
+    }
+}
+
 SWildernessInfo CWilderness::Apply(CMap & level) const
 {
     SWildernessInfo info;
@@ -1006,11 +1128,33 @@ SWildernessInfo CWilderness::Apply(CMap & level) const
 
     for (int y = 0; y < height_; ++y) {
         for (int x = 0; x < width_; ++x) {
-            level.SetCell(static_cast<std::size_t>(x), static_cast<std::size_t>(y), TileAt(x, y));
+            const auto type = TileAt(x, y);
+            if (type == "slope") {
+                const auto terrain = regions_[region_id_[Index(x, y)]].terrain;
+                const double elevation = terrain == Ter::Hills ?
+                                         0.5 * HeightAt(x, y) + 0.5 * Fbm(x * 0.15, y * 0.15, noise_seed_ + 99) :
+                                         HeightAt(x, y);
+                const double blend = std::clamp(elevation, 0.0, 1.0);
+                const auto low = CTileData::get("grass").second.rgb_color;
+                constexpr std::uint32_t high = 0xA08A5B;
+                std::uint32_t colour = 0;
+                for (int shift : {16, 8, 0}) {
+                    const double channel = ((low >> shift) & 0xFF) * (1.0 - blend) +
+                                           ((high >> shift) & 0xFF) * blend;
+                    colour |= static_cast<std::uint32_t>(std::lround(channel)) << shift;
+                }
+                auto data = CTileData::get(type).second;
+                data.rgb_color = GetJitteredColor(colour);
+                level.get(x, y) = CTile(type, data);
+            } else {
+                level.SetCell(static_cast<std::size_t>(x), static_cast<std::size_t>(y), type);
+            }
             info.difficulty.set(static_cast<std::size_t>(x), static_cast<std::size_t>(y),
                                 regions_[region_id_[Index(x, y)]].difficulty);
         }
     }
+
+    AddHillFeatures(level);
 
     for (std::size_t i = 0; i < regions_.size(); ++i) {
         const Region & region = regions_[i];
