@@ -199,3 +199,38 @@ about 105 columns; keyboard selection works on smaller terminals too.
 Pass a seed with `xmake run demo-features 123` for a reproducible sequence
 of maps when using the same controls. The application needs an interactive
 POSIX terminal of at least 40 columns and 10 rows.
+
+Town generation
+---------------
+
+`rl.mapgenerators.growthtown` (also exported by `rl.mapgenerators`) provides
+`CreateGrowthTown(map, number_of_buildings = 80)`. It replaces the map with
+an uneven town wall, a market square with a well, and winding main roads
+three tiles wide. After buildings and gardens are placed, the generator finds the largest
+open paved square in each quarter and puts a well at its centre. Main roads
+and narrow lanes are excluded; quarters without a square at least 3×3 tiles
+wide get no extra well. The market well remains, and all wells use the
+`well` tile with the glyph `o`.
+Cottages fill street frontages and back plots, separated
+by shared one-tile passages. Remaining courtyards are paved; greenery within
+the walls is limited to occasional two-tile gardens. The countryside stays
+green. Rampart tiles overlap at steps to prevent movement through diagonal
+gaps; the four gate roads remain open. Building entrances face any of the
+four directions. Most cottages measure 5–7 tiles along each axis, including
+walls; smaller workshops and sheds fill narrow plots. The function returns
+the buildings actually placed as `std::vector<SBuilding>`; requests above
+the available space return fewer buildings. Wall corners are
+inclusive, and `door` identifies each street-facing entrance. Empty and
+small maps are supported; maps smaller than 19 cells on either axis
+receive simple crossing paths without buildings. Use `InitRandomness(seed)`
+for reproducible towns.
+
+The interiors are inspired by [Lopes et al., A Constrained Growth Method
+for Procedural Floor Plan Generation (GAMEON 2010)](https://graphics.tudelft.nl/~rafa/myPapers/bidarra.GAMEON10.pdf):
+room seeds grow as rectangles, then absorb remaining space along their
+frontiers according to relative area weights. Door placement favours a
+larger public entrance room and connects the room adjacency graph. All
+rooms are reachable from the street using cardinal steps when doors are
+opened. This is a single-floor adaptation; it does not expose the paper's
+hierarchical zones or user-defined adjacency constraints. Select **Growth
+Town** in the feature demo to explore it.

@@ -100,6 +100,12 @@ std::vector<SGenerator> Generators()
             }
         },
         {
+            "Growth Town", [](CMap & map)
+            {
+                CreateGrowthTown(map);
+            }
+        },
+        {
             "Simple City", [](CMap & map)
             {
                 CreateSimpleCity(map, 15);

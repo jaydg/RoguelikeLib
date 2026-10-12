@@ -53,6 +53,7 @@ export {
                 { "door_closed", { U'+', 0xAA7744, false, false } },
                 { "door_open",   { U'+', 0xAA7744, true,  true } },
                 { "water",       { U'~', 0x3399FF, true,  false } },
+                { "well",        { U'o', 0x3399FF, true,  false } },
                 { "bridge",      { U'=', 0x8B4513, true,  true } },
                 { "rock",        { U'^', 0x555555, false, false } }
             };

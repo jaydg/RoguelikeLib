@@ -12,6 +12,7 @@ void TestClock();
 void TestCalendar();
 void TestDistanceMap();
 void TestNames();
+void TestGrowthTown();
 void TestScreen();
 void TestCamera();
 void TestRectangles();
@@ -37,6 +38,7 @@ int main(int argc, char* argv[])
         {"Calendar", TestCalendar},
         {"DistanceMap", TestDistanceMap},
         {"Names", TestNames},
+        {"GrowthTown", TestGrowthTown},
         {"Screen", TestScreen},
         {"Camera", TestCamera},
         {"Rectangles", TestRectangles},
