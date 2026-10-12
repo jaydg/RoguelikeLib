@@ -349,7 +349,8 @@ constexpr std::array<SOpening, 3> ForestOpenings = {{
 // @param tree_density       Share of vegetation that is trees, not plants (0.0–1.0, def. 0.7)
 // @param rock_density       Probability of rocks (0.0–1.0) (def. 0.05)
 // @param num_clearings      Number of clearings (def. 5)
-// @param num_paths          Number of paths (def. 8)
+// @param num_paths          Optional extra connection attempts (def. 8);
+//                           routes may reuse existing roads entirely
 // @param num_rivers         Number of rivers (def. 1)
 // @param num_streams        Number of streams (def. 8)
 // @param vegetation_density Target vegetation coverage (0.0-1.0, def. 0.6)
@@ -358,8 +359,8 @@ constexpr std::array<SOpening, 3> ForestOpenings = {{
 //         grass everywhere within 0.4 times its radius of the center,
 //         save for water, paths and rocks; further out it frays, and at
 //         1.6 times its radius it ends. Clearings may overlap. With more
-//         than one clearing, each center lies on the path network, on a
-//         path or a bridge.
+//         than one clearing, roads connect entrances near their edges, sharing
+//         trunks where routes overlap; clearing centres remain open.
 
 std::vector<SLocation> GenerateForest(
     CMap& map,
@@ -659,176 +660,141 @@ std::vector<SLocation> GenerateForest(
         current_clearing_tiles = count_clearing_tiles();
     }
 
+    CMatrix<bool> clearing_access(map.getSize(), false);
+
     // 5. Generate ways connecting clearings (with collision avoidance and bridges)
     if (!clearing_centers.empty()) {
-        // Path tiles laid so far, so that nearness to a path is a look at the
-        // surrounding tiles rather than a search through every path tile
         CMatrix<bool> path_tiles(map.getSize(), false);
+        std::vector<std::vector<Position>> entrances(clearing_centers.size());
+        const auto index = [&](Position p) { return p.y * map.getWidth() + p.x; };
 
-        // Helper function to check if a position is on or next to an existing path
-        auto IsNearPath = [&](const Position & pos) -> bool {
-            for (std::size_t x = pos.x > 0 ? pos.x - 1 : 0; x <= pos.x + 1 && x < map.getWidth(); ++x)
-            {
-                for (std::size_t y = pos.y > 0 ? pos.y - 1 : 0; y <= pos.y + 1 && y < map.getHeight(); ++y) {
-                    if (path_tiles.get(x, y)) {
-                        return true;
-                    }
+        // Reuse an entrance for destinations in the same general direction.
+        // Opposite destinations can still have separate clearing entrances.
+        const auto entrance = [&](std::size_t clearing, Position destination) {
+            const Position center = clearing_centers[clearing];
+            const double dx = static_cast<double>(destination.x) - center.x;
+            const double dy = static_cast<double>(destination.y) - center.y;
+            const double length = std::hypot(dx, dy);
+            for (Position existing : entrances[clearing]) {
+                const double ex = static_cast<double>(existing.x) - center.x;
+                const double ey = static_cast<double>(existing.y) - center.y;
+                if (ex * dx + ey * dy >= 0.5 * std::hypot(ex, ey) * length) {
+                    return existing;
                 }
             }
-
-            return false;
+            // Stay just inside the irregular edge, rather than running a
+            // road through the middle of the open clearing.
+            const double distance = std::min(length * 0.4, clearing_radii[clearing] * 0.8);
+            Position result(
+                std::clamp<int>(std::lround(center.x + (length > 0 ? dx / length * distance : 0)), 0, map.getWidth() - 1),
+                std::clamp<int>(std::lround(center.y + (length > 0 ? dy / length * distance : 0)), 0, map.getHeight() - 1));
+            entrances[clearing].push_back(result);
+            // Keep access through the clearing walkable without painting a
+            // road across its centre. Water still needs a bridge.
+            const int steps = std::max(std::abs(static_cast<int>(result.x) - static_cast<int>(center.x)),
+                                       std::abs(static_cast<int>(result.y) - static_cast<int>(center.y)));
+            for (int step = 0; step <= steps; ++step) {
+                const double t = steps > 0 ? static_cast<double>(step) / steps : 0;
+                const Position p(std::lround(center.x + (static_cast<double>(result.x) - center.x) * t),
+                                 std::lround(center.y + (static_cast<double>(result.y) - center.y) * t));
+                clearing_access.set(p.x, p.y, true);
+                const auto type = map.get(p).getType();
+                if (type == "tree" || type == "plant" || type == "rock") map.SetCell(p.x, p.y, "grass");
+                else if (type == "water") map.SetCell(p.x, p.y, "bridge");
+            }
+            return result;
         };
 
-        // Helper function to check if a position is near any clearing except the two specified endpoints
-        // Use different buffers for main paths vs extra paths
-        auto IsNearAnyClearing = [&](const Position & pos, const Position & exclude1, const Position & exclude2, bool strict = false) -> bool {
-            for (const auto& center : clearing_centers)
-            {
-                // Skip the two endpoint clearings
-                if (Distance(pos.x, pos.y, exclude1.x, exclude1.y) <= 1.0f) {
-                    continue;
-                }
-
-                if (Distance(pos.x, pos.y, exclude2.x, exclude2.y) <= 1.0f) {
-                    continue;
-                }
-
-                // If within buffer distance of any OTHER clearing center, reject
-                float dist = Distance(pos.x, pos.y, center.x, center.y);
-                float buffer = strict ? 5.0f : 1.0f;  // Strict for extra paths, minimal for main paths
-
-                if (dist <= buffer) {
-                    return true;
+        CMatrix<bool> clearing_core(map.getSize(), false);
+        for (std::size_t y = 0; y < map.getHeight(); ++y) {
+            for (std::size_t x = 0; x < map.getWidth(); ++x) {
+                for (std::size_t i = 0; i < clearing_centers.size(); ++i) {
+                    if (Distance(x, y, clearing_centers[i].x, clearing_centers[i].y) < clearing_radii[i] * 0.5)
+                        clearing_core.set(x, y, true);
                 }
             }
-
-            return false;
-        };
-
-        // Lays a path on the map, with bridges where it crosses water
-        auto LayPath = [&](const std::vector<Position>& path) {
-            for (const auto& pos : path) {
-                if (map.inside(pos.x, pos.y)) {
-                    if (map.get(pos.x, pos.y).getType() == "water") {
-                        map.SetCell(pos.x, pos.y, "bridge");
-                    } else {
-                        map.SetCell(pos.x, pos.y, "corridor");
-                    }
-
-                    path_tiles.set(pos.x, pos.y, true);
-                }
-            }
-        };
-
-        // Build a path network connecting all clearings: connect each clearing
-        // to the closest earlier one, forming a tree. Every earlier clearing
-        // is already part of the network.
-        for (std::size_t i = 1; i < clearing_centers.size(); ++i) {
-            // Find the closest earlier clearing
-            std::size_t best_j = 0;
-            float best_dist = std::numeric_limits<float>::max();
-
-            for (std::size_t j = 0; j < i; ++j) {
-                float dist = Distance(
-                                 clearing_centers[i].x, clearing_centers[i].y,
-                                 clearing_centers[j].x, clearing_centers[j].y
-                             );
-
-                if (dist < best_dist) {
-                    best_dist = dist;
-                    best_j = j;
-                }
-            }
-
-            // Connect clearing i to clearing best_j. Every path laid so far is
-            // part of the network, so the path ends where it first reaches one
-            // and joins it there, rather than running alongside it.
-            std::vector<Position> path;
-            bool path_valid = false;
-            int path_attempts = 0;
-            const int max_path_attempts = 3;
-
-            // Try multiple path variations if the first one fails
-            while (!path_valid && path_attempts < max_path_attempts) {
-                path.clear();
-                // Vary the path parameters to get different routes
-                unsigned turnpct = 50 + Random(20); // 50-70%
-                unsigned diagpct = 30 + Random(20);  // 30-50%
-                BuildSigsagPath(path, clearing_centers[i], clearing_centers[best_j], turnpct, diagpct);
-
-                for (std::size_t step = 0; step < path.size(); ++step) {
-                    if (IsNearPath(path[step])) {
-                        path.resize(step + 1);
-                        break;
-                    }
-                }
-
-                // Check if path crosses any other clearing
-                path_valid = true;
-
-                for (const auto& pos : path) {
-                    // For the main connecting paths, use a lenient clearing buffer to ensure connectivity
-                    if (IsNearAnyClearing(pos, clearing_centers[i], clearing_centers[best_j], false)) {
-                        path_valid = false;
-                        break;
-                    }
-                }
-
-                path_attempts++;
-            }
-
-            // A path through another clearing is better than none: without it
-            // this clearing would be cut off from the rest
-            LayPath(path);
         }
 
-        // Add additional paths if we have capacity and want more connections
-        // Connect random pairs of already-connected clearings
-        for (std::size_t extra = 0; extra < num_paths && clearing_centers.size() > 1; ++extra) {
-            std::size_t i1 = Random(clearing_centers.size());
-            std::size_t i2 = Random(clearing_centers.size());
-
-            if (i1 == i2) {
-                continue;
-            }
-
-            std::vector<Position> path;
-            bool path_valid = false;
-            int path_attempts = 0;
-            const int max_path_attempts = 3;
-
-            // Try multiple path variations if the first one fails
-            while (!path_valid && path_attempts < max_path_attempts) {
-                path.clear();
-                // Vary the path parameters to get different routes
-                unsigned turnpct = 50 + Random(20); // 50-70%
-                unsigned diagpct = 30 + Random(20);  // 30-50%
-                BuildSigsagPath(path, clearing_centers[i1], clearing_centers[i2], turnpct, diagpct);
-
-                // Check if path crosses any clearing or is too close to existing paths
-                path_valid = true;
-
-                for (const auto& pos : path) {
-                    // Inside its own two clearings a path meets the paths that
-                    // already lead there; that is where paths converge
-                    if (Distance(pos.x, pos.y, clearing_centers[i1].x, clearing_centers[i1].y) <= clearing_radii[i1] ||
-                            Distance(pos.x, pos.y, clearing_centers[i2].x, clearing_centers[i2].y) <= clearing_radii[i2]) {
-                        continue;
-                    }
-
-                    // For extra paths, use strict clearing check
-                    if (IsNearAnyClearing(pos, clearing_centers[i1], clearing_centers[i2], true) || IsNearPath(pos)) {
-                        path_valid = false;
-                        break;
+        const auto connect = [&](Position start, Position end) {
+            // A winding guide gives new roads a natural shape. Routing can
+            // depart from it to reuse a trunk or join an existing road.
+            std::vector<Position> guide;
+            BuildWindingPath(guide, map, start, end, 8);
+            CMatrix<bool> near_guide(map.getSize(), false);
+            CMatrix<bool> near_road(map.getSize(), false);
+            const auto mark_near = [&](CMatrix<bool>& mask, Position p, int radius) {
+                for (int dy = -radius; dy <= radius; ++dy) {
+                    for (int dx = -radius; dx <= radius; ++dx) {
+                        const Position at(p.x + dx, p.y + dy);
+                        if (map.inside(at)) mask.set(at.x, at.y, true);
                     }
                 }
-
-                path_attempts++;
+            };
+            for (Position p : guide) mark_near(near_guide, p, 2);
+            for (std::size_t y = 0; y < map.getHeight(); ++y) {
+                for (std::size_t x = 0; x < map.getWidth(); ++x) {
+                    if (path_tiles.get(x, y)) mark_near(near_road, Position(x, y), 3);
+                }
             }
-
-            if (path_valid) {
-                LayPath(path);
+            const auto count = map.getWidth() * map.getHeight();
+            std::vector<int> costs(count, std::numeric_limits<int>::max());
+            std::vector<std::size_t> parent(count, count);
+            using Entry = std::pair<int, std::size_t>;
+            std::priority_queue<Entry, std::vector<Entry>, std::greater<Entry>> pending;
+            costs[index(start)] = 0;
+            pending.emplace(0, index(start));
+            while (!pending.empty()) {
+                const auto [cost, cell] = pending.top(); pending.pop();
+                if (cost != costs[cell]) continue;
+                if (cell == index(end)) break;
+                const Position here(cell % map.getWidth(), cell / map.getWidth());
+                for (int dy = -1; dy <= 1; ++dy) {
+                    for (int dx = -1; dx <= 1; ++dx) {
+                        if (dx == 0 && dy == 0) continue;
+                        const Position next(here.x + dx, here.y + dy);
+                        if (!map.inside(next)) continue;
+                        // Actual road tiles are cheap; running beside a road
+                        // is expensive, so routes share tiles before forking.
+                        int step = path_tiles.get(next.x, next.y) ? 2 :
+                            10 + (near_guide.get(next.x, next.y) ? 0 : 8) +
+                            (near_road.get(next.x, next.y) ? 24 : 0) +
+                            (clearing_core.get(next.x, next.y) ? 80 : 0);
+                        if (map.get(next).getType() == "water") step += 30;
+                        if (dx != 0 && dy != 0) step = step * 14 / 10;
+                        const auto target = index(next);
+                        if (cost + step < costs[target]) {
+                            costs[target] = cost + step;
+                            parent[target] = cell;
+                            pending.emplace(cost + step, target);
+                        }
+                    }
+                }
             }
+            for (auto cell = index(end); cell != count; cell = parent[cell]) {
+                const Position p(cell % map.getWidth(), cell / map.getWidth());
+                map.SetCell(p.x, p.y, map.get(p).getType() == "water" || map.get(p).getType() == "bridge" ? "bridge" : "corridor");
+                path_tiles.set(p.x, p.y, true);
+            }
+        };
+
+        // First connect every clearing to the closest earlier clearing.
+        // Subsequent routes reuse existing entrances and road segments.
+        for (std::size_t i = 1; i < clearing_centers.size(); ++i) {
+            std::size_t nearest = 0;
+            for (std::size_t j = 1; j < i; ++j) {
+                if (Distance(clearing_centers[i].x, clearing_centers[i].y, clearing_centers[j].x, clearing_centers[j].y) <
+                    Distance(clearing_centers[i].x, clearing_centers[i].y, clearing_centers[nearest].x, clearing_centers[nearest].y)) nearest = j;
+            }
+            const Position start = entrance(i, clearing_centers[nearest]);
+            const Position end = entrance(nearest, clearing_centers[i]);
+            connect(start, end);
+        }
+        for (std::size_t extra = 0; extra < num_paths && clearing_centers.size() > 1; ++extra) {
+            const std::size_t a = Random(clearing_centers.size()), b = Random(clearing_centers.size());
+            if (a == b) continue;
+            const Position start = entrance(a, clearing_centers[b]);
+            const Position end = entrance(b, clearing_centers[a]);
+            connect(start, end);
         }
     } else {
         // Fallback: generate random paths if no clearings were created
@@ -841,6 +807,12 @@ std::vector<SLocation> GenerateForest(
 
     // 6. Place rocks (after rivers, streams, clearings, and paths)
     GenerateRocks(map, rock_density);
+    // Scattered rocks must not close the unpaved access to an entrance.
+    for (std::size_t y = 0; y < map.getHeight(); ++y) {
+        for (std::size_t x = 0; x < map.getWidth(); ++x) {
+            if (clearing_access.get(x, y) && map.get(x, y).getType() == "rock") map.SetCell(x, y, "grass");
+        }
+    }
 
     std::vector<SLocation> clearings;
     clearings.reserve(clearing_centers.size());

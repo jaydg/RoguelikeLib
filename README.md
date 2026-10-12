@@ -296,6 +296,12 @@ can clear trees and rocks, and adds bridges over water when needed. It
 returns the number of gates connected; gates with no reachable road are
 left without external roads. The Town in Wilderness demo uses this helper.
 
+Forest roads enter clearings near their edges, leaving the centres open.
+Routes heading in similar directions share entrances and existing road
+segments before branching; nearby roads merge instead of running in parallel.
+Unpaved access inside each clearing stays walkable, and river crossings use
+bridges.
+
 Voronoi wilderness forests use a lighter mix comparable to the forest
 generator: scattered trees, passable underbrush (`plant`), open grass and
 occasional rocks. Density varies gradually across each forest, creating

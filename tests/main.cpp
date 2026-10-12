@@ -17,6 +17,7 @@ void TestVoronoiScale();
 void TestVoronoiChasms();
 void TestVoronoiFields();
 void TestWindingRoad();
+void TestForestRoads();
 void TestMapStamp();
 void TestTownRoads();
 void TestScreen();
@@ -49,6 +50,7 @@ int main(int argc, char* argv[])
         {"VoronoiChasms", TestVoronoiChasms},
         {"VoronoiFields", TestVoronoiFields},
         {"WindingRoad", TestWindingRoad},
+        {"ForestRoads", TestForestRoads},
         {"MapStamp", TestMapStamp},
         {"TownRoads", TestTownRoads},
         {"Screen", TestScreen},
