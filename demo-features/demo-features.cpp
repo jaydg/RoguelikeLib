@@ -9,6 +9,7 @@ import rl.randomness;
 import rl.scheduler;
 import rl.tile;
 import rtui.list;
+import rtui.input;
 import rtui.map;
 import std;
 
@@ -135,6 +136,42 @@ std::vector<SGenerator> Generators()
     return result;
 }
 
+// The shared input widget supplies editing and submission; this window
+// adds the current dimensions, usage hints and validation feedback.
+class CMapSizeInput : public CInputWindow
+{
+    Size current{79, 50};
+    std::string message;
+public:
+    CMapSizeInput()
+        : CInputWindow("Map size", {Position(4, 3), Size(32, 6)}, 20,
+                       EWindowOptions::NoResize | EWindowOptions::NoMove | EWindowOptions::NoClose)
+    {
+        setPrompt("New size: ");
+    }
+    void Begin(Size size)
+    {
+        current = size;
+        message.clear();
+        setText("");
+    }
+    void setMessage(std::string value) { message = std::move(value); }
+    void Draw(CScreen& screen, const SRect& inside) override
+    {
+        if (inside.Empty()) {
+            return;
+        }
+        CInputWindow::Draw(screen, inside);
+        if (inside.size.y > 1) {
+            screen.Print(inside.corner.x, inside.corner.y + 1, std::format("Current: {}x{}", current.x, current.y));
+        }
+        if (inside.size.y > 2) {
+            screen.Print(inside.corner.x, inside.corner.y + 2,
+                         message.empty() ? "Enter: apply | Esc: cancel" : message);
+        }
+    }
+};
+
 // Each tab owns its demonstration state. The generator tab embeds the
 // library list widget, forwarding input in its sidebar to that widget.
 class CFeatureWindow : public CWindow
@@ -143,7 +180,8 @@ private:
     int mode;
     std::vector<SGenerator> generators;
     CListWindow list{"Generators", {Position(0, 0), Size(30, 10)}};
-    CMap level{Size(79, 50)};
+    std::optional<Size> custom_size;
+    CMap level;
     bool ready = false;
     bool paused = false;
     std::size_t generated = 0;
@@ -191,7 +229,7 @@ private:
         if (mode == 0) {
             generated = list.getSelected().value_or(0);
             generators[generated].generate(level);
-            detail = generators[generated].name;
+            detail = std::format("{} ({}x{})", generators[generated].name, level.getWidth(), level.getHeight());
             focus = Position(level.getWidth() / 2, level.getHeight() / 2);
         } else if (mode == 1) {
             CreateSimpleCity(level, 15);
@@ -248,6 +286,15 @@ private:
     }
 
 public:
+    [[nodiscard]] Size getMapSize() const { return level.getSize(); }
+
+    void setMapSize(Size size)
+    {
+        custom_size = size;
+        ready = false;
+        scroll_origin.reset();
+    }
+
     [[nodiscard]] bool IsRunning() const
     {
         return mode >= 4 && !paused;
@@ -260,11 +307,11 @@ public:
         }
     }
 
-    CFeatureWindow(std::string title, int a_mode)
+    CFeatureWindow(std::string title, int a_mode, std::optional<Size> map_size = {})
         : CWindow(std::move(title),
     {
         Position(0, 0), Size(100, 30)
-    }), mode(a_mode)
+    }), mode(a_mode), custom_size(map_size), level(map_size.value_or(Size(79, 50)))
     {
         if (mode == 0) {
             generators = Generators();
@@ -342,10 +389,10 @@ public:
 
         // Keep the default map on small terminals; wide viewports use all
         // available columns. A changed width needs a newly generated map.
-        const std::size_t map_width = std::max<std::size_t>(79, map_area.size.x);
+        const Size map_size = custom_size.value_or(Size(std::max<std::size_t>(79, map_area.size.x), 50));
 
-        if (level.getWidth() != map_width) {
-            level = CMap(Size(map_width, 50));
+        if (level.getSize() != map_size) {
+            level = CMap(map_size);
             ready = false;
         }
 
@@ -516,7 +563,58 @@ public:
 int main(int argc, char* argv[])
 {
     try {
-        const std::uint32_t seed = argc > 1 ? static_cast<std::uint32_t>(std::stoul(argv[1])) : InitRandomness();
+        std::optional<std::uint32_t> requested_seed;
+        std::optional<Size> map_size;
+        auto number = [](std::string_view text) {
+            std::size_t value = 0;
+            const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+            if (error != std::errc{} || end != text.data() + text.size()) {
+                throw std::invalid_argument("Expected an unsigned integer: " + std::string(text));
+            }
+            return value;
+        };
+        for (int i = 1; i < argc; ++i) {
+            const std::string_view argument(argv[i]);
+            if (argument == "--help" || argument == "-h") {
+                std::cout << "Usage: demo-features [SEED] [--size WIDTHxHEIGHT]\n"
+                          << "Custom dimensions stay fixed when the terminal is resized.\n";
+                return 0;
+            }
+            if (argument == "--size" || argument.starts_with("--size=")) {
+                if (map_size) {
+                    throw std::invalid_argument("Specify --size only once");
+                }
+                std::string_view dimensions;
+                if (argument == "--size") {
+                    if (++i == argc) {
+                        throw std::invalid_argument("--size requires WIDTHxHEIGHT");
+                    }
+                    dimensions = argv[i];
+                } else {
+                    dimensions = argument.substr(7);
+                }
+                const auto separator = dimensions.find_first_of("xX");
+                if (separator == std::string_view::npos) {
+                    throw std::invalid_argument("--size requires WIDTHxHEIGHT");
+                }
+                const auto width = number(dimensions.substr(0, separator));
+                const auto height = number(dimensions.substr(separator + 1));
+                if (width == 0 || height == 0 || height > std::numeric_limits<std::size_t>::max() / width) {
+                    throw std::invalid_argument("Map dimensions must be positive and their area must fit in size_t");
+                }
+                map_size = Size(width, height);
+            } else {
+                if (requested_seed || argument.starts_with('-')) {
+                    throw std::invalid_argument("Usage: demo-features [SEED] [--size WIDTHxHEIGHT]");
+                }
+                const auto seed = number(argument);
+                if (seed > std::numeric_limits<std::uint32_t>::max()) {
+                    throw std::invalid_argument("Seed must fit in an unsigned 32-bit integer");
+                }
+                requested_seed = static_cast<std::uint32_t>(seed);
+            }
+        }
+        const std::uint32_t seed = requested_seed ? *requested_seed : InitRandomness();
         InitRandomness(seed);
         CTileData::RegisterTile("pine", {U'♣', 0x2E7D32, false, false});
         CTileData::RegisterTile("pond", {U'≈', 0x3399FF, true, false});
@@ -530,7 +628,7 @@ int main(int argc, char* argv[])
         const std::array titles = {"Map generators", "FOV", "Path finding", "Distance map", "Scheduler", "Calendar"};
 
         for (std::size_t index = 0; index < titles.size(); ++index) {
-            tabs.push_back(std::make_unique<CFeatureWindow>(titles[index], static_cast<int>(index)));
+            tabs.push_back(std::make_unique<CFeatureWindow>(titles[index], static_cast<int>(index), map_size));
             tabs.back()->setFrameTitle("RoguelikeLib features demo");
             windows.Open(*tabs.back());
             windows.Dock(*tabs.back(), EDock::Top, 1000);
@@ -542,6 +640,31 @@ int main(int argc, char* argv[])
 
         windows.Focus(*tabs.front());
         std::size_t active = 0;
+        CMapSizeInput size_entry;
+        bool editing_size = false;
+        auto close_size = [&] {
+            windows.Close(size_entry);
+            windows.Focus(*tabs[active]);
+            editing_size = false;
+        };
+        auto apply_size = [&](std::string_view value) {
+            const auto separator = value.find_first_of("xX");
+            std::size_t width = 0, height = 0;
+            auto parse = [](std::string_view value, std::size_t& result) {
+                const auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), result);
+                return error == std::errc{} && end == value.data() + value.size();
+            };
+            if (separator == std::string_view::npos || !parse(value.substr(0, separator), width) ||
+                    !parse(value.substr(separator + 1), height) || width == 0 || height == 0 ||
+                    height > std::numeric_limits<std::size_t>::max() / width) {
+                size_entry.setMessage("Use positive sizes, e.g. 200x100");
+                return;
+            }
+            for (auto& tab : tabs) {
+                tab->setMapSize(Size(width, height));
+            }
+            close_size();
+        };
         CFeatureWindow* ticking = nullptr;
         auto next_tick = std::chrono::steady_clock::now();
 
@@ -571,7 +694,7 @@ int main(int argc, char* argv[])
             } else {
                 windows.Layout({Position(0, 0), Size(size.x, size.y - 1)});
                 windows.Draw(screen);
-                screen.Print(0, size.y - 1, "1-6/Tab: tabs | R: regenerate | hjkl: pan | Q: quit");
+                screen.Print(0, size.y - 1, "1-6/Tab: tabs | M: map size | R: regenerate | hjkl: pan | Q: quit");
             }
 
             terminal.Write(screen.Compose(false, displayed ? &*displayed : nullptr));
@@ -580,6 +703,23 @@ int main(int argc, char* argv[])
                                                                                                      std::chrono::duration_cast<std::chrono::milliseconds>(next_tick - std::chrono::steady_clock::now()).count()));
             const SKey key = terminal.ReadKey(timeout_ms);
 
+            if (editing_size && key.type != EKey::Closed && !(key.type == EKey::Char && key.ch == 3)) {
+                size_entry.HandleKey(key);
+                if (size_entry.TakeCancelled()) {
+                    close_size();
+                } else if (const auto entered = size_entry.TakeEntered()) {
+                    apply_size(*entered);
+                }
+                continue;
+            }
+            if (key.type == EKey::Char && (key.ch == U'm' || key.ch == U'M')) {
+                const auto dimensions = tabs[active < 4 ? active : 0]->getMapSize();
+                size_entry.Begin(dimensions);
+                editing_size = true;
+                windows.Open(size_entry);
+                windows.Focus(size_entry);
+                continue;
+            }
             if (key.type == EKey::Closed || key.type == EKey::Escape ||
                     (key.type == EKey::Char && (key.ch == U'q' || key.ch == U'Q' || key.ch == 3))) {
                 break;

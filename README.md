@@ -193,7 +193,17 @@ tabs and tabs obscured by the small-terminal message do not advance.
 Resuming starts a fresh one-second interval without catching up. `Q` or Escape
 quits. Resize the terminal to change the viewport. Maps remain at least 79
 columns wide and expand to fill wider map viewports; a change in map width
-regenerates the map. Map height remains 50 rows. All tab labels fit at
+regenerates the map. Map height remains 50 rows by default. Use
+`xmake run demo-features --size 200x100` (or
+`xmake run demo-features 123 --size 200x100` with a seed) for a fixed custom
+map size in all map tabs. Custom maps keep their dimensions across terminal
+resizes; pan or scroll to explore them. The generator name shows the current
+map dimensions beside it. Press **M** at runtime to open the map-size entry,
+type dimensions such as `200x100`, and press Enter to apply them to all map
+tabs. The popup shows the current dimensions; type the new ones and use
+Backspace to edit. Escape cancels. Invalid dimensions leave the entry open.
+The popup uses the shared `rtui.input` widget.
+`--help` prints the command-line options. All tab labels fit at
 about 105 columns; keyboard selection works on smaller terminals too.
 
 Pass a seed with `xmake run demo-features 123` for a reproducible sequence
