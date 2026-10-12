@@ -26,7 +26,8 @@ export namespace RL
 // Has the terminal report buttons pressed and released and the mouse
 // dragged with a button held, in the SGR format; and stop again
 constexpr std::string_view mouse_reporting_on = "\x1b[?1002h\x1b[?1006h";
-constexpr std::string_view mouse_reporting_off = "\x1b[?1006l\x1b[?1002l";
+constexpr std::string_view mouse_hover_reporting_on = "\x1b[?1003h\x1b[?1006h";
+constexpr std::string_view mouse_reporting_off = "\x1b[?1006l\x1b[?1003l\x1b[?1002l";
 
 enum class EMouseButton {
     None,

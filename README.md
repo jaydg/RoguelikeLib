@@ -198,7 +198,9 @@ regenerates the map. Map height remains 50 rows by default. Use
 `xmake run demo-features 123 --size 200x100` with a seed) for a fixed custom
 map size in all map tabs. Custom maps keep their dimensions across terminal
 resizes; pan or scroll to explore them. The generator name shows the current
-map dimensions beside it. Press **M** at runtime to open the map-size entry,
+map dimensions beside it. Hover over a visible map tile to show its description
+beside the generator name; moving outside the map clears the description.
+Press **M** at runtime to open the map-size entry,
 type dimensions such as `200x100`, and press Enter to apply them to all map
 tabs. The popup shows the current dimensions; type the new ones and use
 Backspace to edit. Escape cancels. Invalid dimensions leave the entry open.

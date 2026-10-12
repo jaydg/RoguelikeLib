@@ -188,6 +188,7 @@ private:
     Position focus{0, 0};
     Position origin{0, 0};
     std::optional<Position> scroll_origin;
+    std::optional<Position> hover_position;
     Position start{0, 0};
     Position goal{0, 0};
     Position content_origin{0, 0};
@@ -287,6 +288,8 @@ private:
 
 public:
     [[nodiscard]] Size getMapSize() const { return level.getSize(); }
+
+    void Hover(std::optional<Position> position) { hover_position = position; }
 
     void setMapSize(Size size)
     {
@@ -400,10 +403,23 @@ public:
             Generate();
         }
 
-        screen.Print(inside.corner.x, inside.corner.y, detail);
         origin = scroll_origin.value_or(CameraOrigin(level.getSize(), map_area.size, focus));
         origin.x = std::min(origin.x, level.getWidth() > map_area.size.x ? level.getWidth() - map_area.size.x : 0);
         origin.y = std::min(origin.y, level.getHeight() > map_area.size.y ? level.getHeight() - map_area.size.y : 0);
+        std::string status = detail;
+        if (mode == 0 && hover_position && map_area.Contains(*hover_position)) {
+            const Position tile_position(origin.x + hover_position->x - map_area.corner.x,
+                                         origin.y + hover_position->y - map_area.corner.y);
+            if (level.inside(tile_position)) {
+                std::string description(level.get(tile_position).getType());
+                if (description == "door_closed") description = "closed door";
+                else if (description == "door_open") description = "open door";
+                else if (description == "room") description = "floor";
+                else std::replace(description.begin(), description.end(), '_', ' ');
+                status += " | " + description;
+            }
+        }
+        screen.Print(inside.corner.x, inside.corner.y, status);
         DrawMap(screen, level, map_area, origin);
 
         if (mode == 1 || mode == 3) {
@@ -618,7 +634,7 @@ int main(int argc, char* argv[])
         InitRandomness(seed);
         CTileData::RegisterTile("pine", {U'♣', 0x2E7D32, false, false});
         CTileData::RegisterTile("pond", {U'≈', 0x3399FF, true, false});
-        CTerminal terminal;
+        CTerminal terminal(true);
         CScreen screen;
         std::optional<CScreen> displayed;
         CWindowManager windows;
@@ -703,6 +719,12 @@ int main(int argc, char* argv[])
                                                                                                      std::chrono::duration_cast<std::chrono::milliseconds>(next_tick - std::chrono::steady_clock::now()).count()));
             const SKey key = terminal.ReadKey(timeout_ms);
 
+            if (key.type == EKey::Mouse) {
+                for (auto& tab : tabs) {
+                    tab->Hover(editing_size ? std::nullopt : std::optional(key.mouse.position));
+                }
+            }
+
             if (editing_size && key.type != EKey::Closed && !(key.type == EKey::Char && key.ch == 3)) {
                 size_entry.HandleKey(key);
                 if (size_entry.TakeCancelled()) {
@@ -716,6 +738,7 @@ int main(int argc, char* argv[])
                 const auto dimensions = tabs[active < 4 ? active : 0]->getMapSize();
                 size_entry.Begin(dimensions);
                 editing_size = true;
+                for (auto& tab : tabs) tab->Hover(std::nullopt);
                 windows.Open(size_entry);
                 windows.Focus(size_entry);
                 continue;

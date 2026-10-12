@@ -346,7 +346,8 @@ private:
     }
 
 public:
-    CTerminal()
+    // Opt in to movement reports even when no mouse button is held.
+    explicit CTerminal(bool report_hover = false)
     {
         if (raw_mode) {
             throw std::logic_error("the terminal is already in use");
@@ -393,7 +394,7 @@ public:
         raw_mode = 1;
         resized = 0;
 
-        if (!WriteAll(enter_sequence) || !WriteAll(RL::mouse_reporting_on)) {
+        if (!WriteAll(enter_sequence) || !WriteAll(report_hover ? RL::mouse_hover_reporting_on : RL::mouse_reporting_on)) {
             const int error = errno;
             RestoreTerminal();
             RestoreSignals();
