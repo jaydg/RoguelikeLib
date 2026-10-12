@@ -293,3 +293,8 @@ surviving wilderness `corridor` or `bridge` tiles. It prefers clear ground,
 can clear trees and rocks, and adds bridges over water when needed. It
 returns the number of gates connected; gates with no reachable road are
 left without external roads. The Town in Wilderness demo uses this helper.
+
+Voronoi wilderness forests use a lighter mix comparable to the forest
+generator: scattered trees, passable underbrush (`plant`), open grass and
+occasional rocks. Density varies gradually across each forest, creating
+thickets and thinner patches rather than continuous blocks of trees.

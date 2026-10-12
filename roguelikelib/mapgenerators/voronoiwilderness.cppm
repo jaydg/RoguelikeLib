@@ -898,8 +898,21 @@ std::string_view CWilderness::TileAt(const int x, const int y) const
 
         return "grass";
 
-    case Ter::Forest:           // open region, dense tree cover
-        return noise > 0.28 ? "tree" : "grass";
+    case Ter::Forest: {
+        // Match GenerateForest's lighter mix: about 60% vegetation, of
+        // which 70% is trees, with 5% scattered rocks. Slow density noise
+        // creates thickets and thinner patches; independent cell hashes
+        // scatter individual plants instead of filling solid tree blobs.
+        const double vegetation = 0.45 + 0.30 * Fbm(x * 0.07, y * 0.07, noise_seed_ + 131);
+        const double scatter = HashNoise(x, y, noise_seed_ + 137);
+        if (scatter < 0.05) {
+            return "rock";
+        }
+        if (scatter < 0.05 + 0.95 * vegetation) {
+            return HashNoise(x, y, noise_seed_ + 149) < 0.70 ? "tree" : "plant";
+        }
+        return "grass";
+    }
 
     case Ter::Field:
 
