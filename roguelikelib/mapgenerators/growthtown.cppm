@@ -279,6 +279,53 @@ export std::vector<SBuilding> CreateGrowthTown(CMap& map, std::size_t number_of_
                            (start.y + market.y) / 2 + Random(5) - 2);
         TownRoad(map, start, end);
     }
+    // Keep the three-tile arteries inside the town, but narrow each
+    // opening through the ramparts to two parallel rows or columns.
+    std::array<Position, 4> gate_centres;
+    auto boundary_cell = [&](std::size_t x, std::size_t y) {
+        if (!inside[y * width + x]) {
+            return false;
+        }
+        for (int dy = -1; dy <= 1; ++dy) {
+            for (int dx = -1; dx <= 1; ++dx) {
+                if (!inside[(y + dy) * width + x + dx]) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+    for (std::size_t i = 0; i < gates.size(); ++i) {
+        auto nearest = std::numeric_limits<std::size_t>::max();
+        for (std::size_t y = 1; y + 1 < height; ++y) {
+            for (std::size_t x = 1; x + 1 < width; ++x) {
+                if (boundary_cell(x, y) && map.get(x, y).getType() == "corridor") {
+                    const auto distance = Position(x, y).Distance(gates[i]);
+                    if (distance < nearest) {
+                        nearest = distance;
+                        gate_centres[i] = Position(x, y);
+                    }
+                }
+            }
+        }
+    }
+    for (std::size_t y = 1; y + 1 < height; ++y) {
+        for (std::size_t x = 1; x + 1 < width; ++x) {
+            if (!boundary_cell(x, y)) {
+                continue;
+            }
+            bool opening = false;
+            for (std::size_t i = 0; i < gates.size(); ++i) {
+                const auto p = gate_centres[i];
+                if (i < 2) {
+                    opening |= (i == 0 ? x < width / 2 : x >= width / 2) && (y == p.y || y == p.y + 1);
+                } else {
+                    opening |= (i == 2 ? y < height / 2 : y >= height / 2) && (x == p.x || x == p.x + 1);
+                }
+            }
+            map.SetCell(x, y, opening ? "corridor" : "wall");
+        }
+    }
     // Carving a bent gate road can clip a rampart corner. Restore overlap
     // at those junctions too, without bridging the broad gate openings.
     bool repaired;

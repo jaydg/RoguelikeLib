@@ -215,7 +215,7 @@ Cottages fill street frontages and back plots, separated
 by shared one-tile passages. Remaining courtyards are paved; greenery within
 the walls is limited to occasional two-tile gardens. The countryside stays
 green. Rampart tiles overlap at steps to prevent movement through diagonal
-gaps; the four gate roads remain open. Building entrances face any of the
+gaps; the four gates have two-tile openings into the wider town roads. Building entrances face any of the
 four directions. Most cottages measure 5–7 tiles along each axis, including
 walls; smaller workshops and sheds fill narrow plots. The function returns
 the buildings actually placed as `std::vector<SBuilding>`; requests above

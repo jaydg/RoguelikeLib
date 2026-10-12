@@ -198,8 +198,22 @@ void TestGrowthTown()
         std::vector<RL::Position> gates;
         const auto buildings = RL::CreateGrowthTown(map, 1000, &gates);
         Check(gates.size() == 4, "reports four town gates for wilderness connections");
-        for (auto gate : gates) {
+        for (std::size_t i = 0; i < gates.size(); ++i) {
+            const auto gate = gates[i];
             Check(map.get(gate).getType() == "corridor", "exported gate is an open road at the wall");
+            std::set<std::size_t> lanes;
+            for (std::size_t y = 1; y + 1 < map.getHeight(); ++y) {
+                for (std::size_t x = 1; x + 1 < map.getWidth(); ++x) {
+                    if (map.get(x, y).getType() != "corridor" || RL::Position(x, y).Distance(gate) > 4) {
+                        continue;
+                    }
+                    if (map.get(x - 1, y).getType() == "grass" || map.get(x + 1, y).getType() == "grass" ||
+                            map.get(x, y - 1).getType() == "grass" || map.get(x, y + 1).getType() == "grass") {
+                        lanes.insert(i < 2 ? y : x);
+                    }
+                }
+            }
+            Check(lanes.size() == 2, "each gate has exactly two lanes through the ramparts");
         }
         Check(buildings.size() >= 30 && buildings.size() <= 1000, "fills a standard town with at least thirty buildings");
         CheckUrbanForm(map, buildings);
