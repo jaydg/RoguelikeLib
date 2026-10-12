@@ -13,6 +13,7 @@ void TestCalendar();
 void TestDistanceMap();
 void TestNames();
 void TestGrowthTown();
+void TestVoronoiScale();
 void TestMapStamp();
 void TestTownRoads();
 void TestScreen();
@@ -41,6 +42,7 @@ int main(int argc, char* argv[])
         {"DistanceMap", TestDistanceMap},
         {"Names", TestNames},
         {"GrowthTown", TestGrowthTown},
+        {"VoronoiScale", TestVoronoiScale},
         {"MapStamp", TestMapStamp},
         {"TownRoads", TestTownRoads},
         {"Screen", TestScreen},

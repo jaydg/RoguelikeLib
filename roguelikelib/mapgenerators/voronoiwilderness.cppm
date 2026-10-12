@@ -9,7 +9,7 @@ module;
 // flood fill over that graph turns the distance from a starting region
 // into a difficulty between 0 and 9. The difficulty decides the terrain of
 // a region, and the terrain decides the tiles: open ground scattered with
-// point terrain, the starting town at difficulty 0 with a building if asked for,
+// point terrain, the starting town at difficulty 0 with small buildings if asked for,
 // farmland walled in by hedges and left a single gate, rolling hills with
 // crags on their tops, mountains and high snow rounded and worn to a
 // fractal outline, and lakes and chasms dropped in only where
@@ -50,7 +50,9 @@ struct SWildernessInfo {
     // to the town region.
     std::vector<SLocation> locations;
 
-    // The buildings, when they were asked for: the rectangle of each
+    // The buildings, when they were asked for: 4–7 tiles along each side,
+    // including walls, with multiple houses where the town has room.
+    // The rectangle of each
     // one's outer walls, corners included, with floor inside, and the
     // position of its single door, a wall cell other than a corner. Every
     // building stands wholly on its town, with a ring of open ground
@@ -105,15 +107,9 @@ struct Region {
     int max_edge = 1;
     int gate = -1;
 
-    // The building of a Town region, in cell coordinates. Set only when
-    // part of the rectangle stands on cells the town region owns; a
-    // rectangle that overhangs the region entirely is not a building.
-    int rect_x0 = 0;
-    int rect_y0 = 0;
-    int rect_x1 = 0;
-    int rect_y1 = 0;
-    int door = -1;
-    bool has_building = false;
+    // Small buildings wholly within the town region, with open ground
+    // around each footprint. Large regions get more, never larger, houses.
+    std::vector<SBuilding> buildings;
 };
 
 // The tile types below are not among the library's builtin ones. They are
@@ -392,10 +388,10 @@ private:
     // Terrain from difficulty: the article's "law" axis
     void AssignTerrain();
 
-    // Gates for the fields, and the building for the town. The town gets
-    // its building only where the rectangle lies on the region itself.
+    // Gates for the fields, and small buildings for the town. Buildings
+    // and their clearance must lie wholly within the town region.
     void PlaceFeatures();
-    [[nodiscard]] bool PlaceTown(Region & region, const std::size_t id);
+    void PlaceTown(Region & region, std::size_t id);
 
     // How deep into its region a cell is: 0 at the edge, 1 at the deepest
     [[nodiscard]] double HeightAt(const int x, const int y) const;
@@ -749,111 +745,67 @@ void CWilderness::PlaceFeatures()
                 region.gate = borders[Random(borders.size())];
             }
         } else if (region.terrain == Ter::Town && with_buildings_) {
-            region.has_building = PlaceTown(region, i);
+            PlaceTown(region, i);
         }
     }
 }
 
-bool CWilderness::PlaceTown(Region & region, const std::size_t id)
+void CWilderness::PlaceTown(Region& region, std::size_t id)
 {
-    const auto town = [&](const int x, const int y) {
+    auto town = [&](int x, int y) {
         return x >= 0 && y >= 0 && x < width_ && y < height_ &&
                region_id_[Index(x, y)] == static_cast<int>(id);
     };
-
-    int x0 = width_;
-    int y0 = height_;
-    int x1 = -1;
-    int y1 = -1;
-
-    for (int y = 0; y < height_; ++y) {
-        for (int x = 0; x < width_; ++x) {
-            if (town(x, y)) {
-                x0 = std::min(x0, x);
-                x1 = std::max(x1, x);
-                y0 = std::min(y0, y);
-                y1 = std::max(y1, y);
-            }
-        }
-    }
-
-    if (x1 < 0) {
-        return false;   // no cell of the map belongs to the town region
-    }
-
-    // The walls and a ring of open ground around them all have to stand on
-    // the town: no part of the building is then drawn as another region,
-    // and the door always opens onto the town's own ground
-    const auto fits = [&](const int left, const int top, const int right, const int bottom) {
-        for (int y = top - 1; y <= bottom + 1; ++y) {
-            for (int x = left - 1; x <= right + 1; ++x) {
-                if (!town(x, y)) {
+    std::vector<bool> occupied(width_ * height_);
+    auto fits = [&](int left, int top, int width, int height) {
+        for (int y = top - 1; y <= top + height; ++y) {
+            for (int x = left - 1; x <= left + width; ++x) {
+                if (!town(x, y) || occupied[Index(x, y)]) {
                     return false;
                 }
             }
         }
-
         return true;
     };
-
-    // At most half of the region's bounding box, and smaller until it
-    // fits, down to a floor of 3 by 2 inside the walls
-    constexpr int min_w = 5;
-    constexpr int min_h = 4;
-    int w = std::max(min_w, (x1 - x0 + 1) / 2);
-    int h = std::max(min_h, (y1 - y0 + 1) / 2);
-
-    while (true) {
-        std::vector<std::pair<int, int>> spots;
-
-        for (int top = y0; top + h - 1 <= y1; ++top) {
-            for (int left = x0; left + w - 1 <= x1; ++left) {
-                if (fits(left, top, left + w - 1, top + h - 1)) {
-                    spots.emplace_back(left, top);
-                }
+    std::vector<Position> spots;
+    for (int y = 1; y + 4 < height_; ++y) {
+        for (int x = 1; x + 4 < width_; ++x) {
+            if (fits(x, y, 4, 4)) {
+                spots.emplace_back(x, y);
             }
         }
-
-        if (!spots.empty()) {
-            const auto[left, top] = spots[Random(spots.size())];
-            region.rect_x0 = left;
-            region.rect_y0 = top;
-            region.rect_x1 = left + w - 1;
-            region.rect_y1 = top + h - 1;
-            break;
+    }
+    Shuffle(spots.begin(), spots.end());
+    for (auto spot : spots) {
+        const int left = spot.x, top = spot.y;
+        int width = 4 + Random(4), height = 4 + Random(4);
+        if (!fits(left, top, width, height)) {
+            width = 4;
+            height = 4;
+            if (!fits(left, top, width, height)) {
+                continue;
+            }
         }
-
-        if (w == min_w && h == min_h) {
-            return false;   // the town region is too narrow for a building
+        SBuilding building;
+        building.corner1 = spot;
+        building.corner2 = Position(left + width - 1, top + height - 1);
+        std::vector<Position> doors;
+        for (int x = left + 1; x < left + width - 1; ++x) {
+            doors.emplace_back(x, top);
+            doors.emplace_back(x, top + height - 1);
         }
-
-        // Shrink the side that is longer for its minimum
-        if (w * min_h >= h * min_w && w > min_w) {
-            --w;
-        } else if (h > min_h) {
-            --h;
-        } else {
-            --w;
+        for (int y = top + 1; y < top + height - 1; ++y) {
+            doors.emplace_back(left, y);
+            doors.emplace_back(left + width - 1, y);
+        }
+        building.door = doors[Random(doors.size())];
+        region.buildings.push_back(building);
+        for (int y = top; y < top + height; ++y) {
+            for (int x = left; x < left + width; ++x) {
+                occupied[Index(x, y)] = true;
+            }
         }
     }
-
-    // A door on a random wall cell other than a corner: a door in a corner
-    // could only be passed diagonally, out of the corner of the floor
-    std::vector<int> walls;
-
-    for (int x = region.rect_x0 + 1; x < region.rect_x1; ++x) {
-        walls.push_back(Index(x, region.rect_y0));
-        walls.push_back(Index(x, region.rect_y1));
-    }
-
-    for (int y = region.rect_y0 + 1; y < region.rect_y1; ++y) {
-        walls.push_back(Index(region.rect_x0, y));
-        walls.push_back(Index(region.rect_x1, y));
-    }
-
-    region.door = walls[Random(walls.size())];
-
-    return true;
 }
 
 double CWilderness::HeightAt(const int x, const int y) const
@@ -984,17 +936,17 @@ std::string_view CWilderness::TileAt(const int x, const int y) const
 
     case Ter::Town:
 
-        // The building, standing wholly on the town region
-        if (region.has_building && x >= region.rect_x0 && x <= region.rect_x1 &&
-                y >= region.rect_y0 && y <= region.rect_y1) {
-            if (cell == region.door) {
+        // Each building and its clearance lie wholly within the town.
+        for (const auto& building : region.buildings) {
+            const int left = building.corner1.x, top = building.corner1.y;
+            const int right = building.corner2.x, bottom = building.corner2.y;
+            if (x < left || x > right || y < top || y > bottom) {
+                continue;
+            }
+            if (Position(x, y) == building.door) {
                 return "door_open";
             }
-
-            const bool on_edge = x == region.rect_x0 || x == region.rect_x1 ||
-                                 y == region.rect_y0 || y == region.rect_y1;
-
-            return on_edge ? "wall" : "room";
+            return x == left || x == right || y == top || y == bottom ? "wall" : "room";
         }
 
         return "grass";
@@ -1180,13 +1132,7 @@ SWildernessInfo CWilderness::Apply(CMap & level) const
                                      });
         }
 
-        if (region.has_building) {
-            SBuilding building;
-            building.corner1 = Position(static_cast<std::size_t>(region.rect_x0), static_cast<std::size_t>(region.rect_y0));
-            building.corner2 = Position(static_cast<std::size_t>(region.rect_x1), static_cast<std::size_t>(region.rect_y1));
-            building.door = Position(static_cast<std::size_t>(region.door % width_), static_cast<std::size_t>(region.door / width_));
-            info.buildings.push_back(building);
-        }
+        info.buildings.insert(info.buildings.end(), region.buildings.begin(), region.buildings.end());
     }
 
     return info;
@@ -1225,9 +1171,10 @@ inline constexpr std::array<SOpening, 3> WildernessOpenings = {{
 // @param level           The map to fill. An empty one is left alone.
 // @param num_regions     How many Voronoi regions to scatter, at least 4.
 // At 0 one region is asked for per 200 cells of the
-// map, between 10 and 400 of them.
-// @param with_buildings  Whether to put up a building in the town. It is
-// left out where the town region is too narrow for one.
+// map, with at least 10. Larger maps add regions instead of enlarging them.
+// @param with_buildings  Whether to fill the town with small buildings.
+// Each side, including walls, is 4–7 tiles long; larger towns get more
+// buildings. Narrow plots that cannot hold a 4x4 building stay open.
 //
 // @return The regions and their adjacency edges, the locations the
 // generator laid out - the starting town, as an SLocation of type
@@ -1244,7 +1191,7 @@ SWildernessInfo CreateVoronoiWilderness(CMap & level, int num_regions = 0, bool 
     voronoiwilderness_detail::RegisterWildernessTiles();
 
     if (num_regions <= 0) {
-        num_regions = std::clamp(width * height / 200, 10, 400);
+        num_regions = std::max(width * height / 200, 10);
     } else {
         num_regions = std::clamp(num_regions, 4, 800);
     }

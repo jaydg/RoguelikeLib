@@ -310,3 +310,11 @@ hills get a trail, limited to 6–16 tiles; most hills remain undisturbed. Occas
 2–3 tiles, shown as `=` horizontally or `|` vertically. Trails and logs
 are passable; logs do not overwrite trails, rocks, buildings or other biomes.
 Both features follow the map seed.
+
+The Voronoi demo uses automatic region counts: approximately one region per
+200 tiles, with at least 10. Larger maps add regions to keep terrain patches
+at a similar scale. Explicit nonzero region counts still select a fixed
+count. Voronoi town buildings are 4–7 tiles wide and 4–7 tiles high, including
+walls; larger town regions hold multiple buildings, with one tile of open
+ground between houses and their neighbours. All buildings are returned in
+`SWildernessInfo::buildings`.

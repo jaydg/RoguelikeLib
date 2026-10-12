@@ -98,7 +98,7 @@ std::vector<SGenerator> Generators()
         {
             "Voronoi Wilderness", [](CMap & map)
             {
-                CreateVoronoiWilderness(map, 24, true);
+                CreateVoronoiWilderness(map, 0, true);
             }
         },
         {
