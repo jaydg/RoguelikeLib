@@ -362,12 +362,14 @@ public:
     }
 
     // Prints text with markup from a character of it on, the ones before
-    // left out, as when it is scrolled sideways: what is printed is in the
-    // colour the text has there
+    // left out, as when it is scrolled sideways, and no more than so many
+    // characters of it, the rest cut off: what is printed is in the colour
+    // the text has there
     std::size_t Print(std::size_t x, std::size_t y, std::string_view markup, std::size_t skip, std::uint32_t rgb,
-                      bool bold = false, bool inverse = false)
+                      bool bold = false, bool inverse = false, std::size_t width = std::numeric_limits<std::size_t>::max())
     {
         std::size_t skipped = 0;
+        std::size_t printed = 0;
 
         ForEachGlyph(markup, rgb, [&](char32_t glyph, std::uint32_t colour) {
             if (skipped < skip) {
@@ -375,7 +377,10 @@ public:
                 return;
             }
 
-            Put(x++, y, glyph, colour, bold, inverse);
+            if (printed < width) {
+                Put(x++, y, glyph, colour, bold, inverse);
+                ++printed;
+            }
         });
 
         return x;

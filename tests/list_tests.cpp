@@ -36,6 +36,14 @@ void TestListMarkup()
     wide.Draw(screen, inside);
     Check(Row(screen, 0) == U"defghijklmno" && screen.At(0, 0).rgb == 0x00A6A6,
           "scrolled sideways, an item keeps its colour");
+
+    // Drawn narrower than the screen, an item is cut off at the list's
+    // edge, leaving what is beside it be
+    screen.Clear();
+    const RL::SRect narrow{RL::Position(0, 0), RL::Size(5, 3)};
+    RL::CListWindow cut("Items", narrow, {"abcdefgh"});
+    cut.Draw(screen, narrow);
+    Check(Row(screen, 0) == U"abcde       ", "drawn narrower, an item is cut off at the list's edge");
 }
 
 // A disabled item shows dimmed, and can be selected, but not activated

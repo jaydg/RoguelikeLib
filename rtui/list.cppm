@@ -279,8 +279,9 @@ public:
                 screen.Put(inside.corner.x, y, shortcuts[index], screen.getTextColour(), true, inverse);
             }
 
+            // Cut off at the edge of the list, for what is beside it
             const std::size_t end = keys < view.x ? screen.Print(inside.corner.x + keys, y, Markup(items[index]), horizontal,
-                                                                 screen.getTextColour(), false, inverse) : inside.corner.x + keys;
+                                                                 screen.getTextColour(), false, inverse, view.x - keys) : inside.corner.x + keys;
 
             // A disabled item dimmed, its key with it, as far as it was drawn
             if (!isEnabled(index) && y < screen.getSize().y) {
