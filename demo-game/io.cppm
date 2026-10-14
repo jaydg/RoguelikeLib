@@ -19,10 +19,9 @@ export {
 
     void IOInit()
     {
-        notcurses_options opts = {
-            // supress showing the version when starting
-            .flags = NCOPTION_SUPPRESS_BANNERS
-        };
+        notcurses_options opts{};
+        // Suppress showing the version when starting
+        opts.flags = NCOPTION_SUPPRESS_BANNERS;
 
         // Initialize notcurses
         nc_ctx = notcurses_init(&opts, stdout);

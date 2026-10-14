@@ -28,8 +28,8 @@ bool FindPath(
 {
     auto pathmap = CMatrix<int>(level.getSize(), std::numeric_limits<int>::max());
 
-    for (auto y = 0; y < level.getHeight(); y++) {
-        for (auto x = 0; x < level.getWidth(); x++) {
+    for (std::size_t y = 0; y < level.getHeight(); y++) {
+        for (std::size_t x = 0; x < level.getWidth(); x++) {
             if (level.get(x, y).isPassable()) {
                 pathmap.set(x, y, std::numeric_limits<int>::max() - 1);
             }

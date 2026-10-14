@@ -32,10 +32,10 @@ void GenerateAndTrackClearing(
     const std::size_t max_radius = radius * 2;
     const float noise_scale = 0.3f; // Scaling for "randomness" of the shape
 
-    for (std::size_t x = std::max(0, static_cast<int>(center.x) - static_cast<int>(max_radius));
+    for (int x = std::max(0, static_cast<int>(center.x) - static_cast<int>(max_radius));
             x <= std::min(static_cast<int>(map.getWidth()) - 1, static_cast<int>(center.x) + static_cast<int>(max_radius));
             ++x) {
-        for (std::size_t y = std::max(0, static_cast<int>(center.y) - static_cast<int>(max_radius));
+        for (int y = std::max(0, static_cast<int>(center.y) - static_cast<int>(max_radius));
                 y <= std::min(static_cast<int>(map.getHeight()) - 1, static_cast<int>(center.y) + static_cast<int>(max_radius));
                 ++y) {
             // Calculate the distance to the center
