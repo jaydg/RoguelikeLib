@@ -430,6 +430,12 @@ export std::vector<SBuilding> CreateGrowthTown(CMap& map, std::size_t number_of_
             } else if (attempt == 6) {
                 h = 2;
             }
+            // A generated home needs room for its hearth, a bed, and one
+            // clear tile. Buildings with a single interior cell cannot be
+            // furnished as homes and should not be stamped into the town.
+            if ((w - 1) * (h - 1) < 3) {
+                continue;
+            }
             const int frontage_length = frontage.dx == 0 ? w : h;
             const int offset = attempt < 3 ? 1 + 2 * Random(frontage_length / 2) :
                                1 + 2 * ((attempt - 3) % (frontage_length / 2));
