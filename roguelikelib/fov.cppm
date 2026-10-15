@@ -91,7 +91,7 @@ private:
         // *INDENT-ON*
 
         if (nx >= 0 && ny >= 0 && nx < static_cast<int>(getWidth()) && ny < static_cast<int>(getHeight())) {
-            set(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny), true);
+            set_unchecked(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny), true);
         }
     }
 

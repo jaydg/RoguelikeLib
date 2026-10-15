@@ -110,6 +110,22 @@ public:
         data[pos.x * size.y + pos.y] = val;
     }
 
+    // Unchecked accessors for hot paths that already validate bounds
+    [[nodiscard]] decltype(auto) get_unchecked(std::size_t x, std::size_t y) noexcept
+    {
+        return data[x * size.y + y];
+    }
+
+    [[nodiscard]] decltype(auto) get_unchecked(std::size_t x, std::size_t y) const noexcept
+    {
+        return data[x * size.y + y];
+    }
+
+    void set_unchecked(std::size_t x, std::size_t y, T val) noexcept
+    {
+        data[x * size.y + y] = val;
+    }
+
     [[nodiscard]] Size getSize() const
     {
         return size;
