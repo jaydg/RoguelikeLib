@@ -241,7 +241,9 @@ The interiors are inspired by [Lopes et al., A Constrained Growth Method
 for Procedural Floor Plan Generation (GAMEON 2010)](https://graphics.tudelft.nl/~rafa/myPapers/bidarra.GAMEON10.pdf):
 room seeds grow as rectangles, then absorb remaining space along their
 frontiers according to relative area weights. Door placement favours a
-larger public entrance room and connects the room adjacency graph. All
+larger public entrance room and connects the room adjacency graph. Cottages
+with at most nine interior tiles remain a single room, preserving their
+floor space instead of adding internal walls and doors. All
 rooms are reachable from the street using cardinal steps when doors are
 opened. This is a single-floor adaptation; it does not expose the paper's
 hierarchical zones or user-defined adjacency constraints. Select **Growth

@@ -68,6 +68,19 @@ void CheckTown(const RL::CMap& map, const std::vector<RL::SBuilding>& buildings)
         }
     }
     Check(enclosed, "exterior walls are intact except at the entrance");
+    bool compact_open = true;
+    for (const auto& b : buildings) {
+        const int width = b.corner2.x - b.corner1.x - 1;
+        const int height = b.corner2.y - b.corner1.y - 1;
+        if (width * height <= 9) {
+            for (auto y = b.corner1.y + 1; y < b.corner2.y; ++y) {
+                for (auto x = b.corner1.x + 1; x < b.corner2.x; ++x) {
+                    compact_open &= map.get(x, y).getType() == "room";
+                }
+            }
+        }
+    }
+    Check(compact_open, "small cottages retain every interior tile as floor without internal doors");
 }
 
 void CheckUrbanForm(const RL::CMap& map, const std::vector<RL::SBuilding>& buildings)

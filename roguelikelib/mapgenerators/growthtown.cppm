@@ -17,6 +17,18 @@ struct TownRoom {
 // by frontier filling. Coarse cells leave one tile for walls and doors.
 void TownInterior(CMap& map, const SBuilding& building)
 {
+    const int inside_width = building.corner2.x - building.corner1.x - 1;
+    const int inside_height = building.corner2.y - building.corner1.y - 1;
+    // Small cottages need their floor space more than internal partitions.
+    if (inside_width * inside_height <= 9) {
+        for (auto y = building.corner1.y + 1; y < building.corner2.y; ++y) {
+            for (auto x = building.corner1.x + 1; x < building.corner2.x; ++x) {
+                map.SetCell(Position(x, y), "room");
+            }
+        }
+        map.SetCell(building.door, "door_closed");
+        return;
+    }
     const int w = (building.corner2.x - building.corner1.x) / 2;
     const int h = (building.corner2.y - building.corner1.y) / 2;
     const int max_rooms = std::min(w * h, std::max(2, w * h / 2));
