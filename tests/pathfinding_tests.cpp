@@ -133,4 +133,21 @@ void TestPathfinding()
         Check(visited[0] == line[0] && visited[1] == line[1] && visited[2] == line[2],
               "ForEachBresenham points match line prefix");
     }
+
+    // 8. Position constexpr and noexcept guarantees
+    {
+        constexpr RL::Position def;
+        static_assert(def.x == RL::Position::invalid && def.y == RL::Position::invalid);
+        constexpr RL::Position pos(10, 20);
+        static_assert(pos.x == 10 && pos.y == 20);
+        static_assert(pos == RL::Position(10, 20));
+        static_assert(pos != RL::Position(10, 21));
+        static_assert(noexcept(RL::Position()));
+        static_assert(noexcept(RL::Position(1, 2)));
+        static_assert(noexcept(pos == pos));
+        static_assert(noexcept(pos != pos));
+        static_assert(std::is_trivially_copyable_v<RL::Position>);
+
+        Check(pos.x == 10 && pos.y == 20, "constexpr Position constructed correctly");
+    }
 }

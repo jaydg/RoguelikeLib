@@ -16,37 +16,33 @@ inline int Sign(int n)
 struct Position {
     static constexpr std::size_t invalid = std::numeric_limits<std::size_t>::max();
 
-    std::size_t x;
-    std::size_t y;
+    std::size_t x = invalid;
+    std::size_t y = invalid;
 
-    Position()
-    {
-        x = invalid;
-        y = invalid;
-    }
+    constexpr Position() noexcept = default;
 
-    Position(std::size_t a_x, std::size_t a_y): x(a_x), y(a_y) {};
+    constexpr Position(std::size_t a_x, std::size_t a_y) noexcept : x(a_x), y(a_y) {}
 
-    const Position& operator+=(const Position& r)
+    constexpr const Position& operator+=(const Position& r) noexcept
     {
         x += r.x;
         y += r.y;
         return *this;
     }
 
-    const Position& operator-=(const Position& r)
+    constexpr const Position& operator-=(const Position& r) noexcept
     {
         x -= r.x;
         y -= r.y;
         return *this;
     }
 
-    bool operator==(const Position& r) const
+    constexpr bool operator==(const Position& r) const noexcept
     {
         return (x == r.x && y == r.y);
     }
 
-    bool operator!=(const Position& r) const
+    constexpr bool operator!=(const Position& r) const noexcept
     {
         return !(*this == r);
     }
