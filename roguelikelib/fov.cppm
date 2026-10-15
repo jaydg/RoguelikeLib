@@ -20,6 +20,7 @@ using Transparency = std::function<bool(std::size_t x, std::size_t y)>;
 class CFOV : public CMatrix<bool>
 {
 private:
+    const CMap* map = nullptr;
     Transparency transparent;
 
     // Represents the slope Y/X as a rational number for the shadowcasting bounds
@@ -80,6 +81,10 @@ private:
 
         if (nx < 0 || ny < 0 || nx >= static_cast<int>(getWidth()) || ny >= static_cast<int>(getHeight())) {
             return true;
+        }
+
+        if (map != nullptr) {
+            return !map->get_unchecked(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny)).isTransparent();
         }
 
         return !transparent(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny));
@@ -226,10 +231,8 @@ public:
     CFOV() : CMatrix<bool>(Size(0, 0), false) {}
 
     // The field of view on a map, through the tiles that are transparent
-    explicit CFOV(const CMap *map)
-        : CFOV(map->getSize(), [map](std::size_t x, std::size_t y) {
-        return map->get(x, y).isTransparent();
-    })
+    explicit CFOV(const CMap *a_map)
+        : CMatrix<bool>(a_map->getSize(), false), map(a_map)
     {
     }
 
