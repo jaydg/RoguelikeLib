@@ -243,11 +243,7 @@ public:
     void Calculate(Position start, int radius)
     {
         // Reset the matrix (clear old visibility)
-        for (std::size_t x = 0; x < getWidth(); ++x) {
-            for (std::size_t y = 0; y < getHeight(); ++y) {
-                set(x, y, false);
-            }
-        }
+        fill(false);
 
         int cx = static_cast<int>(start.x);
         int cy = static_cast<int>(start.y);

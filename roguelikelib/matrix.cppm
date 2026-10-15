@@ -141,6 +141,12 @@ public:
         return size.y;
     }
 
+    // Bulk-set every element to val without per-element bounds checks
+    void fill(T val)
+    {
+        std::fill(data.begin(), data.end(), val);
+    }
+
     // Original: compare by equality
     [[nodiscard]] int CountNeighbors(
         const Position& pos, const T& value,
