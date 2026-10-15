@@ -68,6 +68,9 @@ struct Position {
         int x1 = static_cast<int>(x), y1 = static_cast<int>(y);
         int x2 = static_cast<int>(p2.x), y2 = static_cast<int>(p2.y);
 
+        const std::size_t count = static_cast<std::size_t>(std::max(std::abs(x2 - x1), std::abs(y2 - y1))) + 1;
+        ret.reserve(count);
+
         int xstep = Sign(x2 - x1);
         int ystep = Sign(y2 - y1);
 
