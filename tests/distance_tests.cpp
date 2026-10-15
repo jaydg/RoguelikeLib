@@ -119,4 +119,18 @@ void TestDistance()
         Check(RL::ChebyshevDistance(10, 20, 15, 12) == 8, "ChebyshevDistance for (5, 8) delta is 8");
         Check(cp1.ChebyshevDistance(cp2) == 8, "Position::ChebyshevDistance produces 8");
     }
+
+    // 13. Constrained diff helper
+    {
+        static_assert(RL::diff(10, 3) == 7);
+        static_assert(RL::diff(3, 10) == 7);
+        static_assert(RL::diff(0u, 5u) == 5u);
+        static_assert(RL::diff(5u, 0u) == 5u);
+        static_assert(noexcept(RL::diff(1, 2)));
+
+        Check(RL::diff(10, 3) == 7, "diff(10, 3) is 7");
+        Check(RL::diff(3, 10) == 7, "diff(3, 10) is 7");
+        Check(RL::diff(0u, 5u) == 5u, "diff with unsigned avoids underflow");
+    }
 }
+

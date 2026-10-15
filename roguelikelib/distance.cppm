@@ -32,6 +32,7 @@ namespace Detail
 export {
 
     template<typename T>
+        requires std::is_arithmetic_v<T>
     [[nodiscard]] constexpr T diff(T a, T b) noexcept
     {
         return (a > b) ? (a - b) : (b - a);
