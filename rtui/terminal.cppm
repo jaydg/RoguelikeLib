@@ -54,6 +54,8 @@ struct SKey {
     // What was done with the mouse, for EKey::Mouse
     RL::SMouse mouse{};
 
+    bool alt = false;
+
     bool operator==(const SKey&) const = default;
 };
 
@@ -83,16 +85,20 @@ return at_end ? SDecodedKey{{EKey::Escape}, 1} :
         }
 
         if (input[1] != '[' && input[1] != 'O') {
-            // Alt+key arrives as Escape and the key. Hand out the Escape and leave the key for next time,
-            // rather than lose either.
-            return {{EKey::Escape}, 1};
+            // Alt prefixes a normal key (or another escape sequence).
+            auto decoded = DecodeKey(input.substr(1), at_end);
+            if (decoded.length == 0) return {};
+            decoded.key.alt = true;
+            ++decoded.length;
+            return decoded;
         }
 
         // CSI (ESC [) or SS3 (ESC O): parameters, then a final byte that
-        // names the key. Only the first parameter matters here; the others
-        // are modifiers like Shift and Ctrl.
+        // names the key. The second parameter encodes modifiers.
         int parameter = 0;
+        int modifier = 0;
         bool first = true;
+        bool second = true;
         std::size_t index = 2;
 
         for (; index < input.size(); ++index) {
@@ -103,8 +109,11 @@ return at_end ? SDecodedKey{{EKey::Escape}, 1} :
                 // overflow
                 if (first && parameter < 1000) {
                     parameter = parameter * 10 + (c - '0');
+                } else if (!first && second && modifier < 1000) {
+                    modifier = modifier * 10 + (c - '0');
                 }
             } else if (c == ';') {
+                if (!first) second = false;
                 first = false;
             } else if (c < 0x20 || c > 0x3F) {
                 // Not a parameter byte: the final one, or something
@@ -192,7 +201,9 @@ return at_end ? SDecodedKey{{EKey::Escape}, 1} :
 
         // A sequence for an unsupported key - a function key -
         // is swallowed whole rather than handed out byte by byte
-        return {{type}, index + 1};
+        SKey key{type};
+        key.alt = modifier > 0 && ((modifier - 1) & 2) != 0;
+        return {key, index + 1};
     }
 
     if (byte == '\r' || byte == '\n') {

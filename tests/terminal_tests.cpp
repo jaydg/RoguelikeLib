@@ -79,7 +79,15 @@ void TestDecodeKey()
     Check(Decodes("\x1b", true, {RL::EKey::Escape}, 1), "a lone Escape with nothing following");
     Check(Decodes("\x1b[1;", false, {}, 0), "an unfinished sequence waits");
     Check(Decodes("\x1b[1;", true, {RL::EKey::Escape}, 1), "an unfinished sequence that stays so is an Escape");
-    Check(Decodes("\x1bx", false, {RL::EKey::Escape}, 1), "Alt+key leaves the key");
+    RL::SKey alt_x{EKey::Char, U'x'};
+    alt_x.alt = true;
+    Check(Decodes("\x1bx", false, alt_x, 2), "Alt+letter is one key with its modifier");
+    RL::SKey alt_right{EKey::Right};
+    alt_right.alt = true;
+    Check(Decodes("\x1b[1;3C", false, alt_right, 6), "CSI Alt+arrow retains its modifier");
+    Check(Decodes("\x1b\x1b[C", false, alt_right, 4), "Escape-prefixed Alt+arrow retains its modifier");
+    Check(Decodes("\x1b[1;7C", false, alt_right, 6), "Alt+Ctrl+arrow retains Alt");
+    Check(Decodes("\x1b\xC3", false, {}, 0), "Alt+UTF-8 waits for a complete character");
 
     Check(Decodes("\r", false, {RL::EKey::Enter}, 1) && Decodes("\n", false, {RL::EKey::Enter}, 1), "enter");
     Check(Decodes("\x7f", false, {RL::EKey::Backspace}, 1) && Decodes("\x08", false, {RL::EKey::Backspace}, 1), "backspace");
