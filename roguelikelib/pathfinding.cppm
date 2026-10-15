@@ -14,17 +14,14 @@ import std;
 export namespace RL
 {
 
-// CMap &level - in/out
-// input level must be in form of values (higher than floodfill distance)
-// - LevelElementCorridor_value
-// - LevelElementWall_value
-// as output you get a flood filled level
+// Finds a path from start to end on the level.
+// Returns true and writes the sequential steps (excluding start) to path if reachable.
 bool FindPath(
-    CMap &level,
+    const CMap &level,
     const Position& start,
     const Position& end,
     std::vector<Position>& path,
-    const bool& diagonals = true)
+    bool diagonals = true)
 {
     auto pathmap = CMatrix<int>(level.getSize(), std::numeric_limits<int>::max());
 

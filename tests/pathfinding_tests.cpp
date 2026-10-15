@@ -11,7 +11,7 @@ using RL::tests::Check;
 void TestPathfinding()
 {
     // 1. Simple straight line on open map
-    RL::CMap open = RL::tests::MakeMap({
+    const RL::CMap open = RL::tests::MakeMap({
         ".....",
         ".....",
         ".....",
@@ -60,7 +60,7 @@ void TestPathfinding()
     }
 
     // 4. Navigating around a wall
-    RL::CMap walled = RL::tests::MakeMap({
+    const RL::CMap walled = RL::tests::MakeMap({
         ".....",
         ".TTT.",
         "...T.",
@@ -85,7 +85,7 @@ void TestPathfinding()
     }
 
     // 5. Completely blocked destination
-    RL::CMap blocked = RL::tests::MakeMap({
+    const RL::CMap blocked = RL::tests::MakeMap({
         ".....",
         ".TTT.",
         ".T.T.",
