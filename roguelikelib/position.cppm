@@ -8,9 +8,9 @@ import std;
 export namespace RL
 {
 
-inline int Sign(int n)
+[[nodiscard]] constexpr int Sign(int n) noexcept
 {
-    return (n > 0) ? 1 : ((n == 0) ? 0 : -1);
+    return (n > 0) - (n < 0);
 }
 
 struct Position {

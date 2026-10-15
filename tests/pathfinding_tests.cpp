@@ -166,4 +166,16 @@ void TestPathfinding()
         map[RL::Position(10, 20)] = 42;
         Check(map[RL::Position(10, 20)] == 42, "unordered_map stores values at Position key");
     }
+
+    // 10. Branchless constexpr Sign function
+    {
+        static_assert(RL::Sign(42) == 1);
+        static_assert(RL::Sign(-42) == -1);
+        static_assert(RL::Sign(0) == 0);
+        static_assert(noexcept(RL::Sign(0)));
+
+        Check(RL::Sign(100) == 1, "Sign of positive number is 1");
+        Check(RL::Sign(-100) == -1, "Sign of negative number is -1");
+        Check(RL::Sign(0) == 0, "Sign of zero is 0");
+    }
 }
