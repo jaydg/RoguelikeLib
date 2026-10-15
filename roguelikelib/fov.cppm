@@ -41,10 +41,10 @@ private:
         }
     };
 
-    // Calculate Euclidean distance from origin point (0,0) mapped to (x,y)
-    [[nodiscard]] inline int GetDistance(int x, int y) const noexcept
+    // Squared Euclidean distance from origin (0,0) to (x,y)
+    [[nodiscard]] inline int GetDistanceSquared(int x, int y) const noexcept
     {
-        return static_cast<int>(std::round(std::sqrt(x * x + y * y)));
+        return x * x + y * y;
     }
 
     [[nodiscard]] bool BlocksLight(unsigned int x, unsigned int y, unsigned int octant, Position origin)
@@ -114,7 +114,7 @@ private:
     //    h
     //
     // *INDENT-ON*
-    void ComputeOctant(unsigned int octant, Position origin, int rangeLimit, unsigned int x, Slope top, Slope bottom)
+    void ComputeOctant(unsigned int octant, Position origin, int rangeLimit, int rangeLimitSq, unsigned int x, Slope top, Slope bottom)
     {
         for (; rangeLimit < 0 || x <= static_cast<unsigned int>(rangeLimit); x++) {
             // compute the Y coordinates of the top and bottom of the sector. we maintain that top > bottom
@@ -160,7 +160,7 @@ private:
             int wasOpaque = -1; // 0:false, 1:true, -1:not applicable
 
             for (unsigned int y = topY; static_cast<int>(y) >= static_cast<int>(bottomY); y--) {
-                if (rangeLimit < 0 || GetDistance(static_cast<int>(x), static_cast<int>(y)) <= rangeLimit) {
+                if (rangeLimit < 0 || GetDistanceSquared(static_cast<int>(x), static_cast<int>(y)) <= rangeLimitSq) {
                     bool isOpaque = BlocksLight(x, y, octant, origin);
                     bool isVisible = isOpaque ||
                                      ((y != topY || top.Greater(y * 4 - 1, x * 4 + 1)) &&
@@ -185,7 +185,7 @@ private:
                                         bottom = Slope(ny, nx);
                                         break;
                                     } else {
-                                        ComputeOctant(octant, origin, rangeLimit, x + 1, top, Slope(ny, nx));
+                                        ComputeOctant(octant, origin, rangeLimit, rangeLimitSq, x + 1, top, Slope(ny, nx));
                                     }
                                 } else { // sector is empty
                                     if (y == bottomY) {
@@ -255,9 +255,12 @@ public:
         // The starting position is always visible
         set(start.x, start.y, true);
 
+        // Precompute squared range limit to avoid sqrt in the inner loop
+        int rangeLimitSq = radius * radius;
+
         // Calculate visibility for all 8 octants
         for (unsigned int octant = 0; octant < 8; octant++) {
-            ComputeOctant(octant, start, radius, 1, Slope(1, 1), Slope(0, 1));
+            ComputeOctant(octant, start, radius, rangeLimitSq, 1, Slope(1, 1), Slope(0, 1));
         }
     }
 };
