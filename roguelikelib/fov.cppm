@@ -63,7 +63,7 @@ private:
     }};
 
     [[nodiscard]] static inline std::pair<int, int> TransformOctant(
-        unsigned int x, unsigned int y, unsigned int octant, Position origin) noexcept
+        unsigned int x, unsigned int y, unsigned int octant, const Position& origin) noexcept
     {
         const auto& [xx, xy, yx, yy] = octantOffsets[octant];
         const int ix = static_cast<int>(x);
@@ -74,7 +74,7 @@ private:
         };
     }
 
-    [[nodiscard]] bool BlocksLight(unsigned int x, unsigned int y, unsigned int octant, Position origin)
+    [[nodiscard]] bool BlocksLight(unsigned int x, unsigned int y, unsigned int octant, const Position& origin)
     {
         const auto [nx, ny] = TransformOctant(x, y, octant, origin);
 
@@ -85,7 +85,7 @@ private:
         return !transparent(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny));
     }
 
-    void SetVisible(unsigned int x, unsigned int y, unsigned int octant, Position origin)
+    void SetVisible(unsigned int x, unsigned int y, unsigned int octant, const Position& origin)
     {
         const auto [nx, ny] = TransformOctant(x, y, octant, origin);
 
@@ -113,7 +113,7 @@ private:
     //    h
     //
     // *INDENT-ON*
-    void ComputeOctant(unsigned int octant, Position origin, int rangeLimit, int rangeLimitSq, unsigned int x, Slope top, Slope bottom)
+    void ComputeOctant(unsigned int octant, const Position& origin, int rangeLimit, int rangeLimitSq, unsigned int x, Slope top, Slope bottom)
     {
         for (; rangeLimit < 0 || x <= static_cast<unsigned int>(rangeLimit); x++) {
             // compute the Y coordinates of the top and bottom of the sector. we maintain that top > bottom
@@ -239,7 +239,7 @@ public:
     CFOV(Size size, Transparency a_transparent) : CMatrix<bool>(size, false), transparent(std::move(a_transparent)) {}
 
     // Triggers a recalculation of the Field of View using Adam Milazzo's Shadowcasting
-    void Calculate(Position start, int radius)
+    void Calculate(const Position& start, int radius)
     {
         // Reset the matrix (clear old visibility)
         fill(false);
