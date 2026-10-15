@@ -171,9 +171,13 @@ public:
 
     bool FloodFill(Position start, T value, bool diagonal = true, int gradient = 0, Position end = Position(-1, -1))
     {
+        if (!inside(start)) {
+            return false;
+        }
+
         // flood fill room
-        T area_value = get(start.x, start.y);
-        set(start.x, start.y, value);
+        T area_value = get_unchecked(start.x, start.y);
+        set_unchecked(start.x, start.y, value);
 
         std::vector<Position> positions;
         positions.reserve(64);
@@ -194,54 +198,54 @@ public:
             std::size_t pos_x = current.x;
             std::size_t pos_y = current.y;
 
-            T this_value = get(pos_x, pos_y);
+            T this_value = get_unchecked(pos_x, pos_y);
 
             if (pos_x > 0)
-                if (get(pos_x - 1, pos_y) == area_value) {
-                    set(pos_x - 1, pos_y, this_value + gradient);
+                if (get_unchecked(pos_x - 1, pos_y) == area_value) {
+                    set_unchecked(pos_x - 1, pos_y, this_value + gradient);
                     positions.emplace_back(pos_x - 1, pos_y);
                 }
 
             if (pos_x < getWidth() - 1)
-                if (get(pos_x + 1, pos_y) == area_value) {
-                    set(pos_x + 1, pos_y, this_value + gradient);
+                if (get_unchecked(pos_x + 1, pos_y) == area_value) {
+                    set_unchecked(pos_x + 1, pos_y, this_value + gradient);
                     positions.emplace_back(pos_x + 1, pos_y);
                 }
 
             if (pos_y > 0)
-                if (get(pos_x, pos_y - 1) == area_value) {
-                    set(pos_x, pos_y - 1, this_value + gradient);
+                if (get_unchecked(pos_x, pos_y - 1) == area_value) {
+                    set_unchecked(pos_x, pos_y - 1, this_value + gradient);
                     positions.emplace_back(pos_x, pos_y - 1);
                 }
 
             if (pos_y < getHeight() - 1)
-                if (get(pos_x, pos_y + 1) == area_value) {
-                    set(pos_x, pos_y + 1, this_value + gradient);
+                if (get_unchecked(pos_x, pos_y + 1) == area_value) {
+                    set_unchecked(pos_x, pos_y + 1, this_value + gradient);
                     positions.emplace_back(pos_x, pos_y + 1);
                 }
 
             if (diagonal) {
                 if (pos_x > 0 && pos_y > 0)
-                    if (get(pos_x - 1, pos_y - 1) == area_value) {
-                        set(pos_x - 1, pos_y - 1, this_value + gradient);
+                    if (get_unchecked(pos_x - 1, pos_y - 1) == area_value) {
+                        set_unchecked(pos_x - 1, pos_y - 1, this_value + gradient);
                         positions.emplace_back(pos_x - 1, pos_y - 1);
                     }
 
                 if (pos_x < getWidth() - 1 && pos_y < getHeight() - 1)
-                    if (get(pos_x + 1, pos_y + 1) == area_value) {
-                        set(pos_x + 1, pos_y + 1, this_value + gradient);
+                    if (get_unchecked(pos_x + 1, pos_y + 1) == area_value) {
+                        set_unchecked(pos_x + 1, pos_y + 1, this_value + gradient);
                         positions.emplace_back(pos_x + 1, pos_y + 1);
                     }
 
                 if (pos_x < getWidth() - 1 && pos_y > 0)
-                    if (get(pos_x + 1, pos_y - 1) == area_value) {
-                        set(pos_x + 1, pos_y - 1, this_value + gradient);
+                    if (get_unchecked(pos_x + 1, pos_y - 1) == area_value) {
+                        set_unchecked(pos_x + 1, pos_y - 1, this_value + gradient);
                         positions.emplace_back(pos_x + 1, pos_y - 1);
                     }
 
                 if (pos_x > 0 && pos_y < getHeight() - 1)
-                    if (get(pos_x - 1, pos_y + 1) == area_value) {
-                        set(pos_x - 1, pos_y + 1, this_value + gradient);
+                    if (get_unchecked(pos_x - 1, pos_y + 1) == area_value) {
+                        set_unchecked(pos_x - 1, pos_y + 1, this_value + gradient);
                         positions.emplace_back(pos_x - 1, pos_y + 1);
                     }
             }
