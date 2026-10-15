@@ -110,6 +110,16 @@ void TestVoronoiScale()
     RL::CMap huge(RL::Size(300, 300));
     const auto huge_info = RL::CreateVoronoiWilderness(huge);
     Check(huge_info.regions == 450, "automatic segmentation continues beyond the old 400-region ceiling");
+    bool farmland = false, bog = false;
+    for (std::size_t y = 0; y < huge.getHeight(); ++y) {
+        for (std::size_t x = 0; x < huge.getWidth(); ++x) {
+            const auto type = huge.get(x, y).getType();
+            farmland |= type == "field" || type == "hedge";
+            bog |= type == "bog_ground" || type == "bog_reeds" || type == "bog_pool";
+        }
+    }
+    Check(!farmland && bog && huge_info.field_gates.empty(),
+          "wilderness without buildings has bogs instead of cultivated fields and gates");
 }
 
 void TestVoronoiChasms()

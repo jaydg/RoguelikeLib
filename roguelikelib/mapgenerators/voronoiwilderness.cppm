@@ -79,7 +79,7 @@ namespace voronoiwilderness_detail
 
 // The terrain a region is made of
 enum class Ter {
-    Water, Grass, Forest, Field, Hills, Mountain, Snow, Town, Blocked
+    Water, Grass, Forest, Field, Bog, Hills, Mountain, Snow, Town, Blocked
 };
 
 // Lakes and chasms are the only terrains no cell of a region can be
@@ -128,6 +128,9 @@ void RegisterWildernessTiles()
     };
 
     add("field", {U',', 0xD9C463, true, true});     // farmland
+    add("bog_ground", {U'.', 0x6C7156, true, true});
+    add("bog_reeds", {U'&', 0x6C7C59, false, true});
+    add("bog_pool", {U'~', 0x356B70, true, true});
     add("hedge", {U'#', 0x2E7D32, false, false});   // what walls a field in
     add("slope", {CTileData::get("grass").second.glyph, 0xA7CC7C, true, true}); // elevation-tinted grass
     add("scrub", {U'&', 0x84945A, false, true});   // low hillside bushes
@@ -732,6 +735,13 @@ void CWilderness::AssignTerrain()
             ++have_blocked;
         }
     }
+
+    // Unsettled wilderness has wet lowlands in place of cultivated fields.
+    if (!with_buildings_) {
+        for (auto& region : regions_) {
+            if (region.terrain == Ter::Field) region.terrain = Ter::Bog;
+        }
+    }
 }
 
 // Carve a branching ravine inside each selected region rather than using
@@ -1032,6 +1042,13 @@ std::string_view CWilderness::TileAt(const int x, const int y) const
         }
         return "grass";
     }
+
+    case Ter::Bog:
+        // Connected, walkable wetland: pools and reed beds follow the
+        // coherent noise, without agricultural hedges or gates.
+        if (noise < 0.35) return "bog_pool";
+        if (noise > 0.60) return "bog_reeds";
+        return "bog_ground";
 
     case Ter::Field:
 
@@ -1553,6 +1570,7 @@ inline constexpr std::array<SOpening, 3> WildernessOpenings = {{
 // At 0 one region is asked for per 200 cells of the
 // map, with at least 10. Larger maps add regions instead of enlarging them.
 // @param with_buildings  Whether to fill the town with small buildings.
+// When false, agricultural field regions become uncultivated bogs.
 // Each side, including walls, is 4–7 tiles long; larger towns get more
 // buildings. Narrow plots that cannot hold a 4x4 building stay open.
 //

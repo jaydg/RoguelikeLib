@@ -18,10 +18,12 @@ using namespace RL;
 struct SGenerator {
     std::string name;
     std::function<void(CMap&)> generate;
+    std::function<std::string()> variant{};
 };
 
 std::vector<SGenerator> Generators()
 {
+    const auto voronoi_buildings = std::make_shared<bool>(false);
     std::vector<SGenerator> result = {
         {
             "Standard Dungeon", [](CMap & map)
@@ -96,9 +98,14 @@ std::vector<SGenerator> Generators()
             }
         },
         {
-            "Voronoi Wilderness", [](CMap & map)
+            "Voronoi Wilderness", [voronoi_buildings](CMap & map)
             {
-                CreateVoronoiWilderness(map, 0, true);
+                *voronoi_buildings = Random(2) != 0;
+                CreateVoronoiWilderness(map, 0, *voronoi_buildings);
+            },
+            [voronoi_buildings]()
+            {
+                return *voronoi_buildings ? "buildings and fields" : "no buildings; bogs";
             }
         },
         {
@@ -231,6 +238,9 @@ private:
             generated = list.getSelected().value_or(0);
             generators[generated].generate(level);
             detail = std::format("{} ({}x{})", generators[generated].name, level.getWidth(), level.getHeight());
+            if (generators[generated].variant) {
+                detail += ": " + generators[generated].variant();
+            }
             focus = Position(level.getWidth() / 2, level.getHeight() / 2);
         } else if (mode == 1) {
             CreateSimpleCity(level, 15);

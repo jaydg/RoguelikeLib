@@ -325,7 +325,11 @@ at a similar scale. Explicit nonzero region counts still select a fixed
 count. Voronoi town buildings are 4–7 tiles wide and 4–7 tiles high, including
 walls; larger town regions hold multiple buildings, with one tile of open
 ground between houses and their neighbours. All buildings are returned in
-`SWildernessInfo::buildings`.
+`SWildernessInfo::buildings`. The feature demo tosses a coin on each
+Voronoi generation, including `R` regeneration, to enable or disable
+buildings. Its status line reports the selected mode. Without buildings,
+field regions become walkable bogs with reed beds and shallow pools;
+hedges, farm gates and their agricultural road connections are omitted.
 
 Voronoi chasms are branching, curved ravines with open grassy shoulders.
 Broken rocky rims (`#` and `^`) fade through descending faces (`:`) into
