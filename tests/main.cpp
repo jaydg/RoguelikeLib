@@ -33,6 +33,7 @@ void TestListFollowed();
 void TestListShortcuts();
 void TestInput();
 void TestPathfinding();
+void TestDistance();
 
 int main(int argc, char* argv[])
 {
@@ -67,7 +68,8 @@ int main(int argc, char* argv[])
         {"ListFollowed", TestListFollowed},
         {"ListShortcuts", TestListShortcuts},
         {"Input", TestInput},
-        {"Pathfinding", TestPathfinding}
+        {"Pathfinding", TestPathfinding},
+        {"Distance", TestDistance}
     };
     const std::vector<std::string_view> named(argv + 1, argv + argc);
 
