@@ -175,20 +175,24 @@ public:
         T area_value = get(start.x, start.y);
         set(start.x, start.y, value);
 
-        std::list<Position> positions;
+        std::vector<Position> positions;
+        positions.reserve(64);
         positions.emplace_back(start);
 
-        auto m = positions.begin();
+        std::size_t head = 0;
+        bool reached_end = false;
 
-        while (m != positions.end()) {
+        while (head < positions.size()) {
+            const Position current = positions[head++];
 
             // Fill only to the end?
-            if (end.x != Position::invalid && end == (*m)) {
+            if (end.x != Position::invalid && end == current) {
+                reached_end = true;
                 break;
             }
 
-            std::size_t pos_x = m->x;
-            std::size_t pos_y = m->y;
+            std::size_t pos_x = current.x;
+            std::size_t pos_y = current.y;
 
             T this_value = get(pos_x, pos_y);
 
@@ -241,17 +245,10 @@ public:
                         positions.emplace_back(pos_x - 1, pos_y + 1);
                     }
             }
-
-            m = positions.erase(m);
         }
 
-        // filling to the end cell without success
-        if (m == positions.end()) {
-            return false;
-        }
-
-        if (end.x != Position::invalid && end != (*m)) {
-            return false;
+        if (end.x != Position::invalid) {
+            return reached_end;
         }
 
         return true;
