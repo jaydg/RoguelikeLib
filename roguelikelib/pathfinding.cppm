@@ -38,82 +38,52 @@ bool FindPath(
         return false;
     }
 
-    // walk from start to end
-    Position pos = start;
-    Position new_pos = start;
+    // Walk from start to end following the gradient
+    static constexpr std::array<std::pair<int, int>, 4> cardinalSteps = {{
+        {0, -1}, {-1, 0}, {1, 0}, {0, 1}
+    }};
+    static constexpr std::array<std::pair<int, int>, 4> diagonalSteps = {{
+        {-1, -1}, {1, -1}, {-1, 1}, {1, 1}
+    }};
 
-    while (true) {
-        if (pos == end) {
-            return true;
+    Position current = start;
+
+    while (current != end) {
+        int best_value = pathmap.get_unchecked(current.x, current.y);
+        Position best_pos = current;
+
+        auto check_neighbor = [&](int dx, int dy) {
+            int nx = static_cast<int>(current.x) + dx;
+            int ny = static_cast<int>(current.y) + dy;
+            if (nx >= 0 && ny >= 0 && nx < static_cast<int>(pathmap.getWidth()) && ny < static_cast<int>(pathmap.getHeight())) {
+                int val = pathmap.get_unchecked(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny));
+                if (val < best_value) {
+                    best_value = val;
+                    best_pos = Position(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny));
+                }
+            }
+        };
+
+        // Straight steps first for natural path alignment
+        for (const auto& [dx, dy] : cardinalSteps) {
+            check_neighbor(dx, dy);
         }
-
-        pos = new_pos;
-
-        if (pos != start) {
-            path.push_back(pos);
-        }
-
-        int current_value = pathmap.get(pos.x, pos.y);
-
         if (diagonals) {
-            if (pos.x > 0 && pos.y > 0)
-                if (pathmap.get(pos.x - 1, pos.y - 1) < current_value) { // NW
-                    new_pos.x--;
-                    new_pos.y--;
-                    continue;
-                }
-
-            if (pos.x < pathmap.getWidth() - 1 && pos.y > 0)
-                if (pathmap.get(pos.x + 1, pos.y - 1) < current_value) { // NE
-                    new_pos.x++;
-                    new_pos.y--;
-                    continue;
-                }
-
-            if (pos.x < pathmap.getWidth() - 1 && pos.y < pathmap.getHeight() - 1)
-                if (pathmap.get(pos.x + 1, pos.y + 1) < current_value) { // SE
-                    new_pos.x++;
-                    new_pos.y++;
-                    continue;
-                }
-
-            if (pos.x > 0 && pos.y < pathmap.getHeight() - 1)
-                if (pathmap.get(pos.x - 1, pos.y + 1) < current_value) { // SW
-                    new_pos.x--;
-                    new_pos.y++;
-                    continue;
-                }
+            for (const auto& [dx, dy] : diagonalSteps) {
+                check_neighbor(dx, dy);
+            }
         }
 
-        if (pos.y > 0)
-            if (pathmap.get(pos.x, pos.y - 1) < current_value) { // N
-                new_pos.y--;
-                continue;
-            }
-
-        if (pos.x < pathmap.getWidth() - 1)
-            if (pathmap.get(pos.x + 1, pos.y) < current_value) { // E
-                new_pos.x++;
-                continue;
-            }
-
-        if (pos.y < pathmap.getHeight() - 1)
-            if (pathmap.get(pos.x, pos.y + 1) < current_value) { // S
-                new_pos.y++;
-                continue;
-            }
-
-        if (pos.x > 0)
-            if (pathmap.get(pos.x - 1, pos.y) < current_value) { // W
-                new_pos.x--;
-                continue;
-            }
-
-        if (pos == new_pos && new_pos != end) {
+        if (best_pos == current) {
             path.clear();
             return false;
         }
+
+        current = best_pos;
+        path.push_back(current);
     }
+
+    return true;
 }
 
 } // namespace RL
