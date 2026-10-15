@@ -52,7 +52,7 @@ struct Position {
         return std::format("(x: {}, y: {})", x, y);
     }
 
-    [[nodiscard]] std::size_t Distance(const Position &other) const noexcept
+    [[nodiscard]] constexpr std::size_t Distance(const Position &other) const noexcept
     {
         return RL::Distance(x, y, other.x, other.y);
     }

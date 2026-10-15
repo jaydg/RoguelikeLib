@@ -67,4 +67,22 @@ void TestDistance()
         Check(RL::DistanceSquared(0, 0, 5, 12) == 169, "DistanceSquared for 5-12 delta is 169");
         Check(p1.DistanceSquared(p2) == 25, "Position::DistanceSquared produces 25");
     }
+
+    // 10. Distance constexpr compile-time evaluation
+    {
+        static_assert(RL::Distance(0, 0, 0, 0) == 0);
+        static_assert(RL::Distance(0, 0, 3, 4) == 5);
+        static_assert(RL::Distance(0, 0, 1, 1) == 2);
+        static_assert(RL::Distance(0, 0, 1, 2) == 3);
+        static_assert(RL::Distance(0, 0, 5, 12) == 13);
+        static_assert(RL::Distance(0, 0, 6, 8) == 10);
+        static_assert(RL::Distance(0, 0, 1000, 1000) == 1415);
+
+        constexpr RL::Position cp1(10, 20);
+        constexpr RL::Position cp2(13, 24);
+        static_assert(cp1.Distance(cp2) == 5);
+        static_assert(noexcept(cp1.Distance(cp2)));
+
+        Check(cp1.Distance(cp2) == 5, "constexpr Distance produces correct result");
+    }
 }

@@ -11,6 +11,23 @@ import std;
 namespace RL
 {
 
+namespace Detail
+{
+    [[nodiscard]] constexpr std::size_t CeilISqrt(std::size_t n) noexcept
+    {
+        if (n <= 1) {
+            return n;
+        }
+        std::size_t x0 = std::size_t{1} << ((64 - std::countl_zero(n) + 1) / 2);
+        std::size_t x1 = (x0 + n / x0) / 2;
+        while (x1 < x0) {
+            x0 = x1;
+            x1 = (x0 + n / x0) / 2;
+        }
+        return (x0 * x0 == n) ? x0 : (x0 + 1);
+    }
+}
+
 // Public API
 export {
 
@@ -28,14 +45,18 @@ export {
         return diff_x * diff_x + diff_y * diff_y;
     }
 
-    [[nodiscard]] inline std::size_t Distance(std::size_t x1, std::size_t y1, std::size_t x2, std::size_t y2) noexcept
+    [[nodiscard]] constexpr std::size_t Distance(std::size_t x1, std::size_t y1, std::size_t x2, std::size_t y2) noexcept
     {
         const std::size_t diff_x = diff(x1, x2);
         const std::size_t diff_y = diff(y1, y2);
 
-        const double dist = static_cast<double>(diff_x * diff_x + diff_y * diff_y);
+        const std::size_t dist = diff_x * diff_x + diff_y * diff_y;
 
-        return static_cast<std::size_t>(std::ceil(std::sqrt(dist)));
+        if (std::is_constant_evaluated()) {
+            return Detail::CeilISqrt(dist);
+        } else {
+            return static_cast<std::size_t>(std::ceil(std::sqrt(static_cast<double>(dist))));
+        }
     }
 
 } // end of export
