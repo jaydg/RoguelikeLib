@@ -49,4 +49,22 @@ void TestDistance()
 
     // 8. Noexcept verification
     static_assert(noexcept(RL::Distance(0, 0, 0, 0)));
+
+    // 9. DistanceSquared tests and constexpr guarantees
+    {
+        static_assert(RL::DistanceSquared(0, 0, 0, 0) == 0);
+        static_assert(RL::DistanceSquared(0, 0, 3, 4) == 25);
+        static_assert(RL::DistanceSquared(10, 10, 13, 14) == 25);
+        static_assert(RL::DistanceSquared(0, 0, 1, 1) == 2);
+        static_assert(noexcept(RL::DistanceSquared(0, 0, 0, 0)));
+
+        constexpr RL::Position cp1(2, 3);
+        constexpr RL::Position cp2(5, 7);
+        static_assert(cp1.DistanceSquared(cp2) == 25);
+        static_assert(noexcept(cp1.DistanceSquared(cp2)));
+
+        Check(RL::DistanceSquared(0, 0, 3, 4) == 25, "DistanceSquared for 3-4 delta is 25");
+        Check(RL::DistanceSquared(0, 0, 5, 12) == 169, "DistanceSquared for 5-12 delta is 169");
+        Check(p1.DistanceSquared(p2) == 25, "Position::DistanceSquared produces 25");
+    }
 }
