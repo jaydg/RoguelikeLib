@@ -85,4 +85,38 @@ void TestDistance()
 
         Check(cp1.Distance(cp2) == 5, "constexpr Distance produces correct result");
     }
+
+    // 11. Manhattan distance
+    {
+        static_assert(RL::ManhattanDistance(0, 0, 0, 0) == 0);
+        static_assert(RL::ManhattanDistance(0, 0, 3, 4) == 7);
+        static_assert(RL::ManhattanDistance(10, 20, 15, 12) == 13);
+        static_assert(noexcept(RL::ManhattanDistance(0, 0, 0, 0)));
+
+        constexpr RL::Position cp1(10, 20);
+        constexpr RL::Position cp2(15, 12);
+        static_assert(cp1.ManhattanDistance(cp2) == 13);
+        static_assert(noexcept(cp1.ManhattanDistance(cp2)));
+
+        Check(RL::ManhattanDistance(0, 0, 3, 4) == 7, "ManhattanDistance for 3-4 delta is 7");
+        Check(RL::ManhattanDistance(10, 20, 15, 12) == 13, "ManhattanDistance for (5, 8) delta is 13");
+        Check(cp1.ManhattanDistance(cp2) == 13, "Position::ManhattanDistance produces 13");
+    }
+
+    // 12. Chebyshev distance
+    {
+        static_assert(RL::ChebyshevDistance(0, 0, 0, 0) == 0);
+        static_assert(RL::ChebyshevDistance(0, 0, 3, 4) == 4);
+        static_assert(RL::ChebyshevDistance(10, 20, 15, 12) == 8);
+        static_assert(noexcept(RL::ChebyshevDistance(0, 0, 0, 0)));
+
+        constexpr RL::Position cp1(10, 20);
+        constexpr RL::Position cp2(15, 12);
+        static_assert(cp1.ChebyshevDistance(cp2) == 8);
+        static_assert(noexcept(cp1.ChebyshevDistance(cp2)));
+
+        Check(RL::ChebyshevDistance(0, 0, 3, 4) == 4, "ChebyshevDistance for 3-4 delta is 4");
+        Check(RL::ChebyshevDistance(10, 20, 15, 12) == 8, "ChebyshevDistance for (5, 8) delta is 8");
+        Check(cp1.ChebyshevDistance(cp2) == 8, "Position::ChebyshevDistance produces 8");
+    }
 }

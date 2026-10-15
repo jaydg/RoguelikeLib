@@ -61,6 +61,16 @@ struct Position {
     {
         return RL::DistanceSquared(x, y, other.x, other.y);
     }
+
+    [[nodiscard]] constexpr std::size_t ManhattanDistance(const Position &other) const noexcept
+    {
+        return RL::ManhattanDistance(x, y, other.x, other.y);
+    }
+
+    [[nodiscard]] constexpr std::size_t ChebyshevDistance(const Position &other) const noexcept
+    {
+        return RL::ChebyshevDistance(x, y, other.x, other.y);
+    }
     // Traverses points on the Bresenham line to p2 without allocating memory.
     // If Callback returns bool, returning false stops traversal early.
     template <typename Callback>

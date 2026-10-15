@@ -59,6 +59,16 @@ export {
         }
     }
 
+    [[nodiscard]] constexpr std::size_t ManhattanDistance(std::size_t x1, std::size_t y1, std::size_t x2, std::size_t y2) noexcept
+    {
+        return diff(x1, x2) + diff(y1, y2);
+    }
+
+    [[nodiscard]] constexpr std::size_t ChebyshevDistance(std::size_t x1, std::size_t y1, std::size_t x2, std::size_t y2) noexcept
+    {
+        return std::max(diff(x1, x2), diff(y1, y2));
+    }
+
 } // end of export
 
 } // end of namespace RL
