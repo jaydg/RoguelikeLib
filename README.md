@@ -355,3 +355,9 @@ corners but retain large zigzag bends. `BuildWindingPath`/`AddWindingRoad`
 perturb spaced waypoints with turn-angle limits, producing gentler winding
 roads even between endpoints on the same row or column. The build helpers
 return tiles for terrain-aware placement; the add helpers overwrite terrain.
+
+Terrain-aware winding routes can use `BuildWindingRoute` with a tile-cost
+callback: nonpositive costs forbid a tile, while positive costs prefer
+cheaper terrain. The route keeps both endpoints and follows a winding
+guide where the terrain allows it. Voronoi terrain repairs and farm roads
+now leave deep-water lakes unbridged and follow available land instead.

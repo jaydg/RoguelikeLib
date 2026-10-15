@@ -1319,6 +1319,7 @@ void CWilderness::ConnectTownDoors(CMap& level) const
 // they reach. Obstacles use safe waypoints rather than being overwritten.
 void CWilderness::ConnectFieldRoads(CMap& level) const
 {
+    if (!with_buildings_) return;
     std::vector<bool> protected_cell(width_ * height_), network(width_ * height_);
     std::vector<Position> roads;
     int anchor = -1;
@@ -1348,7 +1349,7 @@ void CWilderness::ConnectFieldRoads(CMap& level) const
         if (!level.inside(p) || protected_cell[Index(p.x, p.y)]) { return 0; }
         const auto& tile = level.get(p);
         if (tile.getType() == "tree") { return 4; }
-        if (tile.getType() == "water") { return 6; }
+        if (tile.getType() == "water") { return 0; }
         return tile.isPassable() ? 1 : 0;
     };
     auto append_winding = [&](std::vector<Position>& path, Position start, Position end) {
@@ -1544,13 +1545,11 @@ export namespace RL
 
 // What may be opened up to make the wilderness walkable everywhere: a
 // hedge is broken where a field's gate does not lead out, a tree is felled
-// to get through a forest, and a lake is bridged rather than steered
-// around when it is in the way. Mountains, peaks and chasms are never
-// opened. See MakeReachable() in rl.connectivity.
-inline constexpr std::array<SOpening, 3> WildernessOpenings = {{
+// to get through a forest. Lakes, mountains, peaks and chasms are never
+// opened; paths must follow their shores or other walkable ground. See MakeReachable() in rl.connectivity.
+inline constexpr std::array<SOpening, 2> WildernessOpenings = {{
         {"hedge", 3, "field"},
-        {"tree", 4, "grass"},
-        {"water", 5, "bridge"}
+        {"tree", 4, "grass"}
     }
 };
 

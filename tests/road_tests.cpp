@@ -42,4 +42,28 @@ void TestWindingRoad()
     Check(RL::AddWindingRoad(map, RL::Position(5, 5), RL::Position(65, 45), 8) &&
           map.get(5, 5).getType() == "corridor" && map.get(65, 45).getType() == "corridor",
           "drawing a winding road uses the terminating path builder");
+    RL::CMap lake(RL::Size(24, 16));
+    lake.Clear("grass");
+    for (std::size_t y = 3; y < 13; ++y) for (std::size_t x = 7; x < 17; ++x)
+        lake.SetCell(x, y, "water");
+    const auto cost = [&lake](RL::Position p) { return lake.get(p).getType() == "water" ? 0 : 2; };
+    const RL::Position start(1, 8), end(22, 8);
+    RL::InitRandomness(42);
+    std::vector<RL::Position> route;
+    Check(RL::BuildWindingRoute(route, lake, start, end, 12, cost) &&
+          route.front() == start && route.back() == end,
+          "terrain-aware winding routes preserve endpoints around a lake");
+    bool safe = !route.empty();
+    for (std::size_t i = 0; i < route.size(); ++i) {
+        safe &= cost(route[i]) > 0;
+        if (i > 0) safe &= std::max(std::abs(int(route[i].x) - int(route[i - 1].x)),
+                                   std::abs(int(route[i].y) - int(route[i - 1].y))) == 1;
+    }
+    Check(safe, "terrain-aware winding routes remain continuous without crossing blocked water");
+    for (std::size_t y = 0; y < lake.getHeight(); ++y) lake.SetCell(12, y, "water");
+    Check(!RL::BuildWindingRoute(route, lake, start, end, 12, cost) && route.empty(),
+          "a blocked terrain-aware route fails cleanly rather than bridging a lake");
+    Check(!RL::BuildWindingRoute(route, lake, RL::Position(12, 8), end, 12, cost),
+          "terrain-aware winding routes reject a blocked endpoint");
+
 }

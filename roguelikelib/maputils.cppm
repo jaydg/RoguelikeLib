@@ -684,6 +684,77 @@ bool BuildWindingPath(std::vector<Position>& road, const CMap& level,
     return true;
 }
 
+/** Route near a winding guide while respecting caller-supplied terrain costs.
+ * A cost <= 0 blocks a tile. Positive costs prefer cheaper terrain.
+ * Both endpoints are retained; no map tiles are changed. Failure clears road.
+ */
+bool BuildWindingRoute(std::vector<Position>& road, const CMap& level,
+                       const Position& start, const Position& end, int pertamt,
+                       const std::function<int(Position)>& terrain_cost)
+{
+    road.clear();
+    std::vector<Position> guide;
+    if (!BuildWindingPath(guide, level, start, end, pertamt) ||
+            terrain_cost(start) <= 0 || terrain_cost(end) <= 0) return false;
+    const auto width = level.getWidth(), count = width * level.getHeight();
+    const auto index = [width](Position p) { return p.y * width + p.x; };
+    std::vector<int> guide_distance(count, 8);
+    std::vector<Position> queue;
+    for (const auto p : guide) {
+        if (guide_distance[index(p)] != 0) {
+            guide_distance[index(p)] = 0;
+            queue.push_back(p);
+        }
+    }
+    for (std::size_t i = 0; i < queue.size(); ++i) {
+        const auto here = queue[i];
+        for (int dy = -1; dy <= 1; ++dy) for (int dx = -1; dx <= 1; ++dx) {
+            const Position next(here.x + dx, here.y + dy);
+            if (!level.inside(next)) continue;
+            const auto distance = guide_distance[index(here)] + 1;
+            if (distance < guide_distance[index(next)]) {
+                guide_distance[index(next)] = distance;
+                queue.push_back(next);
+            }
+        }
+    }
+    std::vector<std::int64_t> distance(count, std::numeric_limits<std::int64_t>::max());
+    std::vector<std::size_t> parent(count, count);
+    using Entry = std::pair<std::int64_t, std::size_t>;
+    std::priority_queue<Entry, std::vector<Entry>, std::greater<Entry>> pending;
+    distance[index(start)] = 0;
+    pending.emplace(0, index(start));
+    while (!pending.empty()) {
+        const auto [value, cell] = pending.top();
+        pending.pop();
+        if (value != distance[cell]) continue;
+        if (cell == index(end)) break;
+        const Position here(cell % width, cell / width);
+        for (int dy = -1; dy <= 1; ++dy) for (int dx = -1; dx <= 1; ++dx) {
+            if (!dx && !dy) continue;
+            const Position next(here.x + dx, here.y + dy);
+            if (!level.inside(next)) continue;
+            const int cost = terrain_cost(next);
+            if (cost <= 0) continue;
+            const auto next_cell = index(next);
+            const auto candidate = value + std::int64_t(cost) * (dx && dy ? 14 : 10) +
+                                   guide_distance[next_cell] * 6;
+            if (candidate < distance[next_cell]) {
+                distance[next_cell] = candidate;
+                parent[next_cell] = cell;
+                pending.emplace(candidate, next_cell);
+            }
+        }
+    }
+    if (distance[index(end)] == std::numeric_limits<std::int64_t>::max()) return false;
+    for (auto cell = index(end);; cell = parent[cell]) {
+        road.emplace_back(cell % width, cell / width);
+        if (cell == index(start)) break;
+    }
+    std::ranges::reverse(road);
+    return true;
+}
+
 /** Draw a winding road without large sharp turns.
  *
  * Uses BuildWindingPath; pertamt typically ranges from 5 to 50. This

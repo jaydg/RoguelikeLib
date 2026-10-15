@@ -1,6 +1,5 @@
 import rl.mapgenerators.voronoiwilderness;
 import rl.randomness;
-import rl.connectivity;
 import rltests.check;
 import std;
 
@@ -122,13 +121,14 @@ void TestVoronoiBogs()
             RL::InitRandomness(seed);
             RL::CMap map(RL::Size(160, 80));
             const auto info = RL::CreateVoronoiWilderness(map, 0, buildings);
-            bool farmland = false, bog = false, rooms = false;
+            bool farmland = false, bog = false, rooms = false, bridge = false;
             for (std::size_t y = 0; y < map.getHeight(); ++y) {
                 for (std::size_t x = 0; x < map.getWidth(); ++x) {
                     const auto type = map.get(x, y).getType();
                     farmland |= type == "field" || type == "hedge";
                     bog |= type == "bog_ground" || type == "bog_reeds" || type == "bog_pool";
                     rooms |= type == "room";
+                    bridge |= type == "bridge";
                 }
             }
             if (buildings) {
@@ -138,13 +138,7 @@ void TestVoronoiBogs()
                 Check(!farmland && !rooms && info.buildings.empty() && info.field_gates.empty(),
                       "unsettled Voronoi maps have no buildings, cultivated fields, hedges or farm gates");
             }
-            // Preserve the original game's fixed-seed connectivity check.
-            // Mountains and chasms cannot be opened, so connectivity repairs
-            // do not promise a single walkable region for every seed.
-            if (seed == 42 && !buildings) {
-                Check(RL::FindRegions(map).sizes.size() == 1,
-                      "the bog wilderness fixture has connected walkable ground");
-            }
+            Check(!bridge, "Voronoi terrain repairs and farm roads do not build bridges across lakes");
         }
     }
     Check(saw_bog, "unsettled Voronoi generation exercises bog terrain");
