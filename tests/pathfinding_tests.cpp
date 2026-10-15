@@ -107,4 +107,30 @@ void TestPathfinding()
         Check(found, "already at goal returns true");
         Check(path.empty(), "already at goal has empty path");
     }
+
+    // 7. Bresenham line and visitor
+    {
+        const RL::Position from(0, 0);
+        const RL::Position to(4, 2);
+
+        // Vector overload
+        const auto line = from.BuildBresenhamLine(to);
+        Check(line.size() == 5, "Bresenham line has 5 points from (0,0) to (4,2)");
+        Check(!line.empty() && line.front() == from && line.back() == to, "Bresenham line endpoints match");
+
+        // Buffer overload
+        std::vector<RL::Position> buffer;
+        from.BuildBresenhamLine(to, buffer);
+        Check(buffer == line, "BuildBresenhamLine with buffer produces identical points");
+
+        // Visitor with early stopping
+        std::vector<RL::Position> visited;
+        from.ForEachBresenham(to, [&](const RL::Position& p) {
+            visited.push_back(p);
+            return visited.size() < 3; // stop after 3 points
+        });
+        Check(visited.size() == 3, "ForEachBresenham stops early when callback returns false");
+        Check(visited[0] == line[0] && visited[1] == line[1] && visited[2] == line[2],
+              "ForEachBresenham points match line prefix");
+    }
 }

@@ -60,16 +60,13 @@ struct Position {
     {
         return RL::Distance(x, y, other.x, other.y);
     }
-
-    [[nodiscard]] std::vector<Position> BuildBresenhamLine(const Position& p2) const
+    // Traverses points on the Bresenham line to p2 without allocating memory.
+    // If Callback returns bool, returning false stops traversal early.
+    template <typename Callback>
+    void ForEachBresenham(const Position& p2, Callback&& callback) const
     {
-        std::vector<Position> ret;
-
         int x1 = static_cast<int>(x), y1 = static_cast<int>(y);
         int x2 = static_cast<int>(p2.x), y2 = static_cast<int>(p2.y);
-
-        const std::size_t count = static_cast<std::size_t>(std::max(std::abs(x2 - x1), std::abs(y2 - y1))) + 1;
-        ret.reserve(count);
 
         int xstep = Sign(x2 - x1);
         int ystep = Sign(y2 - y1);
@@ -77,10 +74,17 @@ struct Position {
         int xc = x1;
         int yc = y1;
 
-        ret.emplace_back(static_cast<std::size_t>(xc), static_cast<std::size_t>(yc));
+        auto step = [&](int xpos, int ypos) -> bool {
+            if constexpr (std::is_invocable_r_v<bool, Callback, Position>) {
+                return callback(Position(static_cast<std::size_t>(xpos), static_cast<std::size_t>(ypos)));
+            } else {
+                callback(Position(static_cast<std::size_t>(xpos), static_cast<std::size_t>(ypos)));
+                return true;
+            }
+        };
 
-        if (x1 == x2 && y1 == y2) {
-            return ret;
+        if (!step(xc, yc) || (x1 == x2 && y1 == y2)) {
+            return;
         }
 
         if (std::abs(x2 - x1) >= std::abs(y2 - y1)) {
@@ -95,7 +99,9 @@ struct Position {
                     yc += ystep;
                 }
 
-                ret.emplace_back(static_cast<std::size_t>(xc), static_cast<std::size_t>(yc));
+                if (!step(xc, yc)) {
+                    return;
+                }
             } while (xc != x2);
         } else {
             int acc = std::abs(y2 - y1);
@@ -109,10 +115,30 @@ struct Position {
                     xc += xstep;
                 }
 
-                ret.emplace_back(static_cast<std::size_t>(xc), static_cast<std::size_t>(yc));
+                if (!step(xc, yc)) {
+                    return;
+                }
             } while (yc != y2);
         }
+    }
 
+    // Appends Bresenham line points to an existing vector, avoiding a new heap allocation
+    void BuildBresenhamLine(const Position& p2, std::vector<Position>& out) const
+    {
+        int x1 = static_cast<int>(x), y1 = static_cast<int>(y);
+        int x2 = static_cast<int>(p2.x), y2 = static_cast<int>(p2.y);
+        const std::size_t count = static_cast<std::size_t>(std::max(std::abs(x2 - x1), std::abs(y2 - y1))) + 1;
+        out.reserve(out.size() + count);
+
+        ForEachBresenham(p2, [&](const Position& p) {
+            out.push_back(p);
+        });
+    }
+
+    [[nodiscard]] std::vector<Position> BuildBresenhamLine(const Position& p2) const
+    {
+        std::vector<Position> ret;
+        BuildBresenhamLine(p2, ret);
         return ret;
     }
 };
