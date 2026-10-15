@@ -150,4 +150,20 @@ void TestPathfinding()
 
         Check(pos.x == 10 && pos.y == 20, "constexpr Position constructed correctly");
     }
+
+    // 9. std::hash specialization for Position
+    {
+        std::unordered_set<RL::Position> set;
+        set.insert(RL::Position(1, 2));
+        set.insert(RL::Position(3, 4));
+        set.insert(RL::Position(1, 2));
+
+        Check(set.size() == 2, "unordered_set deduplicates Positions correctly");
+        Check(set.contains(RL::Position(1, 2)), "unordered_set finds inserted Position");
+        Check(!set.contains(RL::Position(5, 6)), "unordered_set does not find missing Position");
+
+        std::unordered_map<RL::Position, int> map;
+        map[RL::Position(10, 20)] = 42;
+        Check(map[RL::Position(10, 20)] == 42, "unordered_map stores values at Position key");
+    }
 }

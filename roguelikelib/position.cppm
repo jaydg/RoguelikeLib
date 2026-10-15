@@ -142,3 +142,13 @@ struct Position {
 using Size = Position;
 
 } // namespace RL
+
+template <>
+struct std::hash<RL::Position> {
+    [[nodiscard]] std::size_t operator()(const RL::Position& p) const noexcept
+    {
+        std::uint64_t h = p.x * 0x9e3779b97f4a7c15ULL;
+        h ^= (p.y + 0x517cc1b727220a95ULL) + (h << 6) + (h >> 2);
+        return static_cast<std::size_t>(h);
+    }
+};
