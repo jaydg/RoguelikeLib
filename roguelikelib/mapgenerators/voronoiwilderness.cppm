@@ -63,6 +63,9 @@ struct SWildernessInfo {
     // Field entrances, facing the village and linked to its road network.
     std::vector<Position> field_gates;
 
+    // Cultivable cells of each field region, excluding hedges, gates and roads.
+    std::vector<std::vector<Position>> fields;
+
     // The difficulty of every cell: 0 in the town, 9 in the hardest
     // region. Opening the map up afterwards (see WildernessOpenings)
     // does not change it.
@@ -372,6 +375,7 @@ public:
     [[nodiscard]] SWildernessInfo Apply(CMap & level) const;
     void ConnectTownDoors(CMap& level) const;
     void ConnectFieldRoads(CMap& level) const;
+    [[nodiscard]] std::vector<std::vector<Position>> Fields(const CMap& level) const;
 
 private:
     int width_;
@@ -1451,6 +1455,19 @@ void CWilderness::ConnectFieldRoads(CMap& level) const
     }
 }
 
+// Collect after connectivity repairs and farm roads, since opening a hedge
+// creates additional cultivable cells. Preserve the original region boundaries.
+std::vector<std::vector<Position>> CWilderness::Fields(const CMap& level) const
+{
+    std::vector<std::vector<Position>> fields(regions_.size());
+    for (std::size_t cell = 0; cell < region_id_.size(); ++cell) {
+        const Position pos{cell % width_, cell / width_};
+        if (level.get(pos).getType() == "field") fields[region_id_[cell]].push_back(pos);
+    }
+    std::erase_if(fields, [](const auto& cells) { return cells.empty(); });
+    return fields;
+}
+
 SWildernessInfo CWilderness::Apply(CMap & level) const
 {
     SWildernessInfo info;
@@ -1602,6 +1619,7 @@ SWildernessInfo CreateVoronoiWilderness(CMap & level, int num_regions = 0, bool 
     MakeReachable(level, WildernessOpenings);
     wilderness.ConnectTownDoors(level);
     wilderness.ConnectFieldRoads(level);
+    info.fields = wilderness.Fields(level);
 
     return info;
 }

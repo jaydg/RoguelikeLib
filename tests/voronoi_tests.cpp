@@ -195,6 +195,18 @@ void TestVoronoiFields()
         RL::InitRandomness(seed);
         RL::CMap map(seed % 2 == 0 ? RL::Size(79, 50) : RL::Size(120, 80));
         const auto info = RL::CreateVoronoiWilderness(map, 0, seed % 3 != 0);
+        std::set<std::pair<std::size_t, std::size_t>> recorded;
+        bool plots = true;
+        for (const auto& field : info.fields) {
+            plots &= !field.empty();
+            for (const auto pos : field)
+                plots &= map.inside(pos) && map.get(pos).getType() == "field" && recorded.emplace(pos.x, pos.y).second;
+        }
+        std::size_t cultivable = 0;
+        for (std::size_t y = 0; y < map.getHeight(); ++y) for (std::size_t x = 0; x < map.getWidth(); ++x)
+            cultivable += map.get(x, y).getType() == "field";
+        Check(plots && recorded.size() == cultivable, "field metadata records every cultivable cell exactly once, without hedges or lanes");
+        if (seed % 3 == 0) Check(info.fields.empty(), "unsettled regions expose no agricultural plots");
         if (info.field_gates.empty() || info.locations.empty()) { continue; }
         RL::Position root;
         if (!info.buildings.empty()) {
