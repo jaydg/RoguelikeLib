@@ -47,23 +47,36 @@ private:
         return x * x + y * y;
     }
 
+    struct OctantOffset {
+        std::int8_t xx, xy, yx, yy;
+    };
+
+    static constexpr std::array<OctantOffset, 8> octantOffsets = {{
+        { 1,  0,  0, -1}, // 0: nx += x; ny -= y;
+        { 0,  1, -1,  0}, // 1: nx += y; ny -= x;
+        { 0, -1, -1,  0}, // 2: nx -= y; ny -= x;
+        {-1,  0,  0, -1}, // 3: nx -= x; ny -= y;
+        {-1,  0,  0,  1}, // 4: nx -= x; ny += y;
+        { 0, -1,  1,  0}, // 5: nx -= y; ny += x;
+        { 0,  1,  1,  0}, // 6: nx += y; ny += x;
+        { 1,  0,  0,  1}  // 7: nx += x; ny += y;
+    }};
+
+    [[nodiscard]] static inline std::pair<int, int> TransformOctant(
+        unsigned int x, unsigned int y, unsigned int octant, Position origin) noexcept
+    {
+        const auto& [xx, xy, yx, yy] = octantOffsets[octant];
+        const int ix = static_cast<int>(x);
+        const int iy = static_cast<int>(y);
+        return {
+            static_cast<int>(origin.x) + ix * xx + iy * xy,
+            static_cast<int>(origin.y) + ix * yx + iy * yy
+        };
+    }
+
     [[nodiscard]] bool BlocksLight(unsigned int x, unsigned int y, unsigned int octant, Position origin)
     {
-        int nx = static_cast<int>(origin.x);
-        int ny = static_cast<int>(origin.y);
-
-        // *INDENT-OFF*
-        switch(octant) {
-            case 0: nx += x; ny -= y; break;
-            case 1: nx += y; ny -= x; break;
-            case 2: nx -= y; ny -= x; break;
-            case 3: nx -= x; ny -= y; break;
-            case 4: nx -= x; ny += y; break;
-            case 5: nx -= y; ny += x; break;
-            case 6: nx += y; ny += x; break;
-            case 7: nx += x; ny += y; break;
-        }
-        // *INDENT-ON*
+        const auto [nx, ny] = TransformOctant(x, y, octant, origin);
 
         if (nx < 0 || ny < 0 || nx >= static_cast<int>(getWidth()) || ny >= static_cast<int>(getHeight())) {
             return true;
@@ -74,21 +87,7 @@ private:
 
     void SetVisible(unsigned int x, unsigned int y, unsigned int octant, Position origin)
     {
-        int nx = static_cast<int>(origin.x);
-        int ny = static_cast<int>(origin.y);
-
-        // *INDENT-OFF*
-        switch(octant) {
-            case 0: nx += x; ny -= y; break;
-            case 1: nx += y; ny -= x; break;
-            case 2: nx -= y; ny -= x; break;
-            case 3: nx -= x; ny -= y; break;
-            case 4: nx -= x; ny += y; break;
-            case 5: nx -= y; ny += x; break;
-            case 6: nx += y; ny += x; break;
-            case 7: nx += x; ny += y; break;
-        }
-        // *INDENT-ON*
+        const auto [nx, ny] = TransformOctant(x, y, octant, origin);
 
         if (nx >= 0 && ny >= 0 && nx < static_cast<int>(getWidth()) && ny < static_cast<int>(getHeight())) {
             set_unchecked(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny), true);
