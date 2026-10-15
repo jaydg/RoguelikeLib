@@ -1,5 +1,6 @@
 import rl.mapgenerators.voronoiwilderness;
 import rl.randomness;
+import rl.connectivity;
 import rltests.check;
 import std;
 
@@ -110,16 +111,43 @@ void TestVoronoiScale()
     RL::CMap huge(RL::Size(300, 300));
     const auto huge_info = RL::CreateVoronoiWilderness(huge);
     Check(huge_info.regions == 450, "automatic segmentation continues beyond the old 400-region ceiling");
-    bool farmland = false, bog = false;
-    for (std::size_t y = 0; y < huge.getHeight(); ++y) {
-        for (std::size_t x = 0; x < huge.getWidth(); ++x) {
-            const auto type = huge.get(x, y).getType();
-            farmland |= type == "field" || type == "hedge";
-            bog |= type == "bog_ground" || type == "bog_reeds" || type == "bog_pool";
+
+}
+
+void TestVoronoiBogs()
+{
+    bool saw_bog = false;
+    for (const unsigned seed : {0U, 1U, 2U, 3U, 4U, 5U, 6U, 7U, 42U}) {
+        for (const bool buildings : {false, true}) {
+            RL::InitRandomness(seed);
+            RL::CMap map(RL::Size(160, 80));
+            const auto info = RL::CreateVoronoiWilderness(map, 0, buildings);
+            bool farmland = false, bog = false, rooms = false;
+            for (std::size_t y = 0; y < map.getHeight(); ++y) {
+                for (std::size_t x = 0; x < map.getWidth(); ++x) {
+                    const auto type = map.get(x, y).getType();
+                    farmland |= type == "field" || type == "hedge";
+                    bog |= type == "bog_ground" || type == "bog_reeds" || type == "bog_pool";
+                    rooms |= type == "room";
+                }
+            }
+            if (buildings) {
+                Check(!bog, "settled Voronoi regions retain fields rather than bogs");
+            } else {
+                saw_bog |= bog;
+                Check(!farmland && !rooms && info.buildings.empty() && info.field_gates.empty(),
+                      "unsettled Voronoi maps have no buildings, cultivated fields, hedges or farm gates");
+            }
+            // Preserve the original game's fixed-seed connectivity check.
+            // Mountains and chasms cannot be opened, so connectivity repairs
+            // do not promise a single walkable region for every seed.
+            if (seed == 42 && !buildings) {
+                Check(RL::FindRegions(map).sizes.size() == 1,
+                      "the bog wilderness fixture has connected walkable ground");
+            }
         }
     }
-    Check(!farmland && bog && huge_info.field_gates.empty(),
-          "wilderness without buildings has bogs instead of cultivated fields and gates");
+    Check(saw_bog, "unsettled Voronoi generation exercises bog terrain");
 }
 
 void TestVoronoiChasms()
