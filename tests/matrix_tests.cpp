@@ -61,4 +61,19 @@ void TestMatrix()
         Check(Tracker::copy_count == 1, "set(Position, lvalue) performs exactly one copy");
         Check(mat.get(RL::Position(2, 2)).value == 42, "value stored via Position overload");
     }
+
+    // 2. inside bounds checks and noexcept guarantees
+    {
+        const RL::CMatrix<int> mat(RL::Size(5, 10), 0);
+        static_assert(noexcept(mat.inside(0, 0)));
+        static_assert(noexcept(mat.inside(RL::Position(0, 0))));
+
+        Check(mat.inside(0, 0), "top-left (0,0) is inside");
+        Check(mat.inside(4, 9), "bottom-right (4,9) is inside");
+        Check(!mat.inside(5, 9), "(5,9) is outside horizontally");
+        Check(!mat.inside(4, 10), "(4,10) is outside vertically");
+        Check(!mat.inside(100, 100), "far point is outside");
+        Check(mat.inside(RL::Position(2, 5)), "Position(2,5) is inside");
+        Check(!mat.inside(RL::Position(5, 5)), "Position(5,5) is outside");
+    }
 }

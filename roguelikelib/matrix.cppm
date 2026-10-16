@@ -46,12 +46,12 @@ public:
         data.resize(size.x * size.y, defval);
     }
 
-    [[nodiscard]] bool inside(const std::size_t& x, const std::size_t& y) const
+    [[nodiscard]] constexpr bool inside(std::size_t x, std::size_t y) const noexcept
     {
         return (x < size.x && y < size.y);
     }
 
-    [[nodiscard]] bool inside(const Position &pos) const
+    [[nodiscard]] constexpr bool inside(const Position &pos) const noexcept
     {
         return inside(pos.x, pos.y);
     }
