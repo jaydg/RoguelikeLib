@@ -134,4 +134,33 @@ void TestMatrix()
         col1[0] = 999;
         Check(mat(1, 0) == 999, "modifying column span modifies matrix cell");
     }
+
+    // 5. CountNeighbors fast interior path and boundary fallback
+    {
+        // 5x5 matrix with all 1s
+        const RL::CMatrix<int> ones(RL::Size(5, 5), 1);
+
+        // Interior cell (2, 2)
+        Check(ones.CountNeighbors(RL::Position(2, 2), 1, RL::Neighbors::All8) == 8,
+              "interior cell (2,2) has 8 neighbors in All8 mode");
+        Check(ones.CountNeighbors(RL::Position(2, 2), 1, RL::Neighbors::Cardinal4) == 4,
+              "interior cell (2,2) has 4 neighbors in Cardinal4 mode");
+
+        // Corner cell (0, 0)
+        Check(ones.CountNeighbors(RL::Position(0, 0), 1, RL::Neighbors::All8) == 3,
+              "corner cell (0,0) has 3 neighbors in All8 mode");
+        Check(ones.CountNeighbors(RL::Position(0, 0), 1, RL::Neighbors::Cardinal4) == 2,
+              "corner cell (0,0) has 2 neighbors in Cardinal4 mode");
+
+        // Edge cell (0, 2)
+        Check(ones.CountNeighbors(RL::Position(0, 2), 1, RL::Neighbors::All8) == 5,
+              "edge cell (0,2) has 5 neighbors in All8 mode");
+        Check(ones.CountNeighbors(RL::Position(0, 2), 1, RL::Neighbors::Cardinal4) == 3,
+              "edge cell (0,2) has 3 neighbors in Cardinal4 mode");
+
+        // Predicate overload on const matrix
+        const auto is_positive = [](int v) { return v > 0; };
+        Check(ones.CountNeighbors(RL::Position(2, 2), is_positive, RL::Neighbors::All8) == 8,
+              "CountNeighbors with predicate works on const matrix");
+    }
 }

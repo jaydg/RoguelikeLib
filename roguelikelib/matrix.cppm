@@ -249,7 +249,7 @@ public:
     // Original: compare by equality
     [[nodiscard]] int CountNeighbors(
         const Position& pos, const T& value,
-        Neighbors mode = Neighbors::Cardinal4)
+        Neighbors mode = Neighbors::Cardinal4) const
     {
         return CountNeighborsImpl(pos,
         [&value](const T & cell) {
@@ -263,7 +263,7 @@ public:
     && std::convertible_to<std::invoke_result_t<Pred, const T&>, bool>
     [[nodiscard]] int CountNeighbors(
         const Position& pos, Pred&& predicate,
-        Neighbors mode = Neighbors::Cardinal4)
+        Neighbors mode = Neighbors::Cardinal4) const
     {
         return CountNeighborsImpl(pos, std::forward<Pred>(predicate), mode);
     }
@@ -365,14 +365,40 @@ private:
     [[nodiscard]] int CountNeighborsImpl(
         const Position& pos, Pred&& predicate, Neighbors mode) const
     {
-        // *INDENT-OFF* (protect againt astyle)
+        const int sx = static_cast<int>(size.x);
+        const int sy = static_cast<int>(size.y);
+        const int px = static_cast<int>(pos.x);
+        const int py = static_cast<int>(pos.y);
+
+        // Fast-path for interior cells (vast majority of cells in a map)
+        if (px > 0 && px + 1 < sx && py > 0 && py + 1 < sy) {
+            const std::size_t center = pos.x * size.y + pos.y;
+            const std::size_t step_y = size.y;
+
+            if (mode == Neighbors::All8) {
+                return (predicate(data[center - step_y - 1]) ? 1 : 0) +
+                       (predicate(data[center - 1]) ? 1 : 0) +
+                       (predicate(data[center + step_y - 1]) ? 1 : 0) +
+                       (predicate(data[center - step_y]) ? 1 : 0) +
+                       (predicate(data[center + step_y]) ? 1 : 0) +
+                       (predicate(data[center - step_y + 1]) ? 1 : 0) +
+                       (predicate(data[center + 1]) ? 1 : 0) +
+                       (predicate(data[center + step_y + 1]) ? 1 : 0);
+            } else {
+                return (predicate(data[center - 1]) ? 1 : 0) +
+                       (predicate(data[center - step_y]) ? 1 : 0) +
+                       (predicate(data[center + step_y]) ? 1 : 0) +
+                       (predicate(data[center + 1]) ? 1 : 0);
+            }
+        }
+
+        // Boundary cells fallback
         static constexpr std::array<std::pair<int, int>, 8> all8 = {{
                 {-1, -1}, {0, -1}, {1, -1},
                 {-1,  0},          {1,  0},
                 {-1,  1}, {0,  1}, {1,  1}
             }
         };
-        // *INDENT-ON*
 
         static constexpr std::array<std::pair<int, int>, 4> cardinal4 = {{
                 {0, -1}, {-1, 0}, {1, 0}, {0, 1}
@@ -383,18 +409,16 @@ private:
                               ? std::span<const std::pair<int, int>>(all8)
                               : std::span<const std::pair<int, int>>(cardinal4);
 
-        const int px = static_cast<int>(pos.x);
-        const int py = static_cast<int>(pos.y);
         int count = 0;
-
         for (auto[dx, dy] : offsets) {
             const int nx = px + dx;
             const int ny = py + dy;
 
-            if (nx >= 0 && nx < static_cast<int>(size.x) && ny >= 0 && ny < static_cast<int>(size.y))
+            if (nx >= 0 && nx < sx && ny >= 0 && ny < sy) {
                 if (predicate(data[nx * size.y + ny])) {
                     ++count;
                 }
+            }
         }
 
         return count;
