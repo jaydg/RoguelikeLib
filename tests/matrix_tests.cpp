@@ -190,4 +190,51 @@ void TestMatrix()
         // Invalid start position
         Check(!mat.FloodFill(RL::Position(10, 10), 5), "FloodFill on outside position returns false");
     }
+
+    // 7. In-place resize(), clear(), size queries, and noexcept move semantics
+    {
+        // Default constructor
+        RL::CMatrix<int> empty_mat;
+        Check(empty_mat.empty(), "default constructed matrix is empty");
+        Check(empty_mat.size() == 0, "empty matrix size() is 0");
+        Check(empty_mat.getWidth() == 0 && empty_mat.getHeight() == 0, "empty matrix dimensions are 0");
+
+        // Width, height constructor with default value
+        RL::CMatrix<int> constructed(3, 4, 7);
+        Check(constructed.getWidth() == 3 && constructed.getHeight() == 4, "width/height constructor sets dimensions");
+        Check(constructed.size() == 12, "size() matches width * height");
+        Check(!constructed.empty(), "constructed matrix is not empty");
+        Check(constructed(1, 2) == 7, "default value populated");
+
+        // In-place resize
+        constructed.resize(RL::Size(5, 2), 42);
+        Check(constructed.getWidth() == 5 && constructed.getHeight() == 2, "resize(Size) updates dimensions");
+        Check(constructed.size() == 10, "resize updates size()");
+        Check(constructed(4, 1) == 42, "resized elements contain new default value");
+
+        constructed.resize(2, 3, 99);
+        Check(constructed.getWidth() == 2 && constructed.getHeight() == 3, "resize(w, h) updates dimensions");
+        Check(constructed.size() == 6, "resize updates size()");
+        Check(constructed(1, 2) == 99, "resized elements contain new default value");
+
+        // clear()
+        constructed.clear();
+        Check(constructed.empty(), "matrix after clear() is empty");
+        Check(constructed.size() == 0, "clear() resets size to 0");
+        Check(constructed.getWidth() == 0 && constructed.getHeight() == 0, "clear() resets dimensions to 0");
+
+        // noexcept move semantics
+        static_assert(std::is_nothrow_move_constructible_v<RL::CMatrix<int>>);
+        static_assert(std::is_nothrow_move_assignable_v<RL::CMatrix<int>>);
+
+        RL::CMatrix<int> source(4, 5, 123);
+        RL::CMatrix<int> moved_to(std::move(source));
+        Check(moved_to.getWidth() == 4 && moved_to.getHeight() == 5, "move constructor preserves dimensions");
+        Check(moved_to(2, 3) == 123, "move constructor preserves cell contents");
+
+        RL::CMatrix<int> assigned;
+        assigned = std::move(moved_to);
+        Check(assigned.getWidth() == 4 && assigned.getHeight() == 5, "move assignment preserves dimensions");
+        Check(assigned(2, 3) == 123, "move assignment preserves cell contents");
+    }
 }
