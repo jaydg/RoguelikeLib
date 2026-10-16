@@ -10,11 +10,17 @@ module;
 
 #include <errno.h>
 #include <poll.h>
+#include <stdio.h>
+#include <unistd.h>
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#else
 #include <signal.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <termios.h>
-#include <unistd.h>
+#endif
 
 export module rtui.terminal;
 
@@ -245,27 +251,23 @@ constexpr int escape_delay_ms = 40;
 constexpr std::string_view enter_sequence = "\x1b[?1049h\x1b[?25l\x1b[2J";
 constexpr std::string_view leave_sequence = "\x1b[0m\x1b[?25h\x1b[?1049l";
 
-// Signals that would end the program with the terminal left raw
-constexpr std::array fatal_signals = {SIGHUP, SIGINT, SIGQUIT, SIGTERM};
-
-// Restoring the terminal has to work from a signal handler and from
-// atexit() as well, so what it needs lives here rather than in the class.
-termios original_mode{};
-volatile sig_atomic_t raw_mode = 0;
-volatile sig_atomic_t resized = 0;
-
-// Writes everything, also when interrupted. Async-signal-safe.
+// Writes everything. In the browser the write goes out to xterm.js, and
+// cannot be interrupted.
 bool WriteAll(std::string_view text)
 {
     while (!text.empty()) {
         const ssize_t written = write(STDOUT_FILENO, text.data(), text.size());
 
         if (written < 0) {
+#ifdef __EMSCRIPTEN__
+            return false;
+#else
             if (errno == EINTR) {
                 continue;
             }
 
             return false;
+#endif
         }
 
         if (written == 0) {
@@ -278,6 +280,17 @@ bool WriteAll(std::string_view text)
 
     return true;
 }
+
+#ifndef __EMSCRIPTEN__
+
+// Signals that would end the program with the terminal left raw
+constexpr std::array fatal_signals = {SIGHUP, SIGINT, SIGQUIT, SIGTERM};
+
+// Restoring the terminal has to work from a signal handler and from
+// atexit() as well, so what it needs lives here rather than in the class.
+termios original_mode{};
+volatile sig_atomic_t raw_mode = 0;
+volatile sig_atomic_t resized = 0;
 
 // Puts the terminal back the way it was found. Safe to call more than once,
 // and from a signal handler.
@@ -309,6 +322,8 @@ void OnFatalSignal(int signal_number)
     raise(signal_number);
 }
 
+#endif // !__EMSCRIPTEN__
+
 } // namespace RL
 
 export namespace RL
@@ -321,11 +336,14 @@ class CTerminal
 private:
     std::string pending;
     bool closed = false;
+#ifndef __EMSCRIPTEN__
     struct sigaction old_resize_action {};
     std::array<struct sigaction, fatal_signals.size()> old_fatal_actions{};
+#endif
 
     enum class EWait { Ready, Timeout, Interrupted };
 
+#ifndef __EMSCRIPTEN__
     static EWait WaitForInput(int timeout_ms)
     {
         pollfd descriptor{STDIN_FILENO, POLLIN, 0};
@@ -443,6 +461,76 @@ public:
         return RL::Size(80, 24);
     }
 
+#else // __EMSCRIPTEN__
+
+    // In the browser the terminal is xterm.js: its host feeds the keys
+    // through a pipe that read() drains, and reads the escape sequences
+    // written back. Nothing is done about the mode of the terminal - the
+    // browser terminal is raw already - and there are no signals.
+    static EWait WaitForInput(int timeout_ms)
+    {
+        pollfd descriptor{STDIN_FILENO, POLLIN, 0};
+        const int result = poll(&descriptor, 1, timeout_ms);
+
+        if (result < 0) {
+            throw std::system_error(errno, std::generic_category(), "waiting for the terminal");
+        }
+
+        return result > 0 ? EWait::Ready : EWait::Timeout;
+    }
+
+    void ReadAvailable()
+    {
+        char buffer[256];
+        const ssize_t count = read(STDIN_FILENO, buffer, sizeof(buffer));
+
+        if (count > 0) {
+            pending.append(buffer, static_cast<std::size_t>(count));
+        } else if (count == 0) {
+            closed = true;
+        } else {
+            throw std::system_error(errno, std::generic_category(), "reading the terminal");
+        }
+    }
+
+public:
+    // Opt in to movement reports even when no mouse button is held.
+    explicit CTerminal(bool report_hover = false)
+    {
+        if (!WriteAll(enter_sequence) || !WriteAll(report_hover ? RL::mouse_hover_reporting_on : RL::mouse_reporting_on)) {
+            throw std::system_error(errno, std::generic_category(), "initializing the terminal");
+        }
+    }
+
+    CTerminal(const CTerminal&) = delete;
+    CTerminal& operator=(const CTerminal&) = delete;
+
+    ~CTerminal()
+    {
+        WriteAll(RL::mouse_reporting_off);
+        WriteAll(leave_sequence);
+    }
+
+    void RestoreSignals() {}
+
+    // Columns and rows, as the host says: it sets RV_COLUMNS and RV_ROWS
+    // from the size of the xterm.js element before the program starts
+    [[nodiscard]] static RL::Size getSize()
+    {
+        const char* columns = std::getenv("RV_COLUMNS");
+        const char* rows = std::getenv("RV_ROWS");
+        const int width = columns ? std::atoi(columns) : 0;
+        const int height = rows ? std::atoi(rows) : 0;
+
+        if (width > 0 && height > 0) {
+            return RL::Size(static_cast<std::size_t>(width), static_cast<std::size_t>(height));
+        }
+
+        return RL::Size(80, 24);
+    }
+
+#endif // __EMSCRIPTEN__
+
     void Write(std::string_view text)
     {
         if (!WriteAll(text)) {
@@ -457,10 +545,12 @@ public:
     SKey ReadKey(int timeout_ms = -1)
     {
         for (;;) {
+#ifndef __EMSCRIPTEN__
             if (resized) {
                 resized = 0;
                 return {EKey::Resize};
             }
+#endif
 
             if (!pending.empty()) {
                 SDecodedKey decoded = DecodeKey(pending, closed);
