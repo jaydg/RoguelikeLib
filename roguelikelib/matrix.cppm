@@ -174,6 +174,57 @@ public:
         data[pos.x * size.y + pos.y] = std::move(val);
     }
 
+    // 2D subscripting operator() for unchecked element access
+    [[nodiscard]] constexpr decltype(auto) operator()(std::size_t x, std::size_t y) noexcept
+    {
+        return data[x * size.y + y];
+    }
+
+    [[nodiscard]] constexpr decltype(auto) operator()(std::size_t x, std::size_t y) const noexcept
+    {
+        return data[x * size.y + y];
+    }
+
+    [[nodiscard]] constexpr decltype(auto) operator()(const Position pos) noexcept
+    {
+        return data[pos.x * size.y + pos.y];
+    }
+
+    [[nodiscard]] constexpr decltype(auto) operator()(const Position pos) const noexcept
+    {
+        return data[pos.x * size.y + pos.y];
+    }
+
+    // Flat iterators for linear sequential traversals
+    [[nodiscard]] auto begin() noexcept { return data.begin(); }
+    [[nodiscard]] auto end() noexcept { return data.end(); }
+    [[nodiscard]] auto begin() const noexcept { return data.begin(); }
+    [[nodiscard]] auto end() const noexcept { return data.end(); }
+    [[nodiscard]] auto cbegin() const noexcept { return data.cbegin(); }
+    [[nodiscard]] auto cend() const noexcept { return data.cend(); }
+
+    // Contiguous span access (for non-bool types)
+    [[nodiscard]] auto data_span() noexcept requires (!std::is_same_v<T, bool>)
+    {
+        return std::span<T>(data);
+    }
+
+    [[nodiscard]] auto data_span() const noexcept requires (!std::is_same_v<T, bool>)
+    {
+        return std::span<const T>(data);
+    }
+
+    // In column-major layout, each column is contiguous in memory
+    [[nodiscard]] auto column(std::size_t x) noexcept requires (!std::is_same_v<T, bool>)
+    {
+        return std::span<T>(&data[x * size.y], size.y);
+    }
+
+    [[nodiscard]] auto column(std::size_t x) const noexcept requires (!std::is_same_v<T, bool>)
+    {
+        return std::span<const T>(&data[x * size.y], size.y);
+    }
+
     [[nodiscard]] Size getSize() const
     {
         return size;

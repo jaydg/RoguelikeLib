@@ -98,4 +98,40 @@ void TestMatrix()
         }
         Check(caught_set, "set(Position(5, 5)) throws EOutOfBoundException");
     }
+
+    // 4. operator(), flat iterators, data_span, and column access
+    {
+        RL::CMatrix<int> mat(RL::Size(3, 4), 0);
+
+        // operator() read/write
+        mat(1, 2) = 42;
+        Check(mat(1, 2) == 42, "operator()(x, y) read/write works");
+        Check(mat(RL::Position(1, 2)) == 42, "operator()(Position) works");
+
+        // const operator()
+        const auto& cmat = mat;
+        Check(cmat(1, 2) == 42, "const operator()(x, y) works");
+        Check(cmat(RL::Position(1, 2)) == 42, "const operator()(Position) works");
+
+        // flat range-based for loop
+        int sum = 0;
+        for (int& cell : mat) {
+            cell += 1;
+            sum += cell;
+        }
+        // 3x4 = 12 cells, one was 42 (now 43), eleven were 0 (now 1): 43 + 11 = 54
+        Check(sum == 54, "flat range-based for loop iterates all elements");
+
+        // data_span
+        auto span = mat.data_span();
+        Check(span.size() == 12, "data_span() has full matrix size");
+        Check(span[1 * 4 + 2] == 43, "data_span() indexes correctly");
+
+        // column()
+        auto col1 = mat.column(1);
+        Check(col1.size() == 4, "column(1) has height elements");
+        Check(col1[2] == 43, "column(1)[2] accesses cell (1, 2)");
+        col1[0] = 999;
+        Check(mat(1, 0) == 999, "modifying column span modifies matrix cell");
+    }
 }
