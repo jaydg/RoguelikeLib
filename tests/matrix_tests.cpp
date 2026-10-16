@@ -76,4 +76,26 @@ void TestMatrix()
         Check(mat.inside(RL::Position(2, 5)), "Position(2,5) is inside");
         Check(!mat.inside(RL::Position(5, 5)), "Position(5,5) is outside");
     }
+
+    // 3. Out-of-bounds exception throwing
+    {
+        RL::CMatrix<int> mat(RL::Size(3, 4), 10);
+        bool caught_get = false;
+        try {
+            [[maybe_unused]] auto val = mat.get(3, 4);
+        } catch (const RL::EOutOfBoundException& e) {
+            caught_get = true;
+            Check(std::string_view(e.what()).find("out of bounds") != std::string_view::npos,
+                  "exception contains 'out of bounds'");
+        }
+        Check(caught_get, "get(3, 4) throws EOutOfBoundException");
+
+        bool caught_set = false;
+        try {
+            mat.set(RL::Position(5, 5), 99);
+        } catch (const RL::EOutOfBoundException&) {
+            caught_set = true;
+        }
+        Check(caught_set, "set(Position(5, 5)) throws EOutOfBoundException");
+    }
 }

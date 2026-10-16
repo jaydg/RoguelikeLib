@@ -56,10 +56,15 @@ public:
         return inside(pos.x, pos.y);
     }
 
+    [[noreturn]] static void ThrowOutOfBounds(std::size_t x, std::size_t y, Size size)
+    {
+        throw EOutOfBoundException(Position(x, y), size);
+    }
+
     [[nodiscard]] decltype(auto) get(std::size_t x, std::size_t y)
     {
         if (!inside(x, y)) {
-            throw EOutOfBoundException(Position(x, y), size);
+            ThrowOutOfBounds(x, y, size);
         }
 
         return data[x * size.y + y];
@@ -68,7 +73,7 @@ public:
     [[nodiscard]] decltype(auto) get(std::size_t x, std::size_t y) const
     {
         if (!inside(x, y)) {
-            throw EOutOfBoundException(Position(x, y), size);
+            ThrowOutOfBounds(x, y, size);
         }
 
         return data[x * size.y + y];
@@ -77,7 +82,7 @@ public:
     [[nodiscard]] decltype(auto) get(const Position pos)
     {
         if (!inside(pos)) {
-            throw EOutOfBoundException(pos, size);
+            ThrowOutOfBounds(pos.x, pos.y, size);
         }
 
         return data[pos.x * size.y + pos.y];
@@ -86,7 +91,7 @@ public:
     [[nodiscard]] decltype(auto) get(const Position pos) const
     {
         if (!inside(pos)) {
-            throw EOutOfBoundException(pos, size);
+            ThrowOutOfBounds(pos.x, pos.y, size);
         }
 
         return data[pos.x * size.y + pos.y];
@@ -95,7 +100,7 @@ public:
     void set(std::size_t x, std::size_t y, const T& val)
     {
         if (!inside(x, y)) {
-            throw EOutOfBoundException(Position(x, y), size);
+            ThrowOutOfBounds(x, y, size);
         }
 
         data[x * size.y + y] = val;
@@ -104,7 +109,7 @@ public:
     void set(std::size_t x, std::size_t y, T&& val)
     {
         if (!inside(x, y)) {
-            throw EOutOfBoundException(Position(x, y), size);
+            ThrowOutOfBounds(x, y, size);
         }
 
         data[x * size.y + y] = std::move(val);
@@ -113,7 +118,7 @@ public:
     void set(const Position pos, const T& val)
     {
         if (!inside(pos)) {
-            throw EOutOfBoundException(pos, size);
+            ThrowOutOfBounds(pos.x, pos.y, size);
         }
 
         data[pos.x * size.y + pos.y] = val;
@@ -122,7 +127,7 @@ public:
     void set(const Position pos, T&& val)
     {
         if (!inside(pos)) {
-            throw EOutOfBoundException(pos, size);
+            ThrowOutOfBounds(pos.x, pos.y, size);
         }
 
         data[pos.x * size.y + pos.y] = std::move(val);
