@@ -40,7 +40,7 @@ class CMatrix
 public:
     CMatrix() {};
 
-    CMatrix(Size size_, T defval)
+    CMatrix(Size size_, const T& defval)
     {
         size = size_;
         data.resize(size.x * size.y, defval);
@@ -92,7 +92,7 @@ public:
         return data[pos.x * size.y + pos.y];
     }
 
-    void set(std::size_t x, std::size_t y, T val)
+    void set(std::size_t x, std::size_t y, const T& val)
     {
         if (!inside(x, y)) {
             throw EOutOfBoundException(Position(x, y), size);
@@ -101,13 +101,31 @@ public:
         data[x * size.y + y] = val;
     }
 
-    void set(const Position pos, T val)
+    void set(std::size_t x, std::size_t y, T&& val)
+    {
+        if (!inside(x, y)) {
+            throw EOutOfBoundException(Position(x, y), size);
+        }
+
+        data[x * size.y + y] = std::move(val);
+    }
+
+    void set(const Position pos, const T& val)
     {
         if (!inside(pos)) {
             throw EOutOfBoundException(pos, size);
         }
 
         data[pos.x * size.y + pos.y] = val;
+    }
+
+    void set(const Position pos, T&& val)
+    {
+        if (!inside(pos)) {
+            throw EOutOfBoundException(pos, size);
+        }
+
+        data[pos.x * size.y + pos.y] = std::move(val);
     }
 
     // Unchecked accessors for hot paths that already validate bounds
@@ -121,9 +139,34 @@ public:
         return data[x * size.y + y];
     }
 
-    void set_unchecked(std::size_t x, std::size_t y, T val) noexcept
+    [[nodiscard]] decltype(auto) get_unchecked(const Position pos) noexcept
+    {
+        return data[pos.x * size.y + pos.y];
+    }
+
+    [[nodiscard]] decltype(auto) get_unchecked(const Position pos) const noexcept
+    {
+        return data[pos.x * size.y + pos.y];
+    }
+
+    void set_unchecked(std::size_t x, std::size_t y, const T& val) noexcept
     {
         data[x * size.y + y] = val;
+    }
+
+    void set_unchecked(std::size_t x, std::size_t y, T&& val) noexcept
+    {
+        data[x * size.y + y] = std::move(val);
+    }
+
+    void set_unchecked(const Position pos, const T& val) noexcept
+    {
+        data[pos.x * size.y + pos.y] = val;
+    }
+
+    void set_unchecked(const Position pos, T&& val) noexcept
+    {
+        data[pos.x * size.y + pos.y] = std::move(val);
     }
 
     [[nodiscard]] Size getSize() const
@@ -142,7 +185,7 @@ public:
     }
 
     // Bulk-set every element to val without per-element bounds checks
-    void fill(T val)
+    void fill(const T& val)
     {
         std::fill(data.begin(), data.end(), val);
     }
