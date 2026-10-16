@@ -163,4 +163,31 @@ void TestMatrix()
         Check(ones.CountNeighbors(RL::Position(2, 2), is_positive, RL::Neighbors::All8) == 8,
               "CountNeighbors with predicate works on const matrix");
     }
+
+    // 6. FloodFill correctness, early-exit, and options
+    {
+        RL::CMatrix<int> mat(RL::Size(5, 5), 0);
+
+        // Standard flood fill of entire component
+        bool ok = mat.FloodFill(RL::Position(0, 0), 1, true);
+        Check(ok, "FloodFill returns true on success");
+        int count1 = 0;
+        for (int v : mat) {
+            count1 += (v == 1);
+        }
+        Check(count1 == 25, "FloodFill fills all 25 cells");
+
+        // Early-exit when start cell already matches fill value with zero gradient
+        bool early = mat.FloodFill(RL::Position(0, 0), 1, true, 0);
+        Check(early, "FloodFill early exits when already filled");
+
+        // Target reached check
+        mat.fill(0);
+        bool reached = mat.FloodFill(RL::Position(0, 0), 2, true, 0, RL::Position(2, 2));
+        Check(reached, "FloodFill returns reached_end when target end position hit");
+        Check(mat(2, 2) == 2, "target position (2,2) was filled");
+
+        // Invalid start position
+        Check(!mat.FloodFill(RL::Position(10, 10), 5), "FloodFill on outside position returns false");
+    }
 }

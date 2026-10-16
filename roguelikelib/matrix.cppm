@@ -268,14 +268,17 @@ public:
         return CountNeighborsImpl(pos, std::forward<Pred>(predicate), mode);
     }
 
-    bool FloodFill(Position start, T value, bool diagonal = true, int gradient = 0, Position end = Position(-1, -1))
+    bool FloodFill(Position start, const T& value, bool diagonal = true, int gradient = 0, Position end = Position())
     {
         if (!inside(start)) {
             return false;
         }
 
-        // flood fill room
-        T area_value = get_unchecked(start.x, start.y);
+        const T area_value = get_unchecked(start.x, start.y);
+        if (area_value == value && gradient == 0) {
+            return (end.x == Position::invalid || end == start);
+        }
+
         set_unchecked(start.x, start.y, value);
 
         std::vector<Position> positions;
@@ -284,6 +287,10 @@ public:
 
         std::size_t head = 0;
         bool reached_end = false;
+
+        const std::size_t max_x = (size.x > 0) ? size.x - 1 : 0;
+        const std::size_t max_y = (size.y > 0) ? size.y - 1 : 0;
+        const std::size_t step_y = size.y;
 
         while (head < positions.size()) {
             const Position current = positions[head++];
@@ -294,59 +301,76 @@ public:
                 break;
             }
 
-            std::size_t pos_x = current.x;
-            std::size_t pos_y = current.y;
+            const std::size_t pos_x = current.x;
+            const std::size_t pos_y = current.y;
+            const std::size_t center = pos_x * step_y + pos_y;
 
-            T this_value = get_unchecked(pos_x, pos_y);
+            const T next_value = (gradient == 0) ? value : static_cast<T>(data[center] + gradient);
 
-            if (pos_x > 0)
-                if (get_unchecked(pos_x - 1, pos_y) == area_value) {
-                    set_unchecked(pos_x - 1, pos_y, this_value + gradient);
+            if (pos_x > 0) {
+                const std::size_t idx = center - step_y;
+                if (data[idx] == area_value) {
+                    data[idx] = next_value;
                     positions.emplace_back(pos_x - 1, pos_y);
                 }
+            }
 
-            if (pos_x < getWidth() - 1)
-                if (get_unchecked(pos_x + 1, pos_y) == area_value) {
-                    set_unchecked(pos_x + 1, pos_y, this_value + gradient);
+            if (pos_x < max_x) {
+                const std::size_t idx = center + step_y;
+                if (data[idx] == area_value) {
+                    data[idx] = next_value;
                     positions.emplace_back(pos_x + 1, pos_y);
                 }
+            }
 
-            if (pos_y > 0)
-                if (get_unchecked(pos_x, pos_y - 1) == area_value) {
-                    set_unchecked(pos_x, pos_y - 1, this_value + gradient);
+            if (pos_y > 0) {
+                const std::size_t idx = center - 1;
+                if (data[idx] == area_value) {
+                    data[idx] = next_value;
                     positions.emplace_back(pos_x, pos_y - 1);
                 }
+            }
 
-            if (pos_y < getHeight() - 1)
-                if (get_unchecked(pos_x, pos_y + 1) == area_value) {
-                    set_unchecked(pos_x, pos_y + 1, this_value + gradient);
+            if (pos_y < max_y) {
+                const std::size_t idx = center + 1;
+                if (data[idx] == area_value) {
+                    data[idx] = next_value;
                     positions.emplace_back(pos_x, pos_y + 1);
                 }
+            }
 
             if (diagonal) {
-                if (pos_x > 0 && pos_y > 0)
-                    if (get_unchecked(pos_x - 1, pos_y - 1) == area_value) {
-                        set_unchecked(pos_x - 1, pos_y - 1, this_value + gradient);
+                if (pos_x > 0 && pos_y > 0) {
+                    const std::size_t idx = center - step_y - 1;
+                    if (data[idx] == area_value) {
+                        data[idx] = next_value;
                         positions.emplace_back(pos_x - 1, pos_y - 1);
                     }
+                }
 
-                if (pos_x < getWidth() - 1 && pos_y < getHeight() - 1)
-                    if (get_unchecked(pos_x + 1, pos_y + 1) == area_value) {
-                        set_unchecked(pos_x + 1, pos_y + 1, this_value + gradient);
+                if (pos_x < max_x && pos_y < max_y) {
+                    const std::size_t idx = center + step_y + 1;
+                    if (data[idx] == area_value) {
+                        data[idx] = next_value;
                         positions.emplace_back(pos_x + 1, pos_y + 1);
                     }
+                }
 
-                if (pos_x < getWidth() - 1 && pos_y > 0)
-                    if (get_unchecked(pos_x + 1, pos_y - 1) == area_value) {
-                        set_unchecked(pos_x + 1, pos_y - 1, this_value + gradient);
+                if (pos_x < max_x && pos_y > 0) {
+                    const std::size_t idx = center + step_y - 1;
+                    if (data[idx] == area_value) {
+                        data[idx] = next_value;
                         positions.emplace_back(pos_x + 1, pos_y - 1);
                     }
+                }
 
-                if (pos_x > 0 && pos_y < getHeight() - 1)
-                    if (get_unchecked(pos_x - 1, pos_y + 1) == area_value) {
-                        set_unchecked(pos_x - 1, pos_y + 1, this_value + gradient);
+                if (pos_x > 0 && pos_y < max_y) {
+                    const std::size_t idx = center - step_y + 1;
+                    if (data[idx] == area_value) {
+                        data[idx] = next_value;
                         positions.emplace_back(pos_x - 1, pos_y + 1);
                     }
+                }
             }
         }
 
