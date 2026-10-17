@@ -84,7 +84,18 @@ void TestCamera()
     Check(CameraOrigin(RL::Size(20, 10), view, RL::Position(15, 8)) == RL::Position(0, 0),
           "a map just as big as the view does not move");
 
+    // Constexpr and noexcept verification
+    static_assert(noexcept(CameraOrigin(map, view, RL::Position(50, 25))));
+    static_assert(CameraOrigin(RL::Size(100, 50), RL::Size(20, 10), RL::Position(50, 25)) == RL::Position(40, 20));
+    static_assert(CameraOrigin(RL::Size(10, 5), RL::Size(20, 10), RL::Position(9, 4)) == RL::Position(0, 0));
+
     const RL::SRect area{RL::Position(2, 1), RL::Size(5, 3)};
+    static_assert(noexcept(RL::OnScreen(area, RL::Position(10, 10), RL::Position(12, 11))));
+    static_assert(RL::OnScreen(RL::SRect{RL::Position(2, 1), RL::Size(5, 3)},
+                               RL::Position(10, 10), RL::Position(12, 11)) == RL::Position(4, 2));
+    static_assert(!RL::OnScreen(RL::SRect{RL::Position(2, 1), RL::Size(5, 3)},
+                                RL::Position(10, 10), RL::Position(15, 11)).has_value());
+
     Check(RL::OnScreen(area, RL::Position(10, 10), RL::Position(12, 11)) == RL::Position(4, 2) &&
           !RL::OnScreen(area, RL::Position(10, 10), RL::Position(15, 11)), "a map position is on screen where the view shows it");
 

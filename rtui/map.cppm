@@ -16,9 +16,9 @@ export namespace RL
 // Viewport helpers adapted from Roguevalley's rv.view module.
 // Centres the focus in the view, clamped to the map's edges. A map
 // smaller than the view starts at the view's top left corner.
-[[nodiscard]] Position CameraOrigin(Size map, Size view, Position focus)
+[[nodiscard]] constexpr Position CameraOrigin(Size map, Size view, Position focus) noexcept
 {
-    const auto axis = [](std::size_t map_length, std::size_t view_length, std::size_t at) {
+    const auto axis = [](std::size_t map_length, std::size_t view_length, std::size_t at) constexpr noexcept {
         if (map_length <= view_length) {
             return std::size_t{0};
         }
@@ -32,7 +32,7 @@ export namespace RL
 
 // Converts a map position to a screen position, or nothing outside the
 // view. Origin is the map position at the area's top left corner.
-[[nodiscard]] std::optional<Position> OnScreen(const SRect& area, Position origin, Position pos)
+[[nodiscard]] constexpr std::optional<Position> OnScreen(const SRect& area, Position origin, Position pos) noexcept
 {
     if (pos.x < origin.x || pos.y < origin.y || pos.x - origin.x >= area.size.x || pos.y - origin.y >= area.size.y) {
         return std::nullopt;
