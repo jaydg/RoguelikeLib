@@ -1,6 +1,9 @@
 import rl.mapgenerators.forest;
 import rl.mapgenerators.caveandglade;
 import rl.mapgenerators.biomes;
+import rl.mapgenerators.growthtown;
+import rl.mapgenerators.simplecity;
+import rl.mapgenerators.voronoiwilderness;
 import rl.randomness;
 import rltests.check;
 import std;
@@ -178,6 +181,65 @@ void TestBiomes()
             }
         }
         Check(saw_bog_pool && saw_water && saw_bridge_or_road, "GenerateForest with SBogBiome generates rivers, bridges, and bog terrain");
+    }
+
+    // 7. CreateGrowthTown with SForestBiome surrounding countryside
+    {
+        RL::CMap map(RL::Size(80, 80));
+        RL::InitRandomness(123);
+        const auto buildings = RL::CreateGrowthTown(map, RL::SForestBiome{.vegetation_density = 0.9f}, 30);
+        bool has_forest_outside = false;
+        bool has_town_wall = false;
+        for (std::size_t y = 0; y < 10; ++y) {
+            for (std::size_t x = 0; x < 10; ++x) {
+                const auto type = map.get(x, y).getType();
+                has_forest_outside |= type == "tree" || type == "plant" || type == "rock";
+            }
+        }
+        for (std::size_t y = 0; y < map.getHeight(); ++y) {
+            for (std::size_t x = 0; x < map.getWidth(); ++x) {
+                has_town_wall |= map.get(x, y).getType() == "wall";
+            }
+        }
+        Check(!buildings.empty() && has_town_wall && has_forest_outside,
+              "CreateGrowthTown with SForestBiome surrounds the walled town with forest terrain");
+    }
+
+    // 8. CreateSimpleCity with SBogBiome on open grounds
+    {
+        RL::CMap map(RL::Size(60, 60));
+        RL::InitRandomness(456);
+        RL::CreateSimpleCity(map, 8, RL::SBogBiome{});
+        bool has_walls = false, has_bog = false;
+        for (std::size_t y = 0; y < map.getHeight(); ++y) {
+            for (std::size_t x = 0; x < map.getWidth(); ++x) {
+                const auto type = map.get(x, y).getType();
+                has_walls |= type == "wall";
+                has_bog |= type == "bog_pool" || type == "bog_reeds" || type == "bog_ground";
+            }
+        }
+        Check(has_walls && has_bog, "CreateSimpleCity with SBogBiome places buildings on a bog terrain");
+    }
+
+    // 9. CreateVoronoiWilderness with custom SWildernessConfig
+    {
+        RL::CMap map(RL::Size(100, 60));
+        RL::InitRandomness(789);
+        RL::SWildernessConfig config{
+            .num_regions = 15,
+            .with_buildings = true,
+            .forest_biome = RL::SBogBiome{}, // override forest with bog
+        };
+        const auto info = RL::CreateVoronoiWilderness(map, config);
+        Check(info.regions == 15, "CreateVoronoiWilderness with SWildernessConfig creates requested regions");
+        bool has_bog = false;
+        for (std::size_t y = 0; y < map.getHeight(); ++y) {
+            for (std::size_t x = 0; x < map.getWidth(); ++x) {
+                const auto type = map.get(x, y).getType();
+                has_bog |= type == "bog_pool" || type == "bog_reeds" || type == "bog_ground";
+            }
+        }
+        Check(has_bog, "CreateVoronoiWilderness with overridden forest_biome places bog terrain");
     }
 }
 

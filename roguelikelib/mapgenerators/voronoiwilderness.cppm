@@ -73,6 +73,16 @@ struct SWildernessInfo {
     CMatrix<int> difficulty;
 };
 
+// Configuration options for Voronoi wilderness generation, including customizable biomes.
+struct SWildernessConfig {
+    int num_regions = 0;              ///< Number of regions (0 = automatic based on map area)
+    bool with_buildings = false;      ///< True to generate town buildings; false for uncultivated bogs
+    TerrainBiome forest_biome = SForestBiome{};     ///< Biome pattern used for forest regions
+    TerrainBiome bog_biome = SBogBiome{};           ///< Biome pattern used for bog regions
+    TerrainBiome hills_biome = SHillsBiome{};       ///< Biome pattern used for rolling hills
+    TerrainBiome grass_biome = SGrasslandBiome{};   ///< Biome pattern used for open grassland
+};
+
 } // export namespace RL
 
 namespace RL
@@ -298,7 +308,7 @@ bool PassableGraphConnected(const std::vector<Region>& regions,
 class CWilderness
 {
 public:
-    CWilderness(const int width, const int height, const int num_regions, const bool with_buildings);
+    CWilderness(const int width, const int height, const SWildernessConfig& config);
 
     // Fill the map, and report what it was divided into
     [[nodiscard]] SWildernessInfo Apply(CMap & level) const;
@@ -310,6 +320,7 @@ private:
     int width_;
     int height_;
     bool with_buildings_;
+    SWildernessConfig config_;
 
     // The noise the point terrain of the open regions is cut from
     std::uint64_t noise_seed_ = 0;
@@ -352,15 +363,15 @@ private:
     void ShapeChasms();
 };
 
-CWilderness::CWilderness(const int width, const int height, const int num_regions, const bool with_buildings)
-    : width_(width), height_(height), with_buildings_(with_buildings)
+CWilderness::CWilderness(const int width, const int height, const SWildernessConfig& config)
+    : width_(width), height_(height), with_buildings_(config.with_buildings), config_(config)
 {
     // One noise field for the whole map, drawn from the library's random
     // stream, so that the same seed gives the same wilderness again
     noise_seed_ = Random(0x7fffffff);
 
     // 1. Scatter the seed points of the diagram over the map
-    regions_.resize(static_cast<std::size_t>(num_regions));
+    regions_.resize(static_cast<std::size_t>(config.num_regions));
 
     for (Region & region : regions_) {
         region.center = {RandomFloat(0.0f, static_cast<float>(width_)),
@@ -949,39 +960,46 @@ std::string_view CWilderness::TileAt(const int x, const int y) const
         }
         return chasm_depth_[cell] == 1 ? "chasm_rim" : chasm_depth_[cell] == 2 ? "chasm_wall" : "chasm";
 
-    case Ter::Grass:            // open region: sparse point terrain
-        if (noise > 0.88) {
-            return "tree";
-        }
-
-        if (noise < 0.06) {
-            return "plant";
-        }
-
-        return "grass";
-
-    case Ter::Forest: {
-        // Match GenerateForest's lighter mix: about 60% vegetation, of
-        // which 70% is trees, with 5% scattered rocks. Slow density noise
-        // creates thickets and thinner patches; independent cell hashes
-        // scatter individual plants instead of filling solid tree blobs.
-        const double vegetation = 0.45 + 0.30 * Fbm(x * 0.07, y * 0.07, noise_seed_ + 131);
-        const double scatter = HashNoise(x, y, noise_seed_ + 137);
-        if (scatter < 0.05) {
-            return "rock";
-        }
-        if (scatter < 0.05 + 0.95 * vegetation) {
-            return HashNoise(x, y, noise_seed_ + 149) < 0.70 ? "tree" : "plant";
+    case Ter::Grass: {
+        if (std::holds_alternative<SGrasslandBiome>(config_.grass_biome)) {
+            const auto& gb = std::get<SGrasslandBiome>(config_.grass_biome);
+            if (noise > gb.tree_threshold) return gb.tree_tile;
+            if (noise < gb.plant_threshold) return gb.plant_tile;
+            return gb.base_tile;
         }
         return "grass";
     }
 
-    case Ter::Bog:
-        // Connected, walkable wetland: pools and reed beds follow the
-        // coherent noise, without agricultural hedges or gates.
-        if (noise < 0.35) return "bog_pool";
-        if (noise > 0.60) return "bog_reeds";
+    case Ter::Forest: {
+        if (std::holds_alternative<SForestBiome>(config_.forest_biome)) {
+            const auto& fb = std::get<SForestBiome>(config_.forest_biome);
+            double vegetation = fb.vegetation_density;
+            if (fb.patchiness > 0.0f) {
+                const double fbm = Fbm(x * 0.07, y * 0.07, noise_seed_ + 131);
+                vegetation = std::clamp(static_cast<double>(fb.vegetation_density) +
+                                        static_cast<double>(fb.patchiness) * (fbm - 0.5), 0.0, 1.0);
+            }
+            const double scatter = HashNoise(x, y, noise_seed_ + 137);
+            if (scatter < fb.rock_density) {
+                return fb.rock_tile;
+            }
+            if (scatter < fb.rock_density + (1.0 - fb.rock_density) * vegetation) {
+                return HashNoise(x, y, noise_seed_ + 149) < fb.tree_density ? fb.tree_tile : fb.plant_tile;
+            }
+            return fb.base_tile;
+        }
+        return "grass";
+    }
+
+    case Ter::Bog: {
+        if (std::holds_alternative<SBogBiome>(config_.bog_biome)) {
+            const auto& bb = std::get<SBogBiome>(config_.bog_biome);
+            if (noise < bb.pool_threshold) return bb.pool_tile;
+            if (noise > bb.reed_threshold) return bb.reed_tile;
+            return bb.ground_tile;
+        }
         return "bog_ground";
+    }
 
     case Ter::Field:
 
@@ -999,18 +1017,20 @@ std::string_view CWilderness::TileAt(const int x, const int y) const
         return noise > 0.90 ? "plant" : "field";
 
     case Ter::Hills: {
-        // Sparse rocks do not turn the hilltops into continuous barriers.
-        // Scrub and flowering heather favour coherent vegetation patches.
-        const double scatter = HashNoise(x, y, noise_seed_ + 163);
-        const double cover = Fbm(x * 0.10, y * 0.10, noise_seed_ + 167);
-        if (scatter < 0.02) {
-            return "rock";
-        }
-        if (scatter < 0.04 && cover > 0.55) {
-            return "heather";
-        }
-        if (scatter < 0.10 + 0.10 * cover) {
-            return "scrub";
+        if (std::holds_alternative<SHillsBiome>(config_.hills_biome)) {
+            const auto& hb = std::get<SHillsBiome>(config_.hills_biome);
+            const double scatter = HashNoise(x, y, noise_seed_ + 163);
+            const double cover = Fbm(x * 0.10, y * 0.10, noise_seed_ + 167);
+            if (scatter < hb.rock_density) {
+                return hb.rock_tile;
+            }
+            if (scatter < hb.rock_density + hb.heather_density && cover > hb.cover_threshold) {
+                return hb.heather_tile;
+            }
+            if (scatter < hb.rock_density + hb.heather_density + hb.scrub_density * (1.0 + cover)) {
+                return hb.scrub_tile;
+            }
+            return hb.base_tile;
         }
         return "slope";
     }
@@ -1404,50 +1424,87 @@ SWildernessInfo CWilderness::Apply(CMap & level) const
     info.adjacency = adjacency_set_.size();
     info.difficulty = CMatrix<int>(level.getSize(), 0);
 
+    CMatrix<bool> forest_mask(width_, height_, false);
+    CMatrix<bool> bog_mask(width_, height_, false);
+    CMatrix<bool> hills_mask(width_, height_, false);
+    CMatrix<bool> grass_mask(width_, height_, false);
+
     for (int y = 0; y < height_; ++y) {
         for (int x = 0; x < width_; ++x) {
-            const auto type = TileAt(x, y);
-            if (type == "slope") {
-                const auto terrain = regions_[region_id_[Index(x, y)]].terrain;
-                const double elevation = terrain == Ter::Hills ?
-                                         0.5 * HeightAt(x, y) + 0.5 * Fbm(x * 0.15, y * 0.15, noise_seed_ + 99) :
-                                         HeightAt(x, y);
-                const double blend = std::clamp(elevation, 0.0, 1.0);
-                const auto low = CTileData::get("grass").second.rgb_color;
-                constexpr std::uint32_t high = 0xA08A5B;
-                std::uint32_t colour = 0;
-                for (int shift : {16, 8, 0}) {
-                    const double channel = ((low >> shift) & 0xFF) * (1.0 - blend) +
-                                           ((high >> shift) & 0xFF) * blend;
-                    colour |= static_cast<std::uint32_t>(std::lround(channel)) << shift;
-                }
-                auto data = CTileData::get(type).second;
-                data.rgb_color = GetJitteredColor(colour);
-                level.get(x, y) = CTile(type, data);
-            } else if (type == "chasm" || type == "chasm_rim" || type == "chasm_wall") {
-                auto data = CTileData::get(type).second;
-                const int depth = chasm_depth_[Index(x, y)];
-                const double shade = std::clamp((depth - 1) / 3.0, 0.0, 1.0);
-                std::uint32_t colour = 0;
-                constexpr std::uint32_t rim = 0x8E7862, deep = 0x211E28;
-                for (int shift : {16, 8, 0}) {
-                    const double channel = ((rim >> shift) & 0xFF) * (1.0 - shade) + ((deep >> shift) & 0xFF) * shade;
-                    colour |= static_cast<std::uint32_t>(std::lround(channel)) << shift;
-                }
-                data.rgb_color = GetJitteredColor(colour);
-                if (type == "chasm_rim" && HashNoise(x, y, noise_seed_ + 197) < 0.25) {
-                    data.glyph = U'^';
-                }
-                level.get(x, y) = CTile(type, data);
+            const auto terrain = regions_[region_id_[Index(x, y)]].terrain;
+            if (terrain == Ter::Forest) {
+                forest_mask.set(x, y, true);
+            } else if (terrain == Ter::Bog) {
+                bog_mask.set(x, y, true);
+            } else if (terrain == Ter::Hills) {
+                hills_mask.set(x, y, true);
+            } else if (terrain == Ter::Grass) {
+                grass_mask.set(x, y, true);
             } else {
-                level.SetCell(static_cast<std::size_t>(x), static_cast<std::size_t>(y), type);
+                const auto type = TileAt(x, y);
+                if (type == "slope") {
+                    const double elevation = HeightAt(x, y);
+                    const double blend = std::clamp(elevation, 0.0, 1.0);
+                    const auto low = CTileData::get("grass").second.rgb_color;
+                    constexpr std::uint32_t high = 0xA08A5B;
+                    std::uint32_t colour = 0;
+                    for (int shift : {16, 8, 0}) {
+                        const double channel = ((low >> shift) & 0xFF) * (1.0 - blend) +
+                                               ((high >> shift) & 0xFF) * blend;
+                        colour |= static_cast<std::uint32_t>(std::lround(channel)) << shift;
+                    }
+                    auto data = CTileData::get(type).second;
+                    data.rgb_color = GetJitteredColor(colour);
+                    level.get(x, y) = CTile(type, data);
+                } else if (type == "chasm" || type == "chasm_rim" || type == "chasm_wall") {
+                    auto data = CTileData::get(type).second;
+                    const int depth = chasm_depth_[Index(x, y)];
+                    const double shade = std::clamp((depth - 1) / 3.0, 0.0, 1.0);
+                    std::uint32_t colour = 0;
+                    constexpr std::uint32_t rim = 0x8E7862, deep = 0x211E28;
+                    for (int shift : {16, 8, 0}) {
+                        const double channel = ((rim >> shift) & 0xFF) * (1.0 - shade) + ((deep >> shift) & 0xFF) * shade;
+                        colour |= static_cast<std::uint32_t>(std::lround(channel)) << shift;
+                    }
+                    data.rgb_color = GetJitteredColor(colour);
+                    if (type == "chasm_rim" && HashNoise(x, y, noise_seed_ + 197) < 0.25) {
+                        data.glyph = U'^';
+                    }
+                    level.get(x, y) = CTile(type, data);
+                } else {
+                    level.SetCell(static_cast<std::size_t>(x), static_cast<std::size_t>(y), type);
+                }
             }
             info.difficulty.set(static_cast<std::size_t>(x), static_cast<std::size_t>(y),
                                 regions_[region_id_[Index(x, y)]].difficulty);
         }
     }
 
-    AddHillFeatures(level);
+    CMatrix<double> elev_mat(level.getSize(), 0.0);
+    CMatrix<int> reg_mat(level.getSize(), 0);
+    for (int y = 0; y < height_; ++y) {
+        for (int x = 0; x < width_; ++x) {
+            elev_mat.set(x, y, elevation_[Index(x, y)]);
+            reg_mat.set(x, y, region_id_[Index(x, y)]);
+        }
+    }
+
+    FillBiome(level, forest_mask, config_.forest_biome, &elev_mat, &reg_mat, noise_seed_);
+    FillBiome(level, bog_mask, config_.bog_biome, &elev_mat, &reg_mat, noise_seed_);
+    FillBiome(level, grass_mask, config_.grass_biome, &elev_mat, &reg_mat, noise_seed_);
+
+    if (std::holds_alternative<SHillsBiome>(config_.hills_biome)) {
+        auto hills = std::get<SHillsBiome>(config_.hills_biome);
+        const bool want_features = hills.animal_trails || hills.fallen_logs;
+        hills.animal_trails = false;
+        hills.fallen_logs = false;
+        FillHills(level, hills_mask, hills, &elev_mat, &reg_mat, noise_seed_);
+        if (want_features) {
+            AddHillFeatures(level);
+        }
+    } else {
+        FillBiome(level, hills_mask, config_.hills_biome, &elev_mat, &reg_mat, noise_seed_);
+    }
 
     for (std::size_t i = 0; i < regions_.size(); ++i) {
         const Region & region = regions_[i];
@@ -1510,19 +1567,12 @@ inline constexpr std::array<SOpening, 2> WildernessOpenings = {{
 // first time this runs; a game that registered a type of one of those
 // names itself keeps its own.
 //
-// @param level           The map to fill. An empty one is left alone.
-// @param num_regions     How many Voronoi regions to scatter, at least 4.
-// At 0 one region is asked for per 200 cells of the
-// map, with at least 10. Larger maps add regions instead of enlarging them.
-// @param with_buildings  Whether to fill the town with small buildings.
-// When false, agricultural field regions become uncultivated bogs.
-// Each side, including walls, is 4–7 tiles long; larger towns get more
-// buildings. Narrow plots that cannot hold a 4x4 building stay open.
+// Generates a wilderness map divided into Voronoi regions with configurable biomes.
 //
-// @return The regions and their adjacency edges, the locations the
-// generator laid out - the starting town, as an SLocation of type
-// Town - the buildings, and the difficulty of every cell.
-SWildernessInfo CreateVoronoiWilderness(CMap & level, int num_regions = 0, bool with_buildings = false)
+// @param level   The map to fill. An empty one is left alone.
+// @param config  Wilderness configuration options (region count, biomes, etc.).
+// @return The regions and their adjacency edges, locations, buildings, and cell difficulties.
+SWildernessInfo CreateVoronoiWilderness(CMap & level, const SWildernessConfig& config)
 {
     const int width = static_cast<int>(level.getWidth());
     const int height = static_cast<int>(level.getHeight());
@@ -1533,13 +1583,17 @@ SWildernessInfo CreateVoronoiWilderness(CMap & level, int num_regions = 0, bool 
 
     voronoiwilderness_detail::RegisterWildernessTiles();
 
+    int num_regions = config.num_regions;
     if (num_regions <= 0) {
         num_regions = std::max(width * height / 200, 10);
     } else {
         num_regions = std::clamp(num_regions, 4, 800);
     }
 
-    const voronoiwilderness_detail::CWilderness wilderness(width, height, num_regions, with_buildings);
+    SWildernessConfig effective_config = config;
+    effective_config.num_regions = num_regions;
+
+    const voronoiwilderness_detail::CWilderness wilderness(width, height, effective_config);
     SWildernessInfo info = wilderness.Apply(level);
 
     // Whatever the connectivity of the regions guaranteed, a gate may
@@ -1551,6 +1605,20 @@ SWildernessInfo CreateVoronoiWilderness(CMap & level, int num_regions = 0, bool 
     info.fields = wilderness.Fields(level);
 
     return info;
+}
+
+// Generates a wilderness map divided into Voronoi regions using default biomes.
+//
+// @param level           The map to fill. An empty one is left alone.
+// @param num_regions     How many Voronoi regions to scatter, at least 4 (0 for automatic).
+// @param with_buildings  Whether to fill the town with small buildings.
+// @return The regions and their adjacency edges, locations, buildings, and cell difficulties.
+inline SWildernessInfo CreateVoronoiWilderness(CMap & level, int num_regions = 0, bool with_buildings = false)
+{
+    return CreateVoronoiWilderness(level, SWildernessConfig{
+        .num_regions = num_regions,
+        .with_buildings = with_buildings
+    });
 }
 
 } // export namespace RL

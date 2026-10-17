@@ -1,6 +1,8 @@
 module;
 export module rl.mapgenerators.growthtown;
+export import rl.mapgenerators.biomes;
 import rl.map;
+import rl.matrix;
 import rl.position;
 import rl.randomness;
 import std;
@@ -198,10 +200,12 @@ void TownRoad(CMap& map, Position from, Position to, int radius = 0)
 }
 } // namespace
 
-// Replaces the map with a walled market town. Returns at most the requested
-// number of buildings, with inclusive wall corners and street-facing doors.
-export std::vector<SBuilding> CreateGrowthTown(CMap& map, std::size_t number_of_buildings = 80,
-                                                  std::vector<Position>* town_gates = nullptr)
+// Replaces the map with a walled market town surrounded by a configurable biome.
+// Returns at most the requested number of buildings, with inclusive wall corners
+// and street-facing doors.
+export std::vector<SBuilding> CreateGrowthTown(CMap& map, const TerrainBiome& surrounding_biome,
+                                              std::size_t number_of_buildings = 80,
+                                              std::vector<Position>* town_gates = nullptr)
 {
     if (town_gates) {
         town_gates->clear();
@@ -593,13 +597,23 @@ export std::vector<SBuilding> CreateGrowthTown(CMap& map, std::size_t number_of_
             town_gates->push_back(opening);
         }
     }
+    CMatrix<bool> outside_mask(width, height, false);
     for (std::size_t y = 0; y < height; ++y) {
         for (std::size_t x = 0; x < width; ++x) {
-            if (!inside[y * width + x] && map.get(x, y).getType() == "corridor") {
-                map.SetCell(x, y, "grass");
+            if (!inside[y * width + x]) {
+                outside_mask.set(x, y, true);
             }
         }
     }
+    FillBiome(map, outside_mask, surrounding_biome);
     return buildings;
+}
+
+// Replaces the map with a walled market town surrounded by grass.
+// Returns at most the requested number of buildings.
+export inline std::vector<SBuilding> CreateGrowthTown(CMap& map, std::size_t number_of_buildings = 80,
+                                                     std::vector<Position>* town_gates = nullptr)
+{
+    return CreateGrowthTown(map, SSolidBiome{"grass"}, number_of_buildings, town_gates);
 }
 } // namespace RL
