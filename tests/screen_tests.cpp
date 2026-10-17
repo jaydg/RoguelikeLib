@@ -72,6 +72,9 @@ void TestScreen()
     Check(!small.getClip().has_value(), "getClip returns nullopt after resetClip");
     small.PutUnchecked(1, 0, U'Z', 0x123456, true, true);
     Check(small.At(1, 0).glyph == U'Z' && small.At(1, 0).bold && small.At(1, 0).inverse, "PutUnchecked writes cell directly");
+    small.PutUnchecked(std::size_t{2}, U'Q', 0x654321, false, true);
+    Check(small.At(2, 0).glyph == U'Q' && small.getCells()[2].inverse, "flat PutUnchecked writes directly by index");
+    Check(small.getCells().size() == 3, "getCells returns span of screen cells");
 
     screen.Put(1, 0, U'a', 0);
     screen.Resize(RL::Size(12, 3));

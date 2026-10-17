@@ -360,11 +360,29 @@ public:
         return clip;
     }
 
+    // Direct access to the underlying cell buffer
+    [[nodiscard]] std::span<SCell> getCells() noexcept
+    {
+        return cells;
+    }
+
+    [[nodiscard]] std::span<const SCell> getCells() const noexcept
+    {
+        return cells;
+    }
+
+    // Draws a glyph directly by flat cell index without bounds checking.
+    // Caller must ensure index < cells.size().
+    void PutUnchecked(std::size_t index, char32_t glyph, std::uint32_t rgb, bool bold = false, bool inverse = false) noexcept
+    {
+        cells[index] = SCell{glyph < U' ' || glyph == U'\x7F' ? U' ' : glyph, rgb, bold, inverse};
+    }
+
     // Draws a glyph directly without bounds or clip checking.
     // Caller must ensure x < size.x and y < size.y, and respect any clipping.
     void PutUnchecked(std::size_t x, std::size_t y, char32_t glyph, std::uint32_t rgb, bool bold = false, bool inverse = false) noexcept
     {
-        cells[y * size.x + x] = SCell{glyph < U' ' || glyph == U'\x7F' ? U' ' : glyph, rgb, bold, inverse};
+        PutUnchecked(y * size.x + x, glyph, rgb, bold, inverse);
     }
 
     // Draws a glyph; off the screen or outside the clip rectangle it is
