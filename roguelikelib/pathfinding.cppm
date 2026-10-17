@@ -1,6 +1,8 @@
-//////////////////////////////////////////////////////////////////////////
-// Path finding
-//////////////////////////////////////////////////////////////////////////
+/**
+ * @file pathfinding.cppm
+ * @brief High-performance A* pathfinding algorithm on 2D grid maps.
+ */
+
 module;
 
 export module rl.pathfinding;
@@ -14,12 +16,25 @@ import std;
 export namespace RL
 {
 
-// Internal search node for A* priority queue
+/**
+ * @brief Internal priority queue node for the A* search graph.
+ *
+ * Tracks the node coordinate, exact path cost from start (@f$g@f$), and total estimated cost (@f$f = g + h@f$).
+ */
 struct SPathNode {
-    Position pos;
-    int g;
-    int f;
+    Position pos; ///< Grid coordinates of this node.
+    int g;        ///< Exact cost from the starting node to this node.
+    int f;        ///< Estimated total cost from start to destination (@f$f = g + h@f$).
 
+    /**
+     * @brief Comparator for min-heap priority queue ordering.
+     *
+     * Orders nodes primarily by lowest total cost @p f. Ties are broken by favoring
+     * higher @p g cost (nodes closer to the target), which dramatically reduces node expansions.
+     *
+     * @param other Node to compare against.
+     * @return True if this node has higher cost (lower priority) than @p other.
+     */
     bool operator>(const SPathNode& other) const noexcept
     {
         if (f != other.f) {
@@ -29,14 +44,50 @@ struct SPathNode {
     }
 };
 
+/**
+ * @brief Per-cell search state stored in the generational grid cache.
+ *
+ * Uses a search counter ID (@p search_id) to eliminate the overhead of clearing
+ * or reallocating the grid state between successive pathfinding queries.
+ */
 struct SCellState {
-    std::uint32_t search_id = 0;
-    int g = std::numeric_limits<int>::max();
-    Position parent;
+    std::uint32_t search_id = 0;                  ///< ID of the search that last touched this cell.
+    int g = std::numeric_limits<int>::max();      ///< Lowest path cost discovered to reach this cell.
+    Position parent;                              ///< Predecessor cell coordinate for path reconstruction.
 };
 
-// Finds a path from start to end on the level.
-// Returns true and writes the sequential steps (excluding start) to path if reachable.
+/**
+ * @brief Finds the shortest path between two points on a map using the A* algorithm.
+ *
+ * Computes an optimal path on the grid from @p start to @p end. The output @p path
+ * vector is populated with the sequence of intermediate coordinates leading up to and
+ * including @p end (the @p start coordinate itself is excluded).
+ *
+ * Features and performance optimizations:
+ * - **Generational Scratchpad:** Employs a thread-local flat vector with 32-bit search IDs,
+ *   achieving zero heap allocation per search after initial warmup.
+ * - **Chebyshev / Manhattan Heuristics:** Automatically switches between Chebyshev distance
+ *   (@f$\max(|dx|, |dy|)@f$) when diagonal movement is enabled and Manhattan distance
+ *   (@f$|dx| + |dy|@f$) when restricted to 4 cardinal directions.
+ * - **Straight-Line Bias:** Cardinal steps are evaluated before diagonal moves, producing
+ *   visually natural and direct paths.
+ * - **Matching Passability:** Pathfinding traverses tiles sharing the target tile's passability
+ *   (normally passable floor tiles, or impassable tiles if navigating blocked terrain).
+ *
+ * @param level Reference to the grid map containing tile passability.
+ * @param start Starting coordinate.
+ * @param end Target destination coordinate.
+ * @param[out] path Output vector where the resulting sequence of steps is written.
+ *                  Cleared prior to searching. If @p start equals @p end, returns true
+ *                  with @p path left empty.
+ * @param diagonals If true, permits 8-directional movement (cardinal + diagonal);
+ *                  if false, restricts movement to 4 cardinal directions. Defaults to true.
+ * @return True if a valid path exists from @p start to @p end (or if @p start == @p end);
+ *         false if no path exists or either coordinate is outside map bounds.
+ *
+ * @see CMap
+ * @see Position
+ */
 bool FindPath(
     const CMap &level,
     const Position& start,
