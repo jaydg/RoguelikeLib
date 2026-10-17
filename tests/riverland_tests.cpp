@@ -1,9 +1,9 @@
-import rl.mapgenerators.forest;
+import rl.mapgenerators.riverland;
 import rl.mapgenerators.caveandglade;
 import rl.mapgenerators.biomes;
 import rl.mapgenerators.growthtown;
 import rl.mapgenerators.simplecity;
-import rl.mapgenerators.voronoiwilderness;
+import rl.mapgenerators.multiregion;
 import rl.randomness;
 import rltests.check;
 import std;
@@ -165,12 +165,12 @@ void TestBiomes()
         Check(has_forest_trees && has_grass, "CreateCaveAndGlade with TerrainBiome fills walls with forest and glades with grassland");
     }
 
-    // 6. GenerateForest with Bog biome
+    // 6. CreateRiverland with Bog biome
     {
         RL::CMap map(RL::Size(79, 50));
         RL::InitRandomness(42);
-        const auto locations = RL::GenerateForest(map, RL::SBogBiome{}, 4, 6, 1, 4);
-        Check(!locations.empty(), "GenerateForest with SBogBiome succeeds and creates clearings");
+        const auto locations = RL::CreateRiverland(map, RL::SBogBiome{}, 4, 6, 1, 4);
+        Check(!locations.empty(), "CreateRiverland with SBogBiome succeeds and creates clearings");
         bool saw_bog_pool = false, saw_water = false, saw_bridge_or_road = false;
         for (std::size_t y = 0; y < map.getHeight(); ++y) {
             for (std::size_t x = 0; x < map.getWidth(); ++x) {
@@ -180,7 +180,13 @@ void TestBiomes()
                 saw_bridge_or_road |= type == "bridge" || type == "corridor";
             }
         }
-        Check(saw_bog_pool && saw_water && saw_bridge_or_road, "GenerateForest with SBogBiome generates rivers, bridges, and bog terrain");
+        Check(saw_bog_pool && saw_water && saw_bridge_or_road, "CreateRiverland with SBogBiome generates rivers, bridges, and bog terrain");
+
+        // Verify GenerateForest alias produces equivalent locations
+        RL::CMap alias_map(RL::Size(79, 50));
+        RL::InitRandomness(42);
+        const auto alias_locs = RL::GenerateForest(alias_map, RL::SBogBiome{}, 4, 6, 1, 4);
+        Check(alias_locs.size() == locations.size(), "GenerateForest alias returns identical clearing count");
     }
 
     // 7. CreateGrowthTown with SForestBiome surrounding countryside
@@ -221,17 +227,17 @@ void TestBiomes()
         Check(has_walls && has_bog, "CreateSimpleCity with SBogBiome places buildings on a bog terrain");
     }
 
-    // 9. CreateVoronoiWilderness with custom SWildernessConfig
+    // 9. CreateMultiRegion with custom SMultiRegionConfig
     {
         RL::CMap map(RL::Size(100, 60));
         RL::InitRandomness(789);
-        RL::SWildernessConfig config{
+        RL::SMultiRegionConfig config{
             .num_regions = 15,
             .with_buildings = true,
             .forest_biome = RL::SBogBiome{}, // override forest with bog
         };
-        const auto info = RL::CreateVoronoiWilderness(map, config);
-        Check(info.regions == 15, "CreateVoronoiWilderness with SWildernessConfig creates requested regions");
+        const auto info = RL::CreateMultiRegion(map, config);
+        Check(info.regions == 15, "CreateMultiRegion with SMultiRegionConfig creates requested regions");
         bool has_bog = false;
         for (std::size_t y = 0; y < map.getHeight(); ++y) {
             for (std::size_t x = 0; x < map.getWidth(); ++x) {
@@ -239,7 +245,13 @@ void TestBiomes()
                 has_bog |= type == "bog_pool" || type == "bog_reeds" || type == "bog_ground";
             }
         }
-        Check(has_bog, "CreateVoronoiWilderness with overridden forest_biome places bog terrain");
+        Check(has_bog, "CreateMultiRegion with overridden forest_biome places bog terrain");
+
+        // Verify CreateVoronoiWilderness alias
+        RL::CMap alias_map(RL::Size(100, 60));
+        RL::InitRandomness(789);
+        const auto alias_info = RL::CreateVoronoiWilderness(alias_map, config);
+        Check(alias_info.regions == 15, "CreateVoronoiWilderness alias returns identical region count");
     }
 }
 

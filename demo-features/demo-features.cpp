@@ -68,9 +68,9 @@ std::vector<SGenerator> Generators()
             }
         },
         {
-            "Forest", [](CMap & map)
+            "Riverland", [](CMap & map)
             {
-                GenerateForest(map);
+                CreateRiverland(map);
             }
         },
         {
@@ -98,10 +98,10 @@ std::vector<SGenerator> Generators()
             }
         },
         {
-            "Voronoi Wilderness", [voronoi_buildings](CMap & map)
+            "Multi-Region Wilderness", [voronoi_buildings](CMap & map)
             {
                 *voronoi_buildings = Random(2) != 0;
-                CreateVoronoiWilderness(map, 0, *voronoi_buildings);
+                CreateMultiRegion(map, 0, *voronoi_buildings);
             },
             [voronoi_buildings]()
             {
@@ -117,7 +117,7 @@ std::vector<SGenerator> Generators()
         {
             "Town in Wilderness", [](CMap & map)
             {
-                GenerateForest(map);
+                CreateRiverland(map);
                 CMap town(Size(map.getWidth() * 2 / 3, map.getHeight() * 2 / 3));
                 std::vector<Position> gates;
                 CreateGrowthTown(town, 80, &gates);

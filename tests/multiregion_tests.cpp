@@ -1,4 +1,4 @@
-import rl.mapgenerators.voronoiwilderness;
+import rl.mapgenerators.multiregion;
 import rl.randomness;
 import rltests.check;
 import std;
@@ -7,7 +7,7 @@ using RL::tests::Check;
 
 namespace
 {
-void CheckBuildings(const RL::CMap& map, const RL::SWildernessInfo& info)
+void CheckBuildings(const RL::CMap& map, const RL::SMultiRegionInfo& info)
 {
     bool bounded = true, faithful = true, clearance = true;
     std::vector<bool> occupied(map.getWidth() * map.getHeight());
