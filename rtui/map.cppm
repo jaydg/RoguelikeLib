@@ -123,37 +123,41 @@ void DrawMap(CScreen& screen, Size map, const SRect& area, Position origin, Cell
 // untouched; the caller can clear the screen or draw a background first.
 void DrawMap(CScreen& screen, const CMap& map, const SRect& area, Position origin = Position(0, 0))
 {
-    const Size size = screen.getSize();
     const Size map_size = map.getSize();
-
-    if (origin.x >= map_size.x || origin.y >= map_size.y || area.corner.x >= size.x || area.corner.y >= size.y) {
+    if (origin.x >= map_size.x || origin.y >= map_size.y) {
         return;
     }
 
-    const std::size_t width = std::min({area.size.x, map_size.x - origin.x, size.x - area.corner.x});
-    const std::size_t height = std::min({area.size.y, map_size.y - origin.y, size.y - area.corner.y});
+    const Size size = screen.getSize();
+    SRect visible{area.corner, Size(std::min(area.size.x, map_size.x - origin.x), std::min(area.size.y, map_size.y - origin.y))};
 
-    const auto& clip = screen.getClip();
-    if (!clip) {
-        for (std::size_t y = 0; y < height; ++y) {
-            const std::size_t screen_y = area.corner.y + y;
-            const std::size_t map_y = origin.y + y;
-            for (std::size_t x = 0; x < width; ++x) {
-                const auto& tile = map(origin.x + x, map_y);
-                screen.PutUnchecked(area.corner.x + x, screen_y, tile.getGlyph(), tile.getColor());
-            }
+    visible = visible.Intersection(SRect{Position(0, 0), size});
+    if (visible.Empty()) {
+        return;
+    }
+
+    if (const auto& clip = screen.getClip()) {
+        visible = visible.Intersection(*clip);
+        if (visible.Empty()) {
+            return;
         }
-    } else {
-        for (std::size_t y = 0; y < height; ++y) {
-            const std::size_t screen_y = area.corner.y + y;
-            const std::size_t map_y = origin.y + y;
-            for (std::size_t x = 0; x < width; ++x) {
-                const std::size_t screen_x = area.corner.x + x;
-                if (clip->Contains(screen_x, screen_y)) {
-                    const auto& tile = map(origin.x + x, map_y);
-                    screen.PutUnchecked(screen_x, screen_y, tile.getGlyph(), tile.getColor());
-                }
-            }
+    }
+
+    const Position effective_origin(origin.x + (visible.corner.x - area.corner.x),
+                                    origin.y + (visible.corner.y - area.corner.y));
+
+    const auto tiles = map.data_span();
+    const std::size_t map_height = map_size.y;
+
+    for (std::size_t y = 0; y < visible.size.y; ++y) {
+        const std::size_t screen_y = visible.corner.y + y;
+        const std::size_t screen_row = screen_y * size.x + visible.corner.x;
+        std::size_t map_idx = effective_origin.x * map_height + (effective_origin.y + y);
+
+        for (std::size_t x = 0; x < visible.size.x; ++x) {
+            const auto& tile = tiles[map_idx];
+            screen.PutUnchecked(screen_row + x, tile.getGlyph(), tile.getColor());
+            map_idx += map_height;
         }
     }
 }

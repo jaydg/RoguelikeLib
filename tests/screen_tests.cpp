@@ -238,4 +238,17 @@ void TestCamera()
     Check(asked_partial == 4, "DrawMap only queries visible cells in clip intersection");
     Check(partial_clip_screen.At(2, 2).glyph == U'P' && partial_clip_screen.At(3, 3).glyph == U'P' &&
           partial_clip_screen.At(1, 1).glyph == U' ', "partial clip draws exactly in intersection");
+
+    // Tile map drawing with origin offset and linear stride
+    const RL::CMap map4x4 = RL::tests::MakeMap({".:T^", "&~:T", "^.:~", "~^&."});
+    RL::CScreen stride_screen(RL::Size(6, 6));
+    RL::DrawMap(stride_screen, map4x4, RL::SRect{RL::Position(1, 1), RL::Size(3, 3)}, RL::Position(1, 1));
+    Check(stride_screen.At(1, 1).glyph == U'~' && stride_screen.At(2, 1).glyph == U'.' && stride_screen.At(3, 1).glyph == U'T',
+          "stride DrawMap correctly blits first row with origin offset");
+    Check(stride_screen.At(1, 2).glyph == U'"' && stride_screen.At(2, 2).glyph == U'.' && stride_screen.At(3, 2).glyph == U'~',
+          "stride DrawMap correctly blits second row with origin offset");
+    Check(stride_screen.At(1, 3).glyph == U'^' && stride_screen.At(2, 3).glyph == U'&' && stride_screen.At(3, 3).glyph == U'"',
+          "stride DrawMap correctly blits third row with origin offset");
+    Check(stride_screen.At(0, 0).glyph == U' ' && stride_screen.At(4, 4).glyph == U' ',
+          "unpainted cells outside viewport remain untouched");
 }
