@@ -4,6 +4,7 @@ export module rl.mapgenerators.forest;
 
 export import rl.connectivity;
 export import rl.locations;
+export import rl.mapgenerators.biomes;
 import rl.map;
 import rl.maputils;
 import rl.matrix;
@@ -364,29 +365,17 @@ constexpr std::array<SOpening, 3> ForestOpenings = {{
 
 std::vector<SLocation> GenerateForest(
     CMap& map,
-    float tree_density = 0.7f,
-    float rock_density = 0.05f,
+    const TerrainBiome& biome,
     std::size_t num_clearings = 5,
     std::size_t num_paths = 8,
     std::size_t num_rivers = 1,
-    std::size_t num_streams = 8,
-    float vegetation_density = 0.6f
+    std::size_t num_streams = 8
 )
 {
     // 1. Fill map with grass
     map.Clear("grass");
 
-    // 2. Generate dense vegetation (forest base layer)
-    for (std::size_t y = 0; y < map.getHeight(); ++y) {
-        for (std::size_t x = 0; x < map.getWidth(); ++x) {
-            if (RandomFloat() < vegetation_density) {
-                map.SetCell(x, y, RandomFloat() < tree_density ? "tree" : "plant");
-            }
-        }
-    }
-
-    // 3. Generate rivers and streams (cut through vegetation)
-    // This way they won't be blocked and will carve through the forest
+    // 2. Generate rivers and streams (cut through vegetation)
     std::vector<Position> all_river_positions;
 
     for (std::size_t i = 0; i < num_rivers; ++i) {
@@ -805,14 +794,25 @@ std::vector<SLocation> GenerateForest(
         }
     }
 
-    // 6. Place rocks (after rivers, streams, clearings, and paths)
-    GenerateRocks(map, rock_density);
-    // Scattered rocks must not close the unpaved access to an entrance.
-    for (std::size_t y = 0; y < map.getHeight(); ++y) {
-        for (std::size_t x = 0; x < map.getWidth(); ++x) {
-            if (clearing_access.get(x, y) && map.get(x, y).getType() == "rock") map.SetCell(x, y, "grass");
+    // 6. Fill the wilderness background outside clearings, access ways, rivers and roads
+    CMatrix<bool> clearing_mask(map.getSize(), false);
+    for (const auto& pos : all_clearing_tiles) {
+        if (map.inside(pos)) {
+            clearing_mask.set(pos.x, pos.y, true);
         }
     }
+
+    CMatrix<bool> mask(map.getSize(), false);
+    for (std::size_t y = 0; y < map.getHeight(); ++y) {
+        for (std::size_t x = 0; x < map.getWidth(); ++x) {
+            const auto type = map.get(x, y).getType();
+            if (type == "grass" && !clearing_mask.get(x, y) && !clearing_access.get(x, y)) {
+                mask.set(x, y, true);
+            }
+        }
+    }
+
+    FillBiome(map, mask, biome);
 
     std::vector<SLocation> clearings;
     clearings.reserve(clearing_centers.size());
@@ -822,6 +822,32 @@ std::vector<SLocation> GenerateForest(
     }
 
     return clearings;
+}
+
+std::vector<SLocation> GenerateForest(
+    CMap& map,
+    float tree_density = 0.7f,
+    float rock_density = 0.05f,
+    std::size_t num_clearings = 5,
+    std::size_t num_paths = 8,
+    std::size_t num_rivers = 1,
+    std::size_t num_streams = 8,
+    float vegetation_density = 0.6f
+)
+{
+    return GenerateForest(
+        map,
+        SForestBiome{
+            .tree_density = tree_density,
+            .rock_density = rock_density,
+            .vegetation_density = vegetation_density,
+            .patchiness = 0.0f
+        },
+        num_clearings,
+        num_paths,
+        num_rivers,
+        num_streams
+    );
 }
 
 } // namespace RL

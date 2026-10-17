@@ -26,6 +26,7 @@ export module rl.mapgenerators.voronoiwilderness;
 export import rl.connectivity;
 export import rl.locations;
 export import rl.map;
+export import rl.mapgenerators.biomes;
 import rl.matrix;
 import rl.maputils;
 import rl.position;
@@ -124,79 +125,7 @@ struct Region {
 // that a type registered under the same name earlier is kept as it is.
 void RegisterWildernessTiles()
 {
-    const auto add = [](const std::string_view name, const STileData & data) {
-        if (!CTileData::has(name)) {
-            CTileData::RegisterTile(name, data);
-        }
-    };
-
-    add("field", {U',', 0xD9C463, true, true});     // farmland
-    add("bog_ground", {U'.', 0x6C7156, true, true});
-    add("bog_reeds", {U'&', 0x6C7C59, false, true});
-    add("bog_pool", {U'~', 0x356B70, true, true});
-    add("hedge", {U'#', 0x2E7D32, false, false});   // what walls a field in
-    add("slope", {CTileData::get("grass").second.glyph, 0xA7CC7C, true, true}); // elevation-tinted grass
-    add("scrub", {U'&', 0x84945A, false, true});   // low hillside bushes
-    add("heather", {U'*', 0xB889B4, true, true}); // sparse flowering ground cover
-    add("animal_trail", {U'.', 0x929B70, true, true}); // faint worn ground
-    add("fallen_log", {U'=', 0x8B6B43, true, true}); // low enough to step over
-    add("fallen_log_vertical", {U'|', 0x8B6B43, true, true});
-    add("mountain_rock", {U'^', 0x888888, false, false}); // impassable mountain rock
-    add("peak", {U'*', 0xF5F5F5, false, false});    // snow-capped summit
-    add("chasm", {U'·', 0x28242E, true, false});   // subdued depths
-    add("chasm_rim", {U'#', 0x8E7862, true, false}); // broken cliff edge
-    add("chasm_wall", {U':', 0x625047, true, false}); // descending rock face
-}
-
-// Deterministic per-cell hash noise in [0, 1). The cheap value-noise base
-// that everything fractal below is grown from.
-double HashNoise(const int x, const int y, const std::uint64_t seed)
-{
-    std::uint64_t hash = seed;
-    hash ^= static_cast<std::uint64_t>(x) * 0x9E3779B97F4A7C15ULL;
-    hash = std::rotl(hash, 31);
-    hash ^= static_cast<std::uint64_t>(y) * 0xC2B2AE3D27D4EB4FULL;
-    hash *= 0xFF51AFD7ED558CCDULL;
-    hash = std::rotl(hash, 29);
-
-    return static_cast<double>(hash >> 11) * (1.0 / 9007199254740992.0);
-}
-
-// Smooth 2D value noise in [0, 1)
-double SmoothNoise(const double x, const double y, const std::uint64_t seed)
-{
-    const int x0 = static_cast<int>(std::floor(x));
-    const int y0 = static_cast<int>(std::floor(y));
-    const double fx = x - x0;
-    const double fy = y - y0;
-    const double sx = fx * fx * (3.0 - 2.0 * fx);
-    const double sy = fy * fy * (3.0 - 2.0 * fy);
-    const double n00 = HashNoise(x0, y0, seed);
-    const double n10 = HashNoise(x0 + 1, y0, seed);
-    const double n01 = HashNoise(x0, y0 + 1, seed);
-    const double n11 = HashNoise(x0 + 1, y0 + 1, seed);
-    const double nx0 = n00 + (n10 - n00) * sx;
-    const double nx1 = n01 + (n11 - n01) * sx;
-
-    return nx0 + (nx1 - nx0) * sy;
-}
-
-// Fractal Brownian motion over the value noise, in [0, 1]
-double Fbm(double x, double y, const std::uint64_t seed, const int octaves = 4)
-{
-    double sum = 0.0;
-    double amplitude = 0.5;
-    double total = 0.0;
-
-    for (int octave = 0; octave < octaves; ++octave) {
-        sum += amplitude * SmoothNoise(x, y, seed + static_cast<std::uint64_t>(octave) * 1013);
-        total += amplitude;
-        x *= 2.0;
-        y *= 2.0;
-        amplitude *= 0.5;
-    }
-
-    return sum / total;
+    RegisterBiomeTiles();
 }
 
 struct Tri {

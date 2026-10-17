@@ -24,7 +24,9 @@ module;
 
 export module rl.mapgenerators.caveandglade;
 
+export import rl.mapgenerators.biomes;
 import rl.map;
+import rl.matrix;
 import rl.position;
 import rl.randomness;
 import std;
@@ -1049,6 +1051,35 @@ export {
         if (!FullyConnected(level)) {
             ConnectRegions(level, floor);
         }
+    }
+
+    void CreateCaveAndGlade(CMap & level,
+                            const TerrainBiome & wall_biome,
+                            const TerrainBiome & floor_biome = SGrasslandBiome{},
+                            const SCaveAndGladeShape & shape = SCaveAndGladeShape(),
+                            const SCaveAndGladeWater & water = SCaveAndGladeWater())
+    {
+        constexpr std::string_view sentinel_wall = "wall";
+        constexpr std::string_view sentinel_floor = "room";
+
+        CreateCaveAndGlade(level, sentinel_wall, sentinel_floor, shape, water);
+
+        CMatrix<bool> wall_mask(level.getSize(), false);
+        CMatrix<bool> floor_mask(level.getSize(), false);
+
+        for (std::size_t y = 0; y < level.getHeight(); ++y) {
+            for (std::size_t x = 0; x < level.getWidth(); ++x) {
+                const auto type = level.get(x, y).getType();
+                if (type == sentinel_wall) {
+                    wall_mask.set(x, y, true);
+                } else if (type == sentinel_floor) {
+                    floor_mask.set(x, y, true);
+                }
+            }
+        }
+
+        FillBiome(level, wall_mask, wall_biome);
+        FillBiome(level, floor_mask, floor_biome);
     }
 
 } // end of export

@@ -36,6 +36,7 @@ void TestPathfinding();
 void TestDistance();
 void TestMatrix();
 void TestRandomness();
+void TestBiomes();
 
 int main(int argc, char* argv[])
 {
@@ -73,7 +74,8 @@ int main(int argc, char* argv[])
         {"Pathfinding", TestPathfinding},
         {"Distance", TestDistance},
         {"Matrix", TestMatrix},
-        {"Randomness", TestRandomness}
+        {"Randomness", TestRandomness},
+        {"Biomes", TestBiomes}
     };
     const std::vector<std::string_view> named(argv + 1, argv + argc);
 
