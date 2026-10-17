@@ -33,12 +33,12 @@ struct SStepCost {
 class CDistanceMap
 {
 private:
-    CMatrix<int> distance;
+    struct SCell {
+        int distance = unreachable;
+        int step_cost = 0;
+    };
 
-    // What walking onto each tile costs, for those the measuring reached;
-    // 0 where it cannot be done, or was not measured
-    CMatrix<int> step_cost;
-
+    CMatrix<SCell> grid;
     Neighbors neighbors;
 
     // Straight steps before diagonal ones, so that of two ways as good the
@@ -53,20 +53,6 @@ private:
         return neighbors == Neighbors::All8 ? std::span(all8) : std::span(all8).first(4);
     }
 
-    // The neighbours of a position that lie on the map
-    template <typename Visit>
-    void ForNeighbors(const Position& at, Visit&& visit) const
-    {
-        for (const auto& [dx, dy] : Steps(neighbors)) {
-            const auto x = static_cast<std::int64_t>(at.x) + dx;
-            const auto y = static_cast<std::int64_t>(at.y) + dy;
-
-            if (x >= 0 && y >= 0 && distance.inside(static_cast<std::size_t>(x), static_cast<std::size_t>(y))) {
-                visit(Position(static_cast<std::size_t>(x), static_cast<std::size_t>(y)));
-            }
-        }
-    }
-
 public:
     static constexpr int unreachable = std::numeric_limits<int>::max();
 
@@ -79,7 +65,7 @@ public:
     // whole map.
     CDistanceMap(const CMap& map, std::span<const Position> goals, std::span<const SStepCost> costs = {},
                  Neighbors a_neighbors = Neighbors::All8, int max_distance = unreachable)
-        : distance(map.getSize(), unreachable), step_cost(map.getSize(), 0), neighbors(a_neighbors)
+        : grid(map.getSize(), SCell{unreachable, 0}), neighbors(a_neighbors)
     {
         for (const SStepCost& cost : costs) {
             if (cost.cost < 1) {
@@ -87,51 +73,125 @@ public:
             }
         }
 
-        // What walking onto a tile that can be stood on costs
-        const auto cost_of = [&costs](const CTile & tile) {
-            for (const SStepCost& listed : costs) {
-                if (tile.getType() == listed.type) {
-                    return listed.cost;
-                }
-            }
+        const std::size_t width = map.getWidth();
+        const std::size_t height = map.getHeight();
 
-            return 1;
-        };
-
-        // From the goals outwards: a tile is as far as the cheapest
-        // neighbour, plus what walking onto that neighbour costs
-        using SQueued = std::pair<int, Position>;
-        const auto later = [](const SQueued & a, const SQueued & b) {
-            return a.first > b.first;
-        };
-        std::priority_queue<SQueued, std::vector<SQueued>, decltype(later)> queue(later);
-
-        for (const Position& goal : goals) {
-            if (map.inside(goal)) {
-                distance.set(goal, 0);
-                step_cost.set(goal, map.get(goal).isPassable() ? cost_of(map.get(goal)) : 1);
-                queue.emplace(0, goal);
-            }
+        if (width == 0 || height == 0) {
+            return;
         }
 
-        while (!queue.empty()) {
-            const auto[so_far, at] = queue.top();
-            queue.pop();
+        const auto steps = Steps(neighbors);
 
-            if (so_far > distance.get(at)) {
-                continue;
+        // Fast-path check: are all edge costs uniform (cost = 1)?
+        const bool has_variable_costs = !costs.empty() && std::ranges::any_of(costs, [](const auto& c) { return c.cost > 1; });
+
+        if (!has_variable_costs) {
+            // UNIFORM BFS FAST-PATH (weights are all 1)
+            std::vector<Position> queue;
+            queue.reserve(std::min(width * height, std::size_t(4096)));
+
+            for (const Position& goal : goals) {
+                if (map.inside(goal)) {
+                    grid.get_unchecked(goal.x, goal.y) = {0, 1};
+                    queue.push_back(goal);
+                }
             }
 
-            const int onto = step_cost.get(at);
+            std::size_t head = 0;
+            while (head < queue.size()) {
+                const Position at = queue[head++];
+                const int next_dist = grid.get_unchecked(at.x, at.y).distance + 1;
 
-            // Only tiles that can be stood on lead anywhere
-            ForNeighbors(at, [&](const Position & from) {
-                if (map.get(from).isPassable() && so_far + onto < distance.get(from) && so_far + onto <= max_distance) {
-                    distance.set(from, so_far + onto);
-                    step_cost.set(from, cost_of(map.get(from)));
-                    queue.emplace(so_far + onto, from);
+                if (next_dist > max_distance) {
+                    break;
                 }
-            });
+
+                const int ix = static_cast<int>(at.x);
+                const int iy = static_cast<int>(at.y);
+
+                for (const auto& [dx, dy] : steps) {
+                    const int nx = ix + dx;
+                    const int ny = iy + dy;
+
+                    if (nx >= 0 && ny >= 0 && nx < static_cast<int>(width) && ny < static_cast<int>(height)) {
+                        const std::size_t unx = static_cast<std::size_t>(nx);
+                        const std::size_t uny = static_cast<std::size_t>(ny);
+                        auto& cell = grid.get_unchecked(unx, uny);
+
+                        if (cell.distance == unreachable && map.get_unchecked(unx, uny).isPassable()) {
+                            cell.distance = next_dist;
+                            cell.step_cost = 1;
+                            queue.push_back(Position(unx, uny));
+                        }
+                    }
+                }
+            }
+        } else {
+            // DIJKSTRA FOR VARIABLE COSTS
+            const auto cost_of = [&costs](const CTile& tile) {
+                for (const auto& listed : costs) {
+                    if (tile.getType() == listed.type) {
+                        return listed.cost;
+                    }
+                }
+                return 1;
+            };
+
+            struct SQueued {
+                int dist;
+                Position pos;
+                bool operator>(const SQueued& other) const noexcept { return dist > other.dist; }
+            };
+            std::priority_queue<SQueued, std::vector<SQueued>, std::greater<SQueued>> queue;
+
+            for (const Position& goal : goals) {
+                if (map.inside(goal)) {
+                    const auto& tile = map.get_unchecked(goal.x, goal.y);
+                    const int step = tile.isPassable() ? cost_of(tile) : 1;
+                    grid.get_unchecked(goal.x, goal.y) = {0, step};
+                    queue.push({0, goal});
+                }
+            }
+
+            while (!queue.empty()) {
+                const auto [so_far, at] = queue.top();
+                queue.pop();
+
+                auto& at_cell = grid.get_unchecked(at.x, at.y);
+                if (so_far > at_cell.distance) {
+                    continue;
+                }
+
+                const int onto = at_cell.step_cost;
+                const int new_dist = so_far + onto;
+
+                if (new_dist > max_distance) {
+                    continue;
+                }
+
+                const int ix = static_cast<int>(at.x);
+                const int iy = static_cast<int>(at.y);
+
+                for (const auto& [dx, dy] : steps) {
+                    const int nx = ix + dx;
+                    const int ny = iy + dy;
+
+                    if (nx >= 0 && ny >= 0 && nx < static_cast<int>(width) && ny < static_cast<int>(height)) {
+                        const std::size_t unx = static_cast<std::size_t>(nx);
+                        const std::size_t uny = static_cast<std::size_t>(ny);
+                        const auto& from_tile = map.get_unchecked(unx, uny);
+
+                        if (from_tile.isPassable()) {
+                            auto& from_cell = grid.get_unchecked(unx, uny);
+                            if (new_dist < from_cell.distance) {
+                                from_cell.distance = new_dist;
+                                from_cell.step_cost = cost_of(from_tile);
+                                queue.push({new_dist, Position(unx, uny)});
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -139,7 +199,7 @@ public:
     // `unreachable` if there is none
     [[nodiscard]] int Distance(const Position& pos) const
     {
-        return distance.inside(pos) ? distance.get(pos) : unreachable;
+        return grid.inside(pos) ? grid.get_unchecked(pos.x, pos.y).distance : unreachable;
     }
 
     [[nodiscard]] bool Reachable(const Position& pos) const
@@ -161,15 +221,25 @@ public:
         std::optional<Position> best;
         int best_cost = unreachable;
 
-        ForNeighbors(from, [&](const Position & next) {
-            const int there = distance.get(next);
-            const int onto = step_cost.get(next);
+        const auto steps = Steps(neighbors);
+        const int ix = static_cast<int>(from.x);
+        const int iy = static_cast<int>(from.y);
+        const int width = static_cast<int>(grid.getWidth());
+        const int height = static_cast<int>(grid.getHeight());
 
-            if (there != unreachable && onto > 0 && there + onto < best_cost) {
-                best = next;
-                best_cost = there + onto;
+        for (const auto& [dx, dy] : steps) {
+            const int nx = ix + dx;
+            const int ny = iy + dy;
+
+            if (nx >= 0 && ny >= 0 && nx < width && ny < height) {
+                const auto& cell = grid.get_unchecked(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny));
+
+                if (cell.distance != unreachable && cell.step_cost > 0 && cell.distance + cell.step_cost < best_cost) {
+                    best = Position(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny));
+                    best_cost = cell.distance + cell.step_cost;
+                }
             }
-        });
+        }
 
         return best;
     }
