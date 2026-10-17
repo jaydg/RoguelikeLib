@@ -30,15 +30,42 @@ export namespace RL
     return Position(axis(map.x, view.x, focus.x), axis(map.y, view.y, focus.y));
 }
 
+// Converts a map position (pos_x, pos_y) to a screen position, or nothing
+// outside the view. Origin is the map position at the area's top left corner.
+[[nodiscard]] constexpr std::optional<Position> OnScreen(const SRect& area, Position origin, std::size_t pos_x, std::size_t pos_y) noexcept
+{
+    if (pos_x < origin.x || pos_y < origin.y || pos_x - origin.x >= area.size.x || pos_y - origin.y >= area.size.y) {
+        return std::nullopt;
+    }
+
+    return Position(area.corner.x + (pos_x - origin.x), area.corner.y + (pos_y - origin.y));
+}
+
 // Converts a map position to a screen position, or nothing outside the
 // view. Origin is the map position at the area's top left corner.
 [[nodiscard]] constexpr std::optional<Position> OnScreen(const SRect& area, Position origin, Position pos) noexcept
 {
-    if (pos.x < origin.x || pos.y < origin.y || pos.x - origin.x >= area.size.x || pos.y - origin.y >= area.size.y) {
+    return OnScreen(area, origin, pos.x, pos.y);
+}
+
+// Converts a screen position (screen_x, screen_y) to a map position, or nothing
+// if the screen position falls outside area. Origin is the map position at the
+// area's top left corner.
+[[nodiscard]] constexpr std::optional<Position> ToMap(const SRect& area, Position origin, std::size_t screen_x, std::size_t screen_y) noexcept
+{
+    if (!area.Contains(screen_x, screen_y)) {
         return std::nullopt;
     }
 
-    return Position(area.corner.x + (pos.x - origin.x), area.corner.y + (pos.y - origin.y));
+    return Position(origin.x + (screen_x - area.corner.x), origin.y + (screen_y - area.corner.y));
+}
+
+// Converts a screen position to a map position, or nothing if the screen
+// position falls outside area. Origin is the map position at the area's
+// top left corner.
+[[nodiscard]] constexpr std::optional<Position> ToMap(const SRect& area, Position origin, Position screen_pos) noexcept
+{
+    return ToMap(area, origin, screen_pos.x, screen_pos.y);
 }
 
 // Draws a map of a size from origin into area, each position as `cell`

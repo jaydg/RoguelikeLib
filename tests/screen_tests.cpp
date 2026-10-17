@@ -140,6 +140,30 @@ void TestCamera()
     Check(RL::OnScreen(area, RL::Position(10, 10), RL::Position(12, 11)) == RL::Position(4, 2) &&
           !RL::OnScreen(area, RL::Position(10, 10), RL::Position(15, 11)), "a map position is on screen where the view shows it");
 
+    // Scalar OnScreen tests
+    static_assert(noexcept(RL::OnScreen(area, RL::Position(10, 10), 12, 11)));
+    static_assert(RL::OnScreen(RL::SRect{RL::Position(2, 1), RL::Size(5, 3)},
+                               RL::Position(10, 10), 12, 11) == RL::Position(4, 2));
+
+    // ToMap tests (constexpr and runtime inverse mapping)
+    static_assert(noexcept(RL::ToMap(area, RL::Position(10, 10), RL::Position(4, 2))));
+    static_assert(noexcept(RL::ToMap(area, RL::Position(10, 10), 4, 2)));
+    static_assert(RL::ToMap(RL::SRect{RL::Position(2, 1), RL::Size(5, 3)},
+                            RL::Position(10, 10), RL::Position(4, 2)) == RL::Position(12, 11));
+    static_assert(RL::ToMap(RL::SRect{RL::Position(2, 1), RL::Size(5, 3)},
+                            RL::Position(10, 10), 4, 2) == RL::Position(12, 11));
+    static_assert(!RL::ToMap(RL::SRect{RL::Position(2, 1), RL::Size(5, 3)},
+                             RL::Position(10, 10), 1, 1).has_value());
+    static_assert(!RL::ToMap(RL::SRect{RL::Position(2, 1), RL::Size(5, 3)},
+                             RL::Position(10, 10), 7, 1).has_value());
+
+    Check(RL::OnScreen(area, RL::Position(10, 10), 12, 11) == RL::Position(4, 2),
+          "scalar OnScreen matches Position overload");
+    Check(RL::ToMap(area, RL::Position(10, 10), RL::Position(4, 2)) == RL::Position(12, 11) &&
+          RL::ToMap(area, RL::Position(10, 10), 4, 2) == RL::Position(12, 11) &&
+          !RL::ToMap(area, RL::Position(10, 10), 0, 0),
+          "ToMap translates screen position back to map position within area");
+
     // Drawn cell by cell as the caller says, the camera and the edges kept
     // by the library: only what is on the map, in the area and on the
     // screen is asked about, and nothing leaves the screen as it is
