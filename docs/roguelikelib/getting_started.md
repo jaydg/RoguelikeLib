@@ -2,10 +2,9 @@
 
 **RoguelikeLib** is a lightweight, portable C++20 library providing core algorithms and data structures for roguelike games and simulations.
 
-> [!NOTE]
-> RoguelikeLib contains **zero UI or terminal dependencies**. It operates purely on data structures such as `RL::CMap`, `RL::Position`, `RL::Size`, and algorithms for map generation, pathfinding, field of view, scheduling, and randomness.
+@note RoguelikeLib contains **zero UI or terminal dependencies**. It operates purely on data structures such as `RL::CMap`, `RL::Position`, `RL::Size`, and algorithms for map generation, pathfinding, field of view, scheduling, and randomness.
 
----
+<hr/>
 
 ## Target Integration with Xmake
 

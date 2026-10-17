@@ -28,7 +28,9 @@ jobs:
       - name: Install Doxygen and Graphviz
         run: |
           sudo apt-get update
-          sudo apt-get install -y doxygen graphviz
+          sudo apt-get install -y graphviz
+          curl -fsSL https://github.com/doxygen/doxygen/releases/download/Release_1_16_1/doxygen-1.16.1.linux.bin.tar.gz | sudo tar --strip-components=1 -xz -C /usr/local
+          doxygen --version
 
       - name: Generate documentation
         run: |

@@ -37,10 +37,9 @@ const std::array<std::string_view, 1> skip{"grass"};
 wilderness.Stamp(town, RL::Position(210, 120), skip);
 ```
 
-> [!TIP]
-> Callers should translate any returned `RL::SBuilding` positions by the `origin` offset when storing global building metadata.
+@note Callers should translate any returned `RL::SBuilding` positions by the `origin` offset when storing global building metadata.
 
----
+<hr/>
 
 ## Connecting Stamped Towns with Roads
 

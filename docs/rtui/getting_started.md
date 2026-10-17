@@ -2,10 +2,9 @@
 
 **RTUI (Roguelike Terminal UI)** is a standalone C++20 terminal user interface toolkit designed for roguelikes, games, and rich interactive console tools.
 
-> [!NOTE]
-> RTUI is an independent library located in the `rtui/` directory. It uses POSIX terminal APIs for raw input, mouse reporting, alternate screen buffers, and provides diff-based screen compositing, a docking window manager, and widgets.
+@note RTUI is an independent library located in the `rtui/` directory. It uses POSIX terminal APIs for raw input, mouse reporting, alternate screen buffers, and provides diff-based screen compositing, a docking window manager, and widgets.
 
----
+<hr/>
 
 ## Target Integration with Xmake
 

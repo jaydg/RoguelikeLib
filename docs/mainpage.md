@@ -2,14 +2,13 @@
 
 Welcome to the documentation for **RoguelikeLib** and **RTUI**.
 
-> [!IMPORTANT]
-> **Two Independent Libraries Under One Roof**
-> 
-> This repository provides two decoupled C++20 libraries:
-> 1. **RoguelikeLib Core (`roguelikelib`)**: An algorithmic roguelike toolkit covering procedural map generation, field-of-view, pathfinding, distance transforms, scheduling, randomness, and name generation. **It has zero terminal or graphical UI dependencies** and can be integrated into any game engine, console tool, or graphical framework.
-> 2. **Roguelike Terminal UI (`rtui`)**: A standalone terminal UI and windowing library providing raw POSIX terminal abstraction, differential screen compositing, a docking window manager with tab groups, scrollbar dragging, interactive widgets, and map viewport rendering.
+@attention **Two Independent Libraries Under One Roof**
+<br>
+This repository provides two decoupled C++20 libraries:
+1. **RoguelikeLib Core (`roguelikelib`)**: An algorithmic roguelike toolkit covering procedural map generation, field-of-view, pathfinding, distance transforms, scheduling, randomness, and name generation. **It has zero terminal or graphical UI dependencies** and can be integrated into any game engine, console tool, or graphical framework.
+2. **Roguelike Terminal UI (`rtui`)**: A standalone terminal UI and windowing library providing raw POSIX terminal abstraction, differential screen compositing, a docking window manager with tab groups, scrollbar dragging, interactive widgets, and map viewport rendering.
 
----
+<hr/>
 
 ## Documentation Sections
 
