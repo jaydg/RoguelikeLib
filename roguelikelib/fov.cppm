@@ -1,5 +1,10 @@
-// Adam Milazzo's Field Of Vision
-// (http://www.adammil.net/blog/v125_Roguelike_Vision_Algorithms.html)
+/**
+ * @file fov.cppm
+ * @brief Field of view (FOV) calculation using Adam Milazzo's recursive shadowcasting.
+ *
+ * Implements the recursive shadowcasting algorithm described by Adam Milazzo in
+ * <a href="http://www.adammil.net/blog/v125_Roguelike_Vision_Algorithms.html">Roguelike Vision Algorithms</a>.
+ */
 
 module;
 
@@ -14,44 +19,105 @@ import std;
 export namespace RL
 {
 
-// Whether light passes through a cell
+/**
+ * @brief Predicate callback determining whether light passes through coordinates `(x, y)`.
+ *
+ * Used by @ref CFOV when evaluating visibility without a direct @ref CMap instance.
+ *
+ * @param x Horizontal column coordinate.
+ * @param y Vertical row coordinate.
+ * @return True if the cell at `(x, y)` is transparent (lets light pass through).
+ */
 using Transparency = std::function<bool(std::size_t x, std::size_t y)>;
 
+/**
+ * @brief 2D boolean visibility matrix computed via Adam Milazzo's recursive shadowcasting.
+ *
+ * Inherits from @ref CMatrix<bool>, where each cell represents whether a tile is currently
+ * visible (`true`) or obscured in darkness/shadow (`false`).
+ *
+ * Based on the algorithm by Adam Milazzo
+ * (<a href="http://www.adammil.net/blog/v125_Roguelike_Vision_Algorithms.html">Roguelike Vision Algorithms</a>).
+ *
+ * Key characteristics:
+ * - **Symmetric Line-of-Sight:** Guarantees reciprocal visibility between clear tiles (if A sees B, B sees A).
+ * - **Sub-tile Precision:** Uses exact rational slopes (@f$\frac{Y}{X}@f$) without floating-point rounding errors,
+ *   treating tiles with inner wall diamonds and corner bevels to avoid diagonal beam leaks or corner artifacts.
+ * - **Circular Euclidean Horizon:** Uses Euclidean squared distance (@f$x^2 + y^2 \le r^2@f$) to bound
+ *   visibility into a natural circle, or unbounded vision across the whole grid when passed a negative radius.
+ * - **Flexible Transparency Providers:** Can sample directly from a @ref CMap (via @ref CTile::isTransparent)
+ *   or an arbitrary @ref Transparency predicate for multi-layered levels or custom vision-blocking entities.
+ *
+ * @see CMatrix
+ * @see CMap
+ * @see Position
+ */
 class CFOV : public CMatrix<bool>
 {
 private:
     const CMap* map = nullptr;
     Transparency transparent;
 
-    // Represents the slope Y/X as a rational number for the shadowcasting bounds
+    /**
+     * @brief Represents ray slope @f$\frac{Y}{X}@f$ as an exact rational number.
+     *
+     * Used for shadowcasting sector boundaries to avoid floating-point drift and rounding errors.
+     */
     struct Slope {
-        unsigned int X, Y;
+        unsigned int X; ///< Run (horizontal delta component in octant space).
+        unsigned int Y; ///< Rise (vertical delta component in octant space).
+
+        /**
+         * @brief Constructs a slope with given rise @p y and run @p x.
+         */
         Slope(unsigned int y, unsigned int x) : X(x), Y(y) {}
 
+        /**
+         * @brief Tests if this slope is strictly greater than @f$\frac{y}{x}@f$.
+         */
         [[nodiscard]] bool Greater(unsigned int y, unsigned int x) const
         {
             return Y * x > X * y;
         }
+
+        /**
+         * @brief Tests if this slope is greater than or equal to @f$\frac{y}{x}@f$.
+         */
         [[nodiscard]] bool GreaterOrEqual(unsigned int y, unsigned int x) const
         {
             return Y * x >= X * y;
         }
+
+        /**
+         * @brief Tests if this slope is strictly less than @f$\frac{y}{x}@f$.
+         */
         [[nodiscard]] bool Less(unsigned int y, unsigned int x) const
         {
             return Y * x < X * y;
         }
     };
 
-    // Squared Euclidean distance from origin (0,0) to (x,y)
+    /**
+     * @brief Computes squared Euclidean distance @f$x^2 + y^2@f$ from local origin.
+     * @param x Horizontal offset.
+     * @param y Vertical offset.
+     * @return Squared distance value.
+     */
     [[nodiscard]] inline int GetDistanceSquared(int x, int y) const noexcept
     {
         return x * x + y * y;
     }
 
+    /**
+     * @brief Coordinate multipliers for transforming octant-relative coordinates to grid space.
+     */
     struct OctantOffset {
         std::int8_t xx, xy, yx, yy;
     };
 
+    /**
+     * @brief Transformation lookup table for the 8 octants.
+     */
     static constexpr std::array<OctantOffset, 8> octantOffsets = {{
         { 1,  0,  0, -1}, // 0: nx += x; ny -= y;
         { 0,  1, -1,  0}, // 1: nx += y; ny -= x;
@@ -63,6 +129,15 @@ private:
         { 1,  0,  0,  1}  // 7: nx += x; ny += y;
     }};
 
+    /**
+     * @brief Transforms octant-relative coordinates `(x, y)` to absolute grid coordinates.
+     *
+     * @param x Octant horizontal distance.
+     * @param y Octant vertical distance.
+     * @param octant Octant index in range [0, 7].
+     * @param origin Vantage point in grid space.
+     * @return Pair of absolute grid coordinates `(nx, ny)`.
+     */
     [[nodiscard]] static inline std::pair<int, int> TransformOctant(
         unsigned int x, unsigned int y, unsigned int octant, const Position& origin) noexcept
     {
@@ -75,6 +150,17 @@ private:
         };
     }
 
+    /**
+     * @brief Checks if the cell at octant-relative `(x, y)` blocks light.
+     *
+     * Out-of-bounds coordinates are considered opaque (blocking light).
+     *
+     * @param x Octant horizontal distance.
+     * @param y Octant vertical distance.
+     * @param octant Octant index in range [0, 7].
+     * @param origin Vantage point in grid space.
+     * @return True if light is blocked.
+     */
     [[nodiscard]] bool BlocksLight(unsigned int x, unsigned int y, unsigned int octant, const Position& origin)
     {
         const auto [nx, ny] = TransformOctant(x, y, octant, origin);
@@ -90,6 +176,16 @@ private:
         return !transparent(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny));
     }
 
+    /**
+     * @brief Marks cell at octant-relative `(x, y)` as visible in the matrix.
+     *
+     * Silently ignores coordinates outside the matrix bounds.
+     *
+     * @param x Octant horizontal distance.
+     * @param y Octant vertical distance.
+     * @param octant Octant index in range [0, 7].
+     * @param origin Vantage point in grid space.
+     */
     void SetVisible(unsigned int x, unsigned int y, unsigned int octant, const Position& origin)
     {
         const auto [nx, ny] = TransformOctant(x, y, octant, origin);
@@ -118,6 +214,21 @@ private:
     //    h
     //
     // *INDENT-ON*
+    /**
+     * @brief Recursively casts shadows within a single octant.
+     *
+     * Traverses columns from `x` outwards, maintaining upper (`top`) and lower (`bottom`)
+     * slope bounds for unobstructed light cones. When opaque obstacles are encountered,
+     * the cone splits or narrows recursively.
+     *
+     * @param octant Octant index in range [0, 7].
+     * @param origin Center vantage point.
+     * @param rangeLimit Maximum radius in cells (< 0 for unlimited).
+     * @param rangeLimitSq Precomputed squared range limit (@f$r^2@f$).
+     * @param x Current column distance within the octant.
+     * @param top Upper slope limit of the light cone.
+     * @param bottom Lower slope limit of the light cone.
+     */
     void ComputeOctant(unsigned int octant, const Position& origin, int rangeLimit, int rangeLimitSq, unsigned int x, Slope top, Slope bottom)
     {
         for (; rangeLimit < 0 || x <= static_cast<unsigned int>(rangeLimit); x++) {
@@ -228,20 +339,48 @@ private:
     }
 
 public:
+    /**
+     * @brief Constructs an empty field of view matrix of size 0x0.
+     */
     CFOV() : CMatrix<bool>(Size(0, 0), false) {}
 
-    // The field of view on a map, through the tiles that are transparent
+    /**
+     * @brief Constructs a field of view grid matching the dimensions of a map.
+     *
+     * Samples transparency directly from the map's tiles using @ref CTile::isTransparent().
+     *
+     * @param a_map Pointer to the map whose tile grid is used for line-of-sight checks.
+     */
     explicit CFOV(const CMap *a_map)
         : CMatrix<bool>(a_map->getSize(), false), map(a_map)
     {
     }
 
-    // The field of view on anything of a size that light passes through
-    // or not, e.g. a level seen together with the one below it. The cells
-    // asked about all lie within the size.
+    /**
+     * @brief Constructs a field of view grid with custom dimensions and a transparency predicate.
+     *
+     * Useful when visibility depends on custom rules, multiple level layers, dynamic obstacles,
+     * or non-map data structures. The cells queried by the predicate will always lie within
+     * the specified size.
+     *
+     * @param size Grid dimensions (width and height).
+     * @param a_transparent Callback taking `(x, y)` coordinates and returning `true` if transparent.
+     */
     CFOV(Size size, Transparency a_transparent) : CMatrix<bool>(size, false), transparent(std::move(a_transparent)) {}
 
-    // Triggers a recalculation of the Field of View using Adam Milazzo's Shadowcasting
+    /**
+     * @brief Calculates visibility outwards from a vantage point up to a given radius.
+     *
+     * Clears previous visibility results (resetting all cells to `false`), marks the
+     * origin as visible, and casts recursive shadow cones through all 8 octants.
+     *
+     * If @p start is outside the matrix boundaries, the method returns immediately
+     * without modifying visibility.
+     *
+     * @param start Center vantage point coordinates.
+     * @param radius Maximum view distance in cells. If negative, visibility is unbounded
+     *               (limited only by the grid boundaries and line-of-sight obstacles).
+     */
     void Calculate(const Position& start, int radius)
     {
         // Reset the matrix (clear old visibility)
