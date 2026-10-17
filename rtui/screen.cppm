@@ -58,29 +58,37 @@ struct SRect {
     Position corner{0, 0};
     Size size{0, 0};
 
+    constexpr SRect() noexcept = default;
+    constexpr SRect(Position c, Size s) noexcept : corner(c), size(s) {}
+
     // The column and row just past it
-    [[nodiscard]] std::size_t Right() const
+    [[nodiscard]] constexpr std::size_t Right() const noexcept
     {
         return corner.x + size.x;
     }
 
-    [[nodiscard]] std::size_t Bottom() const
+    [[nodiscard]] constexpr std::size_t Bottom() const noexcept
     {
         return corner.y + size.y;
     }
 
-    [[nodiscard]] bool Empty() const
+    [[nodiscard]] constexpr bool Empty() const noexcept
     {
         return size.x == 0 || size.y == 0;
     }
 
-    [[nodiscard]] bool Contains(Position pos) const
+    [[nodiscard]] constexpr bool Contains(Position pos) const noexcept
     {
         return pos.x >= corner.x && pos.y >= corner.y && pos.x < Right() && pos.y < Bottom();
     }
 
+    [[nodiscard]] constexpr bool Contains(std::size_t x, std::size_t y) const noexcept
+    {
+        return x >= corner.x && y >= corner.y && x < Right() && y < Bottom();
+    }
+
     // What it has in common with another
-    [[nodiscard]] SRect Intersection(const SRect& other) const
+    [[nodiscard]] constexpr SRect Intersection(const SRect& other) const noexcept
     {
         const std::size_t left = std::max(corner.x, other.corner.x);
         const std::size_t top = std::max(corner.y, other.corner.y);
@@ -95,7 +103,7 @@ struct SRect {
     }
 
     // Smaller by a number of cells on every side
-    [[nodiscard]] SRect Inset(std::size_t cells) const
+    [[nodiscard]] constexpr SRect Inset(std::size_t cells) const noexcept
     {
         if (size.x <= 2 * cells || size.y <= 2 * cells) {
             return {Position(corner.x + std::min(cells, size.x), corner.y + std::min(cells, size.y)), Size(0, 0)};
@@ -104,7 +112,7 @@ struct SRect {
         return {Position(corner.x + cells, corner.y + cells), Size(size.x - 2 * cells, size.y - 2 * cells)};
     }
 
-    bool operator==(const SRect&) const = default;
+    constexpr bool operator==(const SRect&) const noexcept = default;
 };
 
 struct SCell {
@@ -339,7 +347,7 @@ public:
     // the terminal. Bold and inverse hold for the whole glyph.
     void Put(std::size_t x, std::size_t y, char32_t glyph, std::uint32_t rgb, bool bold = false, bool inverse = false)
     {
-        if (x < size.x && y < size.y && (!clip || clip->Contains(Position(x, y)))) {
+        if (x < size.x && y < size.y && (!clip || clip->Contains(x, y))) {
             cells[y * size.x + x] = SCell{glyph < U' ' || glyph == U'\x7F' ? U' ' : glyph, rgb, bold, inverse};
         }
     }

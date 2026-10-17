@@ -78,9 +78,27 @@ RL::SRect Rect(std::size_t x, std::size_t y, std::size_t width, std::size_t heig
 
 void TestRectangles()
 {
+    constexpr RL::SRect crect{RL::Position(2, 3), RL::Size(4, 5)};
+    static_assert(crect.Right() == 6);
+    static_assert(crect.Bottom() == 8);
+    static_assert(crect.Contains(RL::Position(2, 3)));
+    static_assert(crect.Contains(2, 3));
+    static_assert(crect.Contains(5, 7));
+    static_assert(!crect.Contains(6, 7));
+    static_assert(!crect.Contains(1, 3));
+    static_assert(crect.Intersection(RL::SRect{RL::Position(4, 0), RL::Size(10, 4)}) == RL::SRect{RL::Position(4, 3), RL::Size(2, 1)});
+    static_assert(crect.Intersection(RL::SRect{RL::Position(10, 10), RL::Size(1, 1)}).Empty());
+    static_assert(crect.Inset(1) == RL::SRect{RL::Position(3, 4), RL::Size(2, 3)});
+    static_assert(crect.Inset(2).Empty());
+    static_assert(noexcept(crect.Right()));
+    static_assert(noexcept(crect.Contains(2, 3)));
+    static_assert(noexcept(crect.Intersection(crect)));
+
     const RL::SRect rect = Rect(2, 3, 4, 5);
-    Check(rect.Right() == 6 && rect.Bottom() == 8 && rect.Contains(RL::Position(2, 3)) && rect.Contains(RL::Position(5, 7)) &&
-          !rect.Contains(RL::Position(6, 7)) && !rect.Contains(RL::Position(1, 3)), "a rectangle and what it contains");
+    Check(rect.Right() == 6 && rect.Bottom() == 8 && rect.Contains(RL::Position(2, 3)) && rect.Contains(2, 3) &&
+          rect.Contains(RL::Position(5, 7)) && rect.Contains(5, 7) &&
+          !rect.Contains(RL::Position(6, 7)) && !rect.Contains(6, 7) &&
+          !rect.Contains(RL::Position(1, 3)) && !rect.Contains(1, 3), "a rectangle and what it contains");
     Check(rect.Intersection(Rect(4, 0, 10, 4)) == Rect(4, 3, 2, 1) && rect.Intersection(Rect(10, 10, 1, 1)).Empty(),
           "what two rectangles have in common");
     Check(rect.Inset(1) == Rect(3, 4, 2, 3) && rect.Inset(2).Empty(), "a rectangle made smaller on every side");
