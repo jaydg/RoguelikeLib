@@ -3,6 +3,7 @@
 
 import rtui.map;
 import rtui.screen;
+import rtui.utf8;
 import rltests.check;
 import std;
 
@@ -44,12 +45,24 @@ void TestScreen()
     Check(screen.At(0, 2).glyph == U' ', "control codes never reach the terminal");
     screen.Put(50, 50, U'x', 0);   // dropped, not a crash
 
+    // Direct AppendUTF8 test for ASCII and multibyte codepoints
+    std::string utf8_buf;
+    RL::AppendUTF8(utf8_buf, U'A');
+    RL::AppendUTF8(utf8_buf, U'ä');
+    RL::AppendUTF8(utf8_buf, U'♣');
+    RL::AppendUTF8(utf8_buf, U'😀');
+    Check(utf8_buf == "Aä♣😀", "AppendUTF8 correctly encodes ASCII and multibyte codepoints");
+
     RL::CScreen small(RL::Size(3, 1));
-    small.Put(0, 0, U'♣', 0x00FF00);
+    small.Put(0, 0, U'♣', 0x00FF00, true, false);
     const std::string frame = small.Compose(true);
     Check(frame.find("\xE2\x99\xA3") != std::string::npos, "glyphs go out as UTF-8");
     Check(frame.find("\x1b[38;2;0;255;0m") != std::string::npos, "24-bit colour");
+    Check(frame.find("\x1b[1m") != std::string::npos, "bold escape sequence emitted");
     Check(small.Compose(false).find("\x1b[38;5;") != std::string::npos, "256 colours");
+
+    // Incremental compose when unchanged returns empty string
+    Check(small.Compose(true, &small).empty(), "identical previous screen emits empty compose string");
 
     screen.Put(1, 0, U'a', 0);
     screen.Resize(RL::Size(12, 3));

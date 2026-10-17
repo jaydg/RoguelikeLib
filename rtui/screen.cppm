@@ -419,8 +419,8 @@ public:
         }
 
         const bool incremental = previous && previous->size == size;
-        std::ostringstream out;
-        out << (true_color ? stc::true_color : stc::color_256);
+        std::string out;
+        out.reserve(size.x * size.y * 3 + 64);
 
         std::optional<std::uint32_t> current;
         bool bold = false;
@@ -428,17 +428,18 @@ public:
 
         for (std::size_t y = 0; y < size.y; ++y) {
             bool contiguous = false;
+            const std::size_t row_start = y * size.x;
 
             for (std::size_t x = 0; x < size.x; ++x) {
-                const SCell& cell = cells[y * size.x + x];
+                const SCell& cell = cells[row_start + x];
 
-                if (incremental && cell == previous->cells[y * size.x + x]) {
+                if (incremental && cell == previous->cells[row_start + x]) {
                     contiguous = false;
                     continue;
                 }
 
                 if (!contiguous) {
-                    out << "\x1b[" << y + 1 << ';' << x + 1 << 'H';
+                    std::format_to(std::back_inserter(out), "\x1b[{};{}H", y + 1, x + 1);
                     contiguous = true;
                 }
 
@@ -446,19 +447,19 @@ public:
                     // An attribute taken off has to be reset, and a reset
                     // takes the colour with it, so that starts over below
                     if (!cell.bold || !cell.inverse) {
-                        out << stc::reset;
+                        out += "\x1b[0m";
                         current.reset();
                         bold = false;
                         inverse = false;
                     }
 
                     if (cell.bold) {
-                        out << stc::bold;
+                        out += "\x1b[1m";
                         bold = true;
                     }
 
                     if (cell.inverse) {
-                        out << stc::inverse;
+                        out += "\x1b[7m";
                         inverse = true;
                     }
                 }
@@ -466,17 +467,22 @@ public:
                 // An inverse space is a filled cell, so it needs its colour
                 // even though no glyph is written
                 if ((cell.glyph != U' ' || cell.inverse) && cell.rgb != current) {
-                    out << stc::rgb_fg(cell.rgb);
+                    if (true_color) {
+                        std::format_to(std::back_inserter(out), "\x1b[38;2;{};{};{}m",
+                                       (cell.rgb >> 16) & 0xFF, (cell.rgb >> 8) & 0xFF, cell.rgb & 0xFF);
+                    } else {
+                        std::format_to(std::back_inserter(out), "\x1b[38;5;{}m", stc::rgb_fg(cell.rgb).code);
+                    }
                     current = cell.rgb;
                 }
 
-                out << EncodeUTF8(cell.glyph);
+                AppendUTF8(out, cell.glyph);
             }
         }
 
-        out << stc::reset;
+        out += "\x1b[0m";
 
-        return out.str();
+        return out;
     }
 };
 

@@ -15,19 +15,19 @@ export namespace RL
 // What malformed input decodes to, and invalid code points encode as
 constexpr char32_t replacement_character = U'�';
 
-// Encode a glyph as UTF-8, for printing it to a terminal. Anything that
-// is not a valid code point comes out as the replacement character.
-std::string EncodeUTF8(char32_t glyph)
+// Append a glyph encoded as UTF-8 directly into a string buffer
+inline void AppendUTF8(std::string& utf8, char32_t glyph)
 {
+    if (glyph < 0x80) {
+        utf8 += static_cast<char>(glyph);
+        return;
+    }
+
     if (glyph > 0x10FFFF || (glyph >= 0xD800 && glyph <= 0xDFFF)) {
         glyph = replacement_character;
     }
 
-    std::string utf8;
-
-    if (glyph < 0x80) {
-        utf8 += static_cast<char>(glyph);
-    } else if (glyph < 0x800) {
+    if (glyph < 0x800) {
         utf8 += static_cast<char>(0xC0 | (glyph >> 6));
         utf8 += static_cast<char>(0x80 | (glyph & 0x3F));
     } else if (glyph < 0x10000) {
@@ -40,7 +40,14 @@ std::string EncodeUTF8(char32_t glyph)
         utf8 += static_cast<char>(0x80 | ((glyph >> 6) & 0x3F));
         utf8 += static_cast<char>(0x80 | (glyph & 0x3F));
     }
+}
 
+// Encode a glyph as UTF-8, for printing it to a terminal. Anything that
+// is not a valid code point comes out as the replacement character.
+[[nodiscard]] inline std::string EncodeUTF8(char32_t glyph)
+{
+    std::string utf8;
+    AppendUTF8(utf8, glyph);
     return utf8;
 }
 
