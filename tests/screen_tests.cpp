@@ -215,4 +215,27 @@ void TestCamera()
           "PrintMap emits correct tile glyphs");
     Check(printed_str.find("\x1b[0m\n") != std::string::npos,
           "PrintMap resets colors at end of line");
+
+    // Geometric viewport pre-clipping tests
+    RL::CScreen no_overlap_screen(RL::Size(10, 10));
+    no_overlap_screen.setClip(RL::SRect{RL::Position(0, 0), RL::Size(2, 2)});
+    std::size_t asked_clipped = 0;
+    RL::DrawMap(no_overlap_screen, RL::Size(10, 10), RL::SRect{RL::Position(5, 5), RL::Size(3, 3)}, RL::Position(0, 0),
+                [&](RL::Position) -> RL::SCell {
+                    ++asked_clipped;
+                    return RL::SCell{U'X', 0xFFFFFF};
+                });
+    Check(asked_clipped == 0, "DrawMap exits immediately when clip does not intersect area");
+
+    RL::CScreen partial_clip_screen(RL::Size(10, 10));
+    partial_clip_screen.setClip(RL::SRect{RL::Position(2, 2), RL::Size(2, 2)});
+    std::size_t asked_partial = 0;
+    RL::DrawMap(partial_clip_screen, RL::Size(10, 10), RL::SRect{RL::Position(1, 1), RL::Size(3, 3)}, RL::Position(0, 0),
+                [&](RL::Position) -> RL::SCell {
+                    ++asked_partial;
+                    return RL::SCell{U'P', 0xFFFFFF};
+                });
+    Check(asked_partial == 4, "DrawMap only queries visible cells in clip intersection");
+    Check(partial_clip_screen.At(2, 2).glyph == U'P' && partial_clip_screen.At(3, 3).glyph == U'P' &&
+          partial_clip_screen.At(1, 1).glyph == U' ', "partial clip draws exactly in intersection");
 }

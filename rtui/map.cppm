@@ -78,46 +78,40 @@ template <typename CellFunc>
 requires std::invocable<CellFunc, Position>
 void DrawMap(CScreen& screen, Size map, const SRect& area, Position origin, CellFunc&& cell)
 {
-    const Size size = screen.getSize();
-
-    if (origin.x >= map.x || origin.y >= map.y || area.corner.x >= size.x || area.corner.y >= size.y) {
+    if (origin.x >= map.x || origin.y >= map.y) {
         return;
     }
 
-    const std::size_t width = std::min({area.size.x, map.x - origin.x, size.x - area.corner.x});
-    const std::size_t height = std::min({area.size.y, map.y - origin.y, size.y - area.corner.y});
+    const Size size = screen.getSize();
+    SRect visible{area.corner, Size(std::min(area.size.x, map.x - origin.x), std::min(area.size.y, map.y - origin.y))};
 
-    const auto& clip = screen.getClip();
-    if (!clip) {
-        for (std::size_t y = 0; y < height; ++y) {
-            const std::size_t screen_y = area.corner.y + y;
-            const std::size_t map_y = origin.y + y;
-            for (std::size_t x = 0; x < width; ++x) {
-                if constexpr (std::same_as<std::remove_cvref_t<std::invoke_result_t<CellFunc, Position>>, SCell>) {
-                    const SCell shown = cell(Position(origin.x + x, map_y));
-                    screen.PutUnchecked(area.corner.x + x, screen_y, shown.glyph, shown.rgb, shown.bold, shown.inverse);
-                } else {
-                    if (const auto shown = cell(Position(origin.x + x, map_y))) {
-                        screen.PutUnchecked(area.corner.x + x, screen_y, shown->glyph, shown->rgb, shown->bold, shown->inverse);
-                    }
-                }
-            }
+    visible = visible.Intersection(SRect{Position(0, 0), size});
+    if (visible.Empty()) {
+        return;
+    }
+
+    if (const auto& clip = screen.getClip()) {
+        visible = visible.Intersection(*clip);
+        if (visible.Empty()) {
+            return;
         }
-    } else {
-        for (std::size_t y = 0; y < height; ++y) {
-            const std::size_t screen_y = area.corner.y + y;
-            const std::size_t map_y = origin.y + y;
-            for (std::size_t x = 0; x < width; ++x) {
-                const std::size_t screen_x = area.corner.x + x;
-                if (clip->Contains(screen_x, screen_y)) {
-                    if constexpr (std::same_as<std::remove_cvref_t<std::invoke_result_t<CellFunc, Position>>, SCell>) {
-                        const SCell shown = cell(Position(origin.x + x, map_y));
-                        screen.PutUnchecked(screen_x, screen_y, shown.glyph, shown.rgb, shown.bold, shown.inverse);
-                    } else {
-                        if (const auto shown = cell(Position(origin.x + x, map_y))) {
-                            screen.PutUnchecked(screen_x, screen_y, shown->glyph, shown->rgb, shown->bold, shown->inverse);
-                        }
-                    }
+    }
+
+    const Position effective_origin(origin.x + (visible.corner.x - area.corner.x),
+                                    origin.y + (visible.corner.y - area.corner.y));
+
+    for (std::size_t y = 0; y < visible.size.y; ++y) {
+        const std::size_t screen_y = visible.corner.y + y;
+        const std::size_t map_y = effective_origin.y + y;
+        const std::size_t screen_row = screen_y * size.x + visible.corner.x;
+
+        for (std::size_t x = 0; x < visible.size.x; ++x) {
+            if constexpr (std::same_as<std::remove_cvref_t<std::invoke_result_t<CellFunc, Position>>, SCell>) {
+                const SCell shown = cell(Position(effective_origin.x + x, map_y));
+                screen.PutUnchecked(screen_row + x, shown.glyph, shown.rgb, shown.bold, shown.inverse);
+            } else {
+                if (const auto shown = cell(Position(effective_origin.x + x, map_y))) {
+                    screen.PutUnchecked(screen_row + x, shown->glyph, shown->rgb, shown->bold, shown->inverse);
                 }
             }
         }
