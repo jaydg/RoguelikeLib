@@ -202,4 +202,14 @@ void TestCamera()
     clipped_screen.setClip(RL::SRect{RL::Position(1, 1), RL::Size(2, 2)});
     RL::DrawMap(clipped_screen, tiles, RL::SRect{RL::Position(0, 0), RL::Size(4, 4)});
     Check(clipped_screen.At(0, 0).glyph == U' ' && clipped_screen.At(1, 1).glyph == U'^', "DrawMap respects active screen clip");
+
+    // PrintMap with ostream buffer test
+    std::ostringstream printed;
+    RL::PrintMap(tiles, printed);
+    const std::string printed_str = printed.str();
+    Check(!printed_str.empty(), "PrintMap produces output to ostream");
+    Check(printed_str.find("T") != std::string::npos && printed_str.find("^") != std::string::npos,
+          "PrintMap emits correct tile glyphs");
+    Check(printed_str.find("\x1b[0m\n") != std::string::npos,
+          "PrintMap resets colors at end of line");
 }

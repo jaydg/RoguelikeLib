@@ -164,16 +164,39 @@ void DrawMap(CScreen& screen, const CMap& map, const SRect& area, Position origi
     }
 }
 
-void PrintMap(const CMap& map)
+void PrintMap(const CMap& map, std::ostream& out = std::cout)
 {
-    for (std::size_t y = 0; y < map.getHeight(); ++y) {
-        for (std::size_t x = 0; x < map.getWidth(); ++x) {
+    const std::size_t width = map.getWidth();
+    const std::size_t height = map.getHeight();
+
+    if (width == 0 || height == 0) {
+        return;
+    }
+
+    std::string buffer;
+    buffer.reserve(width * height * 4 + height * 8);
+
+    std::optional<std::uint32_t> current_color;
+
+    for (std::size_t y = 0; y < height; ++y) {
+        for (std::size_t x = 0; x < width; ++x) {
             const auto& tile = map(x, y);
-            std::cout << stc::rgb_fg(tile.getColor()) << EncodeUTF8(tile.getGlyph());
+            const std::uint32_t color = tile.getColor();
+
+            if (color != current_color) {
+                std::format_to(std::back_inserter(buffer), "\x1b[38;2;{};{};{}m",
+                               (color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF);
+                current_color = color;
+            }
+
+            AppendUTF8(buffer, tile.getGlyph());
         }
 
-        std::cout << stc::reset << std::endl;
+        buffer += "\x1b[0m\n";
+        current_color.reset();
     }
+
+    out << buffer << std::flush;
 }
 
 } // namespace RL
