@@ -94,7 +94,16 @@ std::vector<SGenerator> Generators()
         {
             "Unicode glade", [](CMap & map)
             {
-                CreateCaveAndGlade(map, "pine", "grass", GladeShape, {.shallow = "pond", .level = 12, .deep_level = 35, .grain = 20});
+                CreateCaveAndGlade(map,
+                                   SForestBiome{
+                                       .vegetation_density = 0.85f,
+                                       .tree_tile = "pine",
+                                   },
+                                   SGrasslandBiome{
+                                       .tree_tile = "pine",
+                                   },
+                                   GladeShape,
+                                   {.shallow = "pond", .level = 12, .deep_level = 35, .grain = 20});
             }
         },
         {
