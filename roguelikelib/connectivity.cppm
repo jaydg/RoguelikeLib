@@ -1,9 +1,11 @@
-//////////////////////////////////////////////////////////////////////////
-// Connectivity
-//
-// Which parts of a map can be walked between, and making every walkable
-// tile reachable from every other one.
-//////////////////////////////////////////////////////////////////////////
+/**
+ * @file connectivity.cppm
+ * @brief Map region connectivity analysis, flood-fill segmentation, and minimum-cost opening repairs.
+ *
+ * Provides algorithms to detect disconnected components across a @ref RL::CMap and carve
+ * minimal-cost pathways through obstacles (e.g. chopping trees, bridging streams, or digging walls)
+ * to guarantee that all playable areas are interconnected.
+ */
 
 module;
 
@@ -18,7 +20,12 @@ import std;
 namespace RL
 {
 
-// The steps from a tile to its neighbours
+/**
+ * @brief Returns coordinate delta steps for neighbor traversal.
+ *
+ * @param neighbors Neighbor connectivity mode (@ref Neighbors::All8 or @ref Neighbors::Cardinal4).
+ * @return Span of (dx, dy) coordinate deltas.
+ */
 std::span<const std::pair<int, int>> Steps(Neighbors neighbors)
 {
     static constexpr std::array<std::pair<int, int>, 8> all8 = {{
@@ -42,16 +49,39 @@ std::span<const std::pair<int, int>> Steps(Neighbors neighbors)
 export namespace RL
 {
 
-// The areas of a map that can be walked between
+/**
+ * @brief Connected components segmentation of a map into isolated walkable regions.
+ *
+ * Produced by @ref FindRegions to catalog all disconnected pockets of walkable terrain.
+ * Each walkable cell is assigned a zero-based integer region identifier, while impassable
+ * obstacles remain marked with `-1`.
+ *
+ * @see FindRegions
+ * @see MakeReachable
+ */
 struct SRegions {
-    // The region of each tile, -1 where it cannot be walked on
+    /**
+     * @brief 2D matrix storing the region ID for each cell.
+     *
+     * Value is `>= 0` for walkable tiles belonging to a region, or `-1` for impassable
+     * obstacles, walls, or unvisited tiles.
+     */
     CMatrix<int> region;
 
-    // How many tiles each region has
+    /**
+     * @brief Number of walkable tiles contained in each region.
+     *
+     * Indexed by region identifier: `sizes[id]` contains the tile count for region `id`.
+     */
     std::vector<std::size_t> sizes;
 
-    // The region with the most tiles, the first of them if several are as
-    // large; -1 when nothing can be walked on
+    /**
+     * @brief Finds the region identifier with the largest surface area.
+     *
+     * In the event of a tie, the lowest region index among the largest is returned.
+     *
+     * @return Region ID of the largest component, or `-1` if the map contains no walkable tiles.
+     */
     [[nodiscard]] int Largest() const
     {
         if (sizes.empty()) {
@@ -62,8 +92,30 @@ struct SRegions {
     }
 };
 
-// Finds the regions of a map. With Neighbors::All8 a diagonal step joins
-// two tiles, with Neighbors::Cardinal4 it does not.
+/**
+ * @brief Flood-fills a map to identify all disconnected walkable regions.
+ *
+ * Traverses all passable cells (@ref CTile::isPassable) using iterative depth-first flood-fill,
+ * assigning a unique region ID to each isolated cluster.
+ *
+ * @param map Map to inspect.
+ * @param neighbors Adjacency mode: @ref Neighbors::All8 treats diagonal steps as connecting tiles;
+ *                  @ref Neighbors::Cardinal4 requires orthogonal adjacency.
+ * @return @ref SRegions structure detailing tile-to-region mappings and region size counts.
+ *
+ * @code{.cpp}
+ * RL::CMap map({80, 50});
+ * // ... populate map with rooms, corridors, and walls ...
+ *
+ * RL::SRegions regions = RL::FindRegions(map, RL::Neighbors::All8);
+ * int main_id = regions.Largest();
+ * std::cout << "Discovered " << regions.sizes.size() << " regions; main area has "
+ *           << (main_id >= 0 ? regions.sizes[main_id] : 0) << " tiles.\n";
+ * @endcode
+ *
+ * @see SRegions
+ * @see MakeReachable
+ */
 SRegions FindRegions(const CMap& map, Neighbors neighbors = Neighbors::All8)
 {
     SRegions result{CMatrix<int>(map.getSize(), -1), {}};
@@ -106,36 +158,86 @@ SRegions FindRegions(const CMap& map, Neighbors neighbors = Neighbors::All8)
     return result;
 }
 
-// How a tile type that is in the way can be opened up
+/**
+ * @brief Specification for opening or converting an impassable obstacle to connect regions.
+ *
+ * Used by @ref MakeReachable to define which obstacle tile archetypes can be excavated,
+ * chopped down, bridged, or cleared, along with their relative economic or pathing costs.
+ *
+ * @code{.cpp}
+ * // Cut through trees easily, build bridges over water at higher cost:
+ * constexpr std::array<RL::SOpening, 2> rules = {{
+ *     {"tree", 2, "grass"},
+ *     {"water", 5, "bridge"}
+ * }};
+ * @endcode
+ *
+ * @see MakeReachable
+ * @see SReachability
+ */
 struct SOpening {
-    // The tile type
-    std::string_view type;
-
-    // What opening one such tile costs, at least 1. The way chosen is the
-    // one that costs least in all.
-    int cost = 1;
-
-    // The walkable tile type it becomes
-    std::string_view becomes;
+    std::string_view type;    ///< Archetype name of the impassable tile to open (e.g., `"tree"`, `"wall"`, `"water"`).
+    int cost = 1;             ///< Excavation or opening cost (must be >= 1). Lower-cost alternatives are chosen first.
+    std::string_view becomes; ///< Archetype name of the replacement walkable tile (e.g., `"grass"`, `"floor"`, `"bridge"`).
 };
 
+/**
+ * @brief Summary report returned after executing connectivity repairs.
+ *
+ * Records how many disjoint components were connected, which obstacles were opened up,
+ * and if any regions remained isolated.
+ *
+ * @see MakeReachable
+ */
 struct SReachability {
-    // Regions joined to the largest one
-    std::size_t regions_joined = 0;
-
-    // How many tiles of each type were opened up
-    std::map<std::string, std::size_t, std::less<>> opened;
-
-    // Regions there is no way to, walled in by what may not be opened
-    std::size_t regions_unreachable = 0;
+    std::size_t regions_joined = 0;                         ///< Number of disconnected regions successfully merged into the primary region.
+    std::map<std::string, std::size_t, std::less<>> opened; ///< Count of modified tiles keyed by original tile archetype.
+    std::size_t regions_unreachable = 0;                    ///< Number of isolated regions that could not be reached via permitted openings.
 };
 
-// Joins every region of the map to the largest one, along the way that
-// costs least to open. Only tile types listed in `openings` are ever
-// opened; anything else that cannot be walked on stays as it is. Uses no
-// random numbers, so the same map is always joined the same way.
-//
-// For a forest: RL::MakeReachable(map, RL::ForestOpenings)
+/**
+ * @brief Connects all isolated map regions to the largest component via minimum-cost pathways.
+ *
+ * Discovers all disjoint walkable regions via @ref FindRegions and connects each isolated
+ * pocket to the primary (largest) region by carving through intervening obstacles. Only obstacle
+ * types explicitly listed in @p openings will ever be modified; any unlisted impassable terrain
+ * remains untouched.
+ *
+ * Algorithm behavior:
+ * - **Deterministic Dijkstra:** Uses a multi-source shortest-path search prioritized by cumulative
+ *   opening costs. Identical maps and rules always yield identical results without PRNG jitter.
+ * - **Size-Ordered Joining:** Attempts to join larger regions first. Connecting a large region
+ *   often creates corridors that serendipitously bridge smaller neighboring regions along the way.
+ * - **Minimal Invasiveness:** Only modifies the exact tiles along the optimal path, updating them
+ *   in-place via @ref CMap::SetCell.
+ * - **Targeted State Resets:** Tracks touched cells to avoid clearing entire grid matrices between
+ *   iterations, maintaining high performance even with dozens of disconnected pockets.
+ *
+ * @param map Map to analyze and modify in-place.
+ * @param openings Span of @ref SOpening rules defining permissible tile transformations and costs.
+ * @param neighbors Adjacency mode (@ref Neighbors::All8 or @ref Neighbors::Cardinal4).
+ * @return @ref SReachability summary detailing modified tiles and connection metrics.
+ *
+ * @throws std::invalid_argument If any @ref SOpening has a cost < 1.
+ *
+ * @code{.cpp}
+ * constexpr std::array<RL::SOpening, 3> forest_openings = {{
+ *     {"water", 2, "bridge"},
+ *     {"tree", 3, "grass"},
+ *     {"rock", 4, "grass"}
+ * }};
+ *
+ * RL::SReachability report = RL::MakeReachable(map, forest_openings);
+ * std::cout << "Merged " << report.regions_joined << " regions.\n";
+ * for (const auto& [type, count] : report.opened) {
+ *     std::cout << "  Converted " << count << " tiles of type '" << type << "'\n";
+ * }
+ * @endcode
+ *
+ * @see SOpening
+ * @see SReachability
+ * @see FindRegions
+ */
 SReachability MakeReachable(CMap& map, std::span<const SOpening> openings, Neighbors neighbors = Neighbors::All8)
 {
     for (const SOpening& opening : openings) {
