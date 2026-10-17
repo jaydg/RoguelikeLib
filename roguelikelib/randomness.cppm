@@ -6,22 +6,23 @@ module;
 
 export module rl.randomness;
 
+export import xoshiro256;
 import std;
 
 namespace RL
 {
 
 // Internal module state (not exported, has module linkage)
-std::mt19937 mt;
+Xoshiro256PlusPlus rng;
 
 // Public API (exported)
 export {
 
     // Seed with a fixed value, so that the same sequence of calls
     // generates the same maps again
-    void InitRandomness(const std::uint32_t seed)
+    void InitRandomness(const std::uint64_t seed)
     {
-        mt.seed(seed);
+        rng.seed(seed);
     }
 
     // Seed from a non-deterministic source. The seed is returned, so that
@@ -40,7 +41,7 @@ export {
     std::string GetRandomState()
     {
         std::ostringstream state;
-        state << mt;
+        state << rng;
         return state.str();
     }
 
@@ -49,14 +50,14 @@ export {
     bool SetRandomState(std::string_view text)
     {
         std::istringstream state{std::string(text)};
-        std::mt19937 restored;
+        Xoshiro256PlusPlus restored;
         state >> restored;
 
         if (state.fail() || !(state >> std::ws).eof()) {
             return false;
         }
 
-        mt = restored;
+        rng = restored;
         return true;
     }
 
@@ -67,7 +68,7 @@ export {
         }
 
         std::uniform_int_distribution<std::size_t> dist(0, limit - 1);
-        return static_cast<unsigned>(dist(mt));
+        return static_cast<unsigned>(dist(rng));
     }
 
     // Generate a random number between min and max
@@ -78,7 +79,7 @@ export {
         }
 
         std::uniform_int_distribution<std::size_t> dist(min, max - 1);
-        return static_cast<unsigned>(dist(mt));
+        return static_cast<unsigned>(dist(rng));
     }
 
     // Generate a random float in the range [min, max)
@@ -86,7 +87,7 @@ export {
     float RandomFloat(float min = 0.0, float max = 1.0)
     {
         std::uniform_real_distribution<float> dist(min, max);
-        return dist(mt);
+        return dist(rng);
     }
 
     bool RandomLowerThatLimit(const std::size_t limit, const std::size_t value)
@@ -108,7 +109,7 @@ export {
     {
         for (auto i = (last - first) - 1; i > 0; --i) {
             std::uniform_int_distribution<decltype(i)> d(0, i);
-            std::swap(first[i], first[d(mt)]);
+            std::swap(first[i], first[d(rng)]);
         }
     }
 
