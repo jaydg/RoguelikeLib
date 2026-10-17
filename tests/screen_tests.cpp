@@ -83,6 +83,10 @@ void TestScreen()
           "what is no tag is text, and carries nothing on");
     Check(screen.WrapText("abcdefghij", 4) == std::vector<std::string> {"abcdefghij"}, "a word too long stays whole");
     Check(screen.WrapText("", 10).empty(), "nothing to wrap");
+    Check(screen.WrapText("one   two three", 7) == std::vector<std::string> {"one two", "three"},
+          "multiple spaces between words are handled correctly");
+    Check(screen.WrapText("1 2 3 4 5 6", 3) == std::vector<std::string> {"1 2", "3 4", "5 6"},
+          "tight budget wraps every two single-character words");
 }
 
 void TestCamera()

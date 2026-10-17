@@ -290,6 +290,7 @@ public:
     {
         std::vector<std::string> lines;
         std::string line;
+        std::size_t current_width = 0;
 
         // The colour the lines so far ended in, as its tag
         std::string colour;
@@ -304,19 +305,28 @@ public:
                 continue;
             }
 
-            const std::string candidate = line.empty() ? std::string(word) : line + ' ' + std::string(word);
+            const std::size_t word_width = TextWidth(word);
 
-            if (!line.empty() && TextWidth(candidate) > width) {
-                lines.push_back(line);
-                colour = LastTag(line, colour);
-                line = colour + std::string(word);
+            if (!line.empty() && current_width + 1 + word_width > width) {
+                lines.push_back(std::move(line));
+                colour = LastTag(lines.back(), colour);
+                line = colour;
+                line.append(word);
+                current_width = word_width;
             } else {
-                line = candidate;
+                if (line.empty()) {
+                    line.assign(word);
+                    current_width = word_width;
+                } else {
+                    line += ' ';
+                    line.append(word);
+                    current_width += 1 + word_width;
+                }
             }
         }
 
         if (!line.empty()) {
-            lines.push_back(line);
+            lines.push_back(std::move(line));
         }
 
         return lines;
