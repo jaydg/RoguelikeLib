@@ -64,6 +64,15 @@ void TestScreen()
     // Incremental compose when unchanged returns empty string
     Check(small.Compose(true, &small).empty(), "identical previous screen emits empty compose string");
 
+    // getClip and PutUnchecked tests
+    Check(!small.getClip().has_value(), "getClip returns nullopt initially");
+    small.setClip(RL::SRect{RL::Position(0, 0), RL::Size(2, 1)});
+    Check(small.getClip().has_value() && small.getClip()->size == RL::Size(2, 1), "getClip returns set clip");
+    small.resetClip();
+    Check(!small.getClip().has_value(), "getClip returns nullopt after resetClip");
+    small.PutUnchecked(1, 0, U'Z', 0x123456, true, true);
+    Check(small.At(1, 0).glyph == U'Z' && small.At(1, 0).bold && small.At(1, 0).inverse, "PutUnchecked writes cell directly");
+
     screen.Put(1, 0, U'a', 0);
     screen.Resize(RL::Size(12, 3));
     Check(screen.At(1, 0).glyph == U'a', "resizing to the same size keeps the content");
@@ -155,4 +164,18 @@ void TestCamera()
     RL::CScreen whole(RL::Size(3, 3));
     RL::DrawMap(whole, tiles, RL::SRect{RL::Position(1, 1), RL::Size(2, 2)});
     Check(whole.At(1, 1).glyph == U'T' && whole.At(2, 2).glyph == U'^', "a map's own tiles are drawn as they look");
+
+    // DrawMap with direct SCell return (without std::optional wrapping)
+    RL::CScreen direct_screen(RL::Size(4, 4));
+    RL::DrawMap(direct_screen, RL::Size(2, 2), RL::SRect{RL::Position(1, 1), RL::Size(2, 2)}, RL::Position(0, 0),
+                [](RL::Position p) -> RL::SCell {
+                    return RL::SCell{p.x == 0 ? U'#' : U'.', 0xFFFFFF};
+                });
+    Check(direct_screen.At(1, 1).glyph == U'#' && direct_screen.At(2, 1).glyph == U'.', "DrawMap works with direct SCell return type");
+
+    // DrawMap respecting active screen clipping
+    RL::CScreen clipped_screen(RL::Size(5, 5));
+    clipped_screen.setClip(RL::SRect{RL::Position(1, 1), RL::Size(2, 2)});
+    RL::DrawMap(clipped_screen, tiles, RL::SRect{RL::Position(0, 0), RL::Size(4, 4)});
+    Check(clipped_screen.At(0, 0).glyph == U' ' && clipped_screen.At(1, 1).glyph == U'^', "DrawMap respects active screen clip");
 }

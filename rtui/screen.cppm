@@ -244,7 +244,7 @@ public:
         std::ranges::fill(cells, SCell{});
     }
 
-    [[nodiscard]] Size getSize() const
+    [[nodiscard]] Size getSize() const noexcept
     {
         return size;
     }
@@ -266,7 +266,7 @@ public:
         text_colour = rgb;
     }
 
-    [[nodiscard]] std::uint32_t getTextColour() const
+    [[nodiscard]] std::uint32_t getTextColour() const noexcept
     {
         return text_colour;
     }
@@ -354,13 +354,26 @@ public:
         clip.reset();
     }
 
+    // The active clip rectangle, if any
+    [[nodiscard]] const std::optional<SRect>& getClip() const noexcept
+    {
+        return clip;
+    }
+
+    // Draws a glyph directly without bounds or clip checking.
+    // Caller must ensure x < size.x and y < size.y, and respect any clipping.
+    void PutUnchecked(std::size_t x, std::size_t y, char32_t glyph, std::uint32_t rgb, bool bold = false, bool inverse = false) noexcept
+    {
+        cells[y * size.x + x] = SCell{glyph < U' ' || glyph == U'\x7F' ? U' ' : glyph, rgb, bold, inverse};
+    }
+
     // Draws a glyph; off the screen or outside the clip rectangle it is
     // dropped. Control codes are drawn as blanks, so that they cannot reach
     // the terminal. Bold and inverse hold for the whole glyph.
     void Put(std::size_t x, std::size_t y, char32_t glyph, std::uint32_t rgb, bool bold = false, bool inverse = false)
     {
         if (x < size.x && y < size.y && (!clip || clip->Contains(x, y))) {
-            cells[y * size.x + x] = SCell{glyph < U' ' || glyph == U'\x7F' ? U' ' : glyph, rgb, bold, inverse};
+            PutUnchecked(x, y, glyph, rgb, bold, inverse);
         }
     }
 
