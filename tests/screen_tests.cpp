@@ -57,7 +57,22 @@ void TestScreen()
     screen.Resize(RL::Size(4, 2));
     Check(screen.getSize() == RL::Size(4, 2) && screen.At(0, 0).glyph == U' ', "resizing clears");
 
+    // Dim and Blend tests (constexpr, noexcept, and runtime clamping)
+    static_assert(noexcept(RL::Dim(0x8040FF, 50)));
+    static_assert(noexcept(RL::Blend(0x000000, 0xFFFFFF, 50)));
+    static_assert(RL::Dim(0x8040FF, 50) == 0x40207F);
+    static_assert(RL::Dim(0xFFFFFF, 0) == 0x000000);
+    static_assert(RL::Dim(0xFFFFFF, 100) == 0xFFFFFF);
+    static_assert(RL::Blend(0x000000, 0x646464, 50) == 0x323232);
+    static_assert(RL::Blend(0x102030, 0x506070, 0) == 0x102030);
+    static_assert(RL::Blend(0x102030, 0x506070, 100) == 0x506070);
+
     Check(RL::Dim(0x8040FF, 50) == 0x40207F, "dimming scales every channel");
+    Check(RL::Dim(0x8040FF, -20) == 0x000000, "dimming clamps negative percent to 0");
+    Check(RL::Dim(0x8040FF, 150) == 0x8040FF, "dimming clamps percent > 100 to 100");
+    Check(RL::Blend(0x000000, 0x646464, 50) == 0x323232, "blend mixes towards target colour");
+    Check(RL::Blend(0x112233, 0x445566, -10) == 0x112233, "blend clamps negative percentage");
+    Check(RL::Blend(0x112233, 0x445566, 150) == 0x445566, "blend clamps percentage above 100");
 
     // Text wraps between words, and its colour carries on across the break
     const auto lines = screen.WrapText("aaa bbb <key>ccc ddd", 7);

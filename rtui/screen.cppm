@@ -31,26 +31,28 @@ constexpr std::uint32_t default_text_colour = 0xC0C0C0;
 
 // The colour at a percentage of its brightness, e.g. for what is
 // remembered but out of sight
-std::uint32_t Dim(std::uint32_t rgb, int percent)
+[[nodiscard]] constexpr std::uint32_t Dim(std::uint32_t rgb, int percent) noexcept
 {
-    const auto scale = [percent](std::uint32_t channel) {
-        return channel * static_cast<std::uint32_t>(std::clamp(percent, 0, 100)) / 100;
-    };
+    const std::uint32_t factor = static_cast<std::uint32_t>(std::clamp(percent, 0, 100));
+    const std::uint32_t r = (((rgb >> 16) & 0xFF) * factor) / 100;
+    const std::uint32_t g = (((rgb >> 8) & 0xFF) * factor) / 100;
+    const std::uint32_t b = ((rgb & 0xFF) * factor) / 100;
 
-    return (scale((rgb >> 16) & 0xFF) << 16) | (scale((rgb >> 8) & 0xFF) << 8) | scale(rgb & 0xFF);
+    return (r << 16) | (g << 8) | b;
 }
 
 // A colour moved towards another by a percentage: 0 is the first, 100 the
 // second; e.g. to tint what a fire lights with the fire's colour
-std::uint32_t Blend(std::uint32_t rgb, std::uint32_t towards, int percent)
+[[nodiscard]] constexpr std::uint32_t Blend(std::uint32_t rgb, std::uint32_t towards, int percent) noexcept
 {
-    const auto weight = static_cast<std::uint32_t>(std::clamp(percent, 0, 100));
-    const auto mix = [weight](std::uint32_t from, std::uint32_t to) {
-        return (from * (100 - weight) + to * weight) / 100;
-    };
+    const std::uint32_t weight = static_cast<std::uint32_t>(std::clamp(percent, 0, 100));
+    const std::uint32_t inv_weight = 100 - weight;
 
-    return (mix((rgb >> 16) & 0xFF, (towards >> 16) & 0xFF) << 16) | (mix((rgb >> 8) & 0xFF, (towards >> 8) & 0xFF) << 8) |
-           mix(rgb & 0xFF, towards & 0xFF);
+    const std::uint32_t r = (((rgb >> 16) & 0xFF) * inv_weight + ((towards >> 16) & 0xFF) * weight) / 100;
+    const std::uint32_t g = (((rgb >> 8) & 0xFF) * inv_weight + ((towards >> 8) & 0xFF) * weight) / 100;
+    const std::uint32_t b = ((rgb & 0xFF) * inv_weight + (towards & 0xFF) * weight) / 100;
+
+    return (r << 16) | (g << 8) | b;
 }
 
 // A rectangle of cells: its top left corner and its size
