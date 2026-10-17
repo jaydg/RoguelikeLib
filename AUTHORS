@@ -5,3 +5,4 @@
   * Adam Milazzo <adam@adammil.net> - FOV algorithm
   * Joachim de Groot <jdegroot@web.de> - modernisation
   * illyigan - terminal colors code
+  * David Blackman and Sebastiano Vigna <vigna@acm.org> - xoshiro256 and splitmix64 PRNG algorithms
