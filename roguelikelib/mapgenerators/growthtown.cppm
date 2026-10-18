@@ -2,6 +2,7 @@ module;
 export module rl.mapgenerators.growthtown;
 export import rl.mapgenerators.biomes;
 import rl.map;
+import rl.maputils;
 import rl.matrix;
 import rl.position;
 import rl.randomness;
@@ -11,170 +12,6 @@ namespace RL
 {
 namespace
 {
-struct TownRoom {
-    int x, y, w = 1, h = 1, area = 1, ratio = 1;
-};
-
-// Inspired by Lopes et al., GAMEON 2010: rectangular seed growth followed
-// by frontier filling. Coarse cells leave one tile for walls and doors.
-void TownInterior(CMap& map, const SBuilding& building)
-{
-    const int inside_width = building.corner2.x - building.corner1.x - 1;
-    const int inside_height = building.corner2.y - building.corner1.y - 1;
-    // Small cottages need their floor space more than internal partitions.
-    if (inside_width * inside_height <= 9) {
-        for (auto y = building.corner1.y + 1; y < building.corner2.y; ++y) {
-            for (auto x = building.corner1.x + 1; x < building.corner2.x; ++x) {
-                map.SetCell(Position(x, y), "room");
-            }
-        }
-        map.SetCell(building.door, "door_closed");
-        return;
-    }
-    const int w = (building.corner2.x - building.corner1.x) / 2;
-    const int h = (building.corner2.y - building.corner1.y) / 2;
-    const int max_rooms = std::min(w * h, std::max(2, w * h / 2));
-    const int count = std::min(max_rooms, 2 + static_cast<int>(Random(3)));
-    std::vector<int> owner(w * h, -1);
-    std::vector<TownRoom> rooms{{0, 0, 1, 1, 1, 3}};
-    // The public room starts just inside the street-facing entrance.
-    const int entrance_x = building.door.x == building.corner1.x ? 0 :
-                           building.door.x == building.corner2.x ? w - 1 :
-                           (building.door.x - building.corner1.x - 1) / 2;
-    const int entrance_y = building.door.y == building.corner1.y ? 0 :
-                           building.door.y == building.corner2.y ? h - 1 :
-                           (building.door.y - building.corner1.y - 1) / 2;
-    rooms[0].x = entrance_x;
-    rooms[0].y = entrance_y;
-    owner[entrance_y * w + entrance_x] = 0;
-    for (int id = 1; id < count; ++id) {
-        std::vector<int> free;
-        for (int c = 0; c < w * h; ++c) {
-            if (owner[c] < 0) {
-                free.push_back(c);
-            }
-        }
-        const int c = free[Random(free.size())];
-        owner[c] = id;
-        rooms.push_back({c % w, c / w, 1, 1, 1, 1 + static_cast<int>(Random(2))});
-    }
-    for (;;) {
-        int selected = -1, direction = 0;
-        std::vector<int> strip;
-        for (int id = 0; id < count; ++id) {
-            const auto& r = rooms[id];
-            const int start = Random(4);
-            for (int step = 0; step < 4; ++step) {
-                const int d = (start + step) % 4;
-                const bool vertical = d < 2;
-                const int fixed = vertical ? r.x + (d == 0 ? -1 : r.w) : r.y + (d == 2 ? -1 : r.h);
-                if (fixed < 0 || fixed >= (vertical ? w : h)) {
-                    continue;
-                }
-                std::vector<int> cells;
-                for (int n = 0; n < (vertical ? r.h : r.w); ++n) {
-                    const int c = vertical ? (r.y + n) * w + fixed : fixed * w + r.x + n;
-                    if (owner[c] >= 0) {
-                        cells.clear();
-                        break;
-                    }
-                    cells.push_back(c);
-                }
-                if (!cells.empty() && (selected < 0 || r.area * rooms[selected].ratio < rooms[selected].area * r.ratio)) {
-                    selected = id;
-                    direction = d;
-                    strip = std::move(cells);
-                }
-            }
-        }
-        if (selected < 0) {
-            break;
-        }
-        auto& r = rooms[selected];
-        for (int c : strip) {
-            owner[c] = selected;
-            ++r.area;
-        }
-        if (direction < 2) {
-            r.x -= direction == 0;
-            ++r.w;
-        } else {
-            r.y -= direction == 2;
-            ++r.h;
-        }
-    }
-    // Fill gaps from adjacent rooms, keeping each room connected.
-    for (;;) {
-        int selected = -1, cell = -1;
-        for (int c = 0; c < w * h; ++c) {
-            if (owner[c] >= 0) {
-                continue;
-            }
-            const std::array neighbors{c % w > 0 ? c - 1 : -1, c % w + 1 < w ? c + 1 : -1,
-                                       c >= w ? c - w : -1, c + w < w * h ? c + w : -1};
-            for (int n : neighbors) {
-                if (n < 0 || owner[n] < 0) {
-                    continue;
-                }
-                const int id = owner[n];
-                if (selected < 0 || rooms[id].area * rooms[selected].ratio < rooms[selected].area * rooms[id].ratio) {
-                    selected = id;
-                    cell = c;
-                }
-            }
-        }
-        if (selected < 0) {
-            break;
-        }
-        owner[cell] = selected;
-        ++rooms[selected].area;
-    }
-    struct Boundary { int a, b; Position pos; };
-    std::vector<Boundary> boundaries;
-    for (int y = 0; y < h; ++y) {
-        for (int x = 0; x < w; ++x) {
-            const int id = owner[y * w + x];
-            const Position p(building.corner1.x + 1 + 2 * x, building.corner1.y + 1 + 2 * y);
-            map.SetCell(p, "room");
-            for (int d = 0; d < 2; ++d) {
-                if ((d == 0 && x + 1 == w) || (d == 1 && y + 1 == h)) {
-                    continue;
-                }
-                const int other = owner[y * w + x + (d == 0 ? 1 : w)];
-                const Position wall(p.x + (d == 0), p.y + (d == 1));
-                if (id == other) {
-                    map.SetCell(wall, "room");
-                } else {
-                    boundaries.push_back({id, other, wall});
-                }
-            }
-            if (x + 1 < w && y + 1 < h && owner[y * w + x + 1] == id &&
-                    owner[(y + 1) * w + x] == id && owner[(y + 1) * w + x + 1] == id) {
-                map.SetCell(p.x + 1, p.y + 1, "room");
-            }
-        }
-    }
-    // Prefer public-room doors, then join components through shared walls.
-    Shuffle(boundaries.begin(), boundaries.end());
-    std::stable_sort(boundaries.begin(), boundaries.end(), [](const auto& a, const auto& b) {
-        return (a.a == 0 || a.b == 0) > (b.a == 0 || b.b == 0);
-    });
-    std::vector<int> component(count);
-    std::iota(component.begin(), component.end(), 0);
-    for (const auto& edge : boundaries) {
-        const int a = component[edge.a], b = component[edge.b];
-        if (a != b) {
-            map.SetCell(edge.pos, "door_closed");
-            for (int& c : component) {
-                if (c == b) {
-                    c = a;
-                }
-            }
-        }
-    }
-    map.SetCell(building.door, "door_closed");
-}
-
 // Join waypoints with cardinal steps; diagonals must not disconnect roads.
 void TownRoad(CMap& map, Position from, Position to, int radius = 0)
 {
@@ -475,7 +312,7 @@ export std::vector<SBuilding> CreateGrowthTown(CMap& map, const TerrainBiome& su
                     map.SetCell(x, y, "wall");
                 }
             }
-            TownInterior(map, building);
+            CreateBuildingInterior(map, building);
             // Adjacent houses share this clearance, leaving exactly one tile
             // between walls. The loop is linked to the entrance's street.
             for (int y = top - 1; y <= top + h + 1; ++y) {

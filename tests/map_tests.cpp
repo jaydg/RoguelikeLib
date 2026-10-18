@@ -519,3 +519,192 @@ void TestDoubleDoors()
           "UpdateOpenDoorGlyphs resolves vertical double door to '\\' over '/'");
 }
 
+void TestBuildingInterior()
+{
+    // 1. Small cottage (3x3 inside, area <= 9): full floor, no partitions
+    {
+        RL::CMap map(RL::Size(15, 15));
+        map.Clear("grass");
+        RL::SBuilding cottage;
+        cottage.corner1 = RL::Position(2, 2);
+        cottage.corner2 = RL::Position(6, 6);
+        cottage.door = RL::Position(2, 4);
+
+        RL::CreateBuildingInterior(map, cottage);
+
+        Check(map.get(cottage.door).getType() == "door_closed", "cottage entrance door is placed");
+        Check(map.get(cottage.door).getGlyph() == U'|', "vertical entrance door has '|' glyph");
+
+        bool walls_intact = true;
+        for (std::size_t y = cottage.corner1.y; y <= cottage.corner2.y; ++y) {
+            for (std::size_t x = cottage.corner1.x; x <= cottage.corner2.x; ++x) {
+                if (x == cottage.corner1.x || x == cottage.corner2.x ||
+                    y == cottage.corner1.y || y == cottage.corner2.y) {
+                    if (RL::Position(x, y) != cottage.door) {
+                        walls_intact &= map.get(x, y).getType() == "wall";
+                    }
+                } else {
+                    walls_intact &= map.get(x, y).getType() == "room";
+                }
+            }
+        }
+        Check(walls_intact, "cottage perimeter wall is intact and interior is fully open room");
+    }
+
+    // 2. Large building with odd dimensions (15x15 footprint, 13x13 inside)
+    {
+        RL::InitRandomness(123);
+        RL::CMap map(RL::Size(25, 25));
+        map.Clear("grass");
+        RL::SBuilding building;
+        building.corner1 = RL::Position(3, 3);
+        building.corner2 = RL::Position(17, 17);
+        building.door = RL::Position(10, 3); // top wall
+
+        RL::CreateBuildingInterior(map, building);
+
+        Check(map.get(building.door).getType() == "door_closed", "entrance door placed");
+        Check(map.get(building.door).getGlyph() == U'-', "horizontal entrance door has '-' glyph");
+
+        // Verify perimeter walls are intact except at entrance
+        bool perimeter_ok = true;
+        for (std::size_t y = building.corner1.y; y <= building.corner2.y; ++y) {
+            for (std::size_t x = building.corner1.x; x <= building.corner2.x; ++x) {
+                if (x == building.corner1.x || x == building.corner2.x ||
+                    y == building.corner1.y || y == building.corner2.y) {
+                    if (RL::Position(x, y) != building.door) {
+                        perimeter_ok &= map.get(x, y).getType() == "wall";
+                    }
+                }
+            }
+        }
+        Check(perimeter_ok, "large building perimeter walls are completely intact");
+
+        // Count interior rooms, internal walls, and internal doors
+        std::size_t room_cells = 0, internal_doors = 0, internal_walls = 0;
+        for (std::size_t y = building.corner1.y + 1; y < building.corner2.y; ++y) {
+            for (std::size_t x = building.corner1.x + 1; x < building.corner2.x; ++x) {
+                const auto type = map.get(x, y).getType();
+                if (type == "room") ++room_cells;
+                else if (type == "door_closed") ++internal_doors;
+                else if (type == "wall") ++internal_walls;
+            }
+        }
+        Check(room_cells > 0 && internal_walls > 0 && internal_doors > 0,
+              "large building contains internal walls, rooms, and doors");
+
+        // Connectivity check: starting at entrance, all rooms must be reachable
+        std::vector<bool> visited(map.getWidth() * map.getHeight(), false);
+        std::vector<RL::Position> queue{building.door};
+        visited[building.door.y * map.getWidth() + building.door.x] = true;
+        for (std::size_t i = 0; i < queue.size(); ++i) {
+            const auto p = queue[i];
+            const std::array next{RL::Position(p.x - 1, p.y), RL::Position(p.x + 1, p.y),
+                                  RL::Position(p.x, p.y - 1), RL::Position(p.x, p.y + 1)};
+            for (auto n : next) {
+                if (n.x <= building.corner1.x || n.x >= building.corner2.x ||
+                    n.y <= building.corner1.y || n.y >= building.corner2.y) continue;
+                if (visited[n.y * map.getWidth() + n.x]) continue;
+                const auto t = map.get(n).getType();
+                if (t == "room" || t == "door_closed") {
+                    visited[n.y * map.getWidth() + n.x] = true;
+                    queue.push_back(n);
+                }
+            }
+        }
+        bool all_rooms_reachable = true;
+        for (std::size_t y = building.corner1.y + 1; y < building.corner2.y; ++y) {
+            for (std::size_t x = building.corner1.x + 1; x < building.corner2.x; ++x) {
+                if (map.get(x, y).getType() == "room") {
+                    all_rooms_reachable &= visited[y * map.getWidth() + x];
+                }
+            }
+        }
+        Check(all_rooms_reachable, "all interior rooms are reachable from the entrance door");
+    }
+
+    // 3. Large building with even dimensions (16x14 footprint)
+    {
+        RL::InitRandomness(456);
+        RL::CMap map(RL::Size(30, 30));
+        map.Clear("grass");
+        RL::SBuilding building;
+        building.corner1 = RL::Position(5, 5);
+        building.corner2 = RL::Position(20, 18); // width 16, height 14
+        building.door = RL::Position(5, 10); // west wall
+
+        RL::CreateBuildingInterior(map, building);
+
+        Check(map.get(building.door).getType() == "door_closed", "even dimension entrance door placed");
+        Check(map.get(building.door).getGlyph() == U'|', "vertical entrance door has '|' glyph");
+
+        bool perimeter_ok = true;
+        for (std::size_t y = building.corner1.y; y <= building.corner2.y; ++y) {
+            for (std::size_t x = building.corner1.x; x <= building.corner2.x; ++x) {
+                if (x == building.corner1.x || x == building.corner2.x ||
+                    y == building.corner1.y || y == building.corner2.y) {
+                    if (RL::Position(x, y) != building.door) {
+                        perimeter_ok &= map.get(x, y).getType() == "wall";
+                    }
+                }
+            }
+        }
+        Check(perimeter_ok, "even dimension building outer walls are strictly 1-tile thick");
+    }
+
+    // 4. Backward compatibility alias TownInterior
+    {
+        RL::InitRandomness(789);
+        RL::CMap map1(RL::Size(20, 20)), map2(RL::Size(20, 20));
+        map1.Clear("grass");
+        map2.Clear("grass");
+        RL::SBuilding b;
+        b.corner1 = RL::Position(2, 2);
+        b.corner2 = RL::Position(14, 14);
+        b.door = RL::Position(8, 2);
+
+        RL::InitRandomness(999);
+        RL::CreateBuildingInterior(map1, b);
+        RL::InitRandomness(999);
+        RL::TownInterior(map2, b);
+
+        bool identical = true;
+        for (std::size_t y = 0; y < 20; ++y) {
+            for (std::size_t x = 0; x < 20; ++x) {
+                identical &= map1.get(x, y).getType() == map2.get(x, y).getType() &&
+                             map1.get(x, y).getGlyph() == map2.get(x, y).getGlyph();
+            }
+        }
+        Check(identical, "TownInterior is an alias producing identical results to CreateBuildingInterior");
+    }
+}
+
+void TestSimpleCity()
+{
+    RL::CMap map(RL::Size(70, 70));
+    RL::InitRandomness(42);
+    RL::CreateSimpleCity(map, 6);
+
+    std::size_t buildings_found = 0;
+    std::size_t doors_found = 0;
+    std::size_t roads_found = 0;
+
+    for (std::size_t y = 0; y < map.getHeight(); ++y) {
+        for (std::size_t x = 0; x < map.getWidth(); ++x) {
+            const auto type = map.get(x, y).getType();
+            if (type == "door_closed") {
+                ++doors_found;
+                const auto glyph = map.get(x, y).getGlyph();
+                Check(glyph == U'-' || glyph == U'|', "all doors in simple city have directional glyphs");
+            } else if (type == "corridor") {
+                ++roads_found;
+            } else if (type == "room") {
+                ++buildings_found;
+            }
+        }
+    }
+
+    Check(buildings_found > 0, "simple city generates building interiors with rooms");
+    Check(doors_found >= 6, "simple city places entrance and interior doors");
+    Check(roads_found > 0, "simple city generates road networks");
+}

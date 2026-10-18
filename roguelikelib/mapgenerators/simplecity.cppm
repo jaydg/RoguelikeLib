@@ -50,36 +50,28 @@ void CreateSimpleCityImpl(CMap &level, const int& a_number_of_buildings, const T
                 Position pos;
 
                 if (FindOnMapRandomRectangleOfType(level, "grass", pos, Size(size_x + 2, size_y + 2))) {
-                    SRoom building, smaller;
                     pos.x++;
                     pos.y++;
+                    SBuilding building;
                     building.corner1 = pos;
-                    building.corner2 = pos;
-                    building.corner2.x += size_x;
-                    building.corner2.y += size_y;
-                    smaller = building;
-                    smaller.corner1.x++;
-                    smaller.corner1.y++;
-                    smaller.corner2.x--;
-                    smaller.corner2.y--;
-                    DrawRectangleOnMap(level, building.corner1, building.corner2, "wall");
-                    DrawRectangleOnMap(level, smaller.corner1, smaller.corner2, "room");
-                    AddRecursiveRooms(level, "wall", 3, 3, smaller);
+                    building.corner2 = Position(pos.x + size_x - 1, pos.y + size_y - 1);
 
-                    // add a doors leading out (improve to lead to nearest road)
+                    // add a door leading out
                     if (CoinToss()) {
                         if (CoinToss()) {
-                            level.SetCell(building.corner1.x + Random(size_x - 2) +1, building.corner1.y, "door_closed");
+                            building.door = Position(building.corner1.x + 1 + Random(size_x - 2), building.corner1.y);
                         } else {
-                            level.SetCell(building.corner1.x + Random(size_x - 2) +1, building.corner2.y - 1, "door_closed");
+                            building.door = Position(building.corner1.x + 1 + Random(size_x - 2), building.corner2.y);
                         }
                     } else {
                         if (CoinToss()) {
-                            level.SetCell(building.corner1.x, building.corner1.y + Random(size_y - 2) +1, "door_closed");
+                            building.door = Position(building.corner1.x, building.corner1.y + 1 + Random(size_y - 2));
                         } else {
-                            level.SetCell(building.corner2.x - 1, building.corner1.y + Random(size_y - 2) +1, "door_closed");
+                            building.door = Position(building.corner2.x, building.corner1.y + 1 + Random(size_y - 2));
                         }
                     }
+
+                    CreateBuildingInterior(level, building);
 
                     build_count++;
 
@@ -125,6 +117,7 @@ void CreateSimpleCityImpl(CMap &level, const int& a_number_of_buildings, const T
                 }
             }
 
+            UpdateDoorAndWindowGlyphs(level);
             return;
         }
     }
