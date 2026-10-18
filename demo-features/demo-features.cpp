@@ -692,6 +692,44 @@ public:
             const std::size_t width = std::min<std::size_t>(30, inside.size.x / 2);
             list_area = {map_area.corner, Size(width, map_area.size.y)};
             list.Draw(screen, list_area);
+
+            const std::size_t sep_x = list_area.Right();
+            if (sep_x < inside.Right()) {
+                const auto info_opt = list.getScrollInfo();
+                if (info_opt && info_opt->content.y > info_opt->viewport.y && list_area.size.y >= 3) {
+                    const auto& info = *info_opt;
+                    const std::size_t content = info.content.y;
+                    const std::size_t viewport = info.viewport.y;
+                    const std::size_t offset = info.offset.y;
+
+                    const bool can_scroll_up = offset > 0;
+                    screen.Put(sep_x, list_area.corner.y, U'▲', can_scroll_up ? 0xFFFF70 : 0x505050, can_scroll_up);
+
+                    const bool can_scroll_down = offset + viewport < content;
+                    screen.Put(sep_x, list_area.Bottom() - 1, U'▼', can_scroll_down ? 0xFFFF70 : 0x505050, can_scroll_down);
+
+                    const std::size_t track_len = list_area.size.y - 2;
+                    const std::size_t thumb_len = std::clamp(static_cast<std::size_t>(
+                        static_cast<double>(viewport) / content * track_len), std::size_t{1}, track_len);
+                    const std::size_t max_offset = content - viewport;
+                    const std::size_t thumb_start = (max_offset == 0) ? 0 : static_cast<std::size_t>(
+                        static_cast<double>(std::min(offset, max_offset)) / max_offset * (track_len - thumb_len));
+
+                    for (std::size_t i = 0; i < track_len; ++i) {
+                        const std::size_t sy = list_area.corner.y + 1 + i;
+                        if (i >= thumb_start && i < thumb_start + thumb_len) {
+                            screen.Put(sep_x, sy, U'█', 0xA0A0A0);
+                        } else {
+                            screen.Put(sep_x, sy, U'│', 0x404040);
+                        }
+                    }
+                } else {
+                    for (std::size_t y = list_area.corner.y; y < list_area.Bottom(); ++y) {
+                        screen.Put(sep_x, y, U'│', 0x505050);
+                    }
+                }
+            }
+
             map_area.corner.x += width + 1;
             map_area.size.x -= std::min(width + 1, map_area.size.x);
         }
@@ -725,7 +763,18 @@ public:
                 status += " | " + description;
             }
         }
-        screen.Print(inside.corner.x, inside.corner.y, status);
+        if (mode == 0 && list_area.size.x > 0) {
+            const std::size_t cur = list.getSelected().value_or(0) + 1;
+            const std::size_t total = list.getItems().size();
+            const std::string header = std::format("Generators ({}/{})", cur, total);
+            screen.Print(inside.corner.x, inside.corner.y, header, 0xC0C0C0);
+            if (list_area.Right() < inside.Right()) {
+                screen.Put(list_area.Right(), inside.corner.y, U'┬', 0x606060);
+            }
+            screen.Print(map_area.corner.x, inside.corner.y, status);
+        } else {
+            screen.Print(inside.corner.x, inside.corner.y, status);
+        }
         DrawMap(screen, level, map_area, origin);
 
         if (mode == 1 || mode == 3) {
@@ -840,9 +889,38 @@ public:
 
         const Position absolute(content_origin.x + at.x, content_origin.y + at.y);
 
-        if (mode == 0 && list_area.Contains(absolute)) {
-            list.Click(Position(absolute.x - list_area.corner.x, absolute.y - list_area.corner.y), button);
-        } else if ((mode == 1 || mode == 3) && map_area.Contains(absolute)) {
+        if (mode == 0) {
+            if (list_area.Contains(absolute)) {
+                list.Click(Position(absolute.x - list_area.corner.x, absolute.y - list_area.corner.y), button);
+            } else if (absolute.x == list_area.Right() && absolute.y >= list_area.corner.y && absolute.y < list_area.Bottom()) {
+                const auto scroll_info = list.getScrollInfo();
+                if (scroll_info && scroll_info->content.y > scroll_info->viewport.y && list_area.size.y >= 3) {
+                    const std::size_t row = absolute.y - list_area.corner.y;
+                    if (row == 0) {
+                        list.Scroll(-1);
+                    } else if (row == list_area.size.y - 1) {
+                        list.Scroll(1);
+                    } else {
+                        const std::size_t track_len = list_area.size.y - 2;
+                        const std::size_t thumb_len = std::clamp(static_cast<std::size_t>(
+                            static_cast<double>(scroll_info->viewport.y) / scroll_info->content.y * track_len), std::size_t{1}, track_len);
+                        const std::size_t max_offset = scroll_info->content.y - scroll_info->viewport.y;
+                        const std::size_t thumb_start = (max_offset == 0) ? 0 : static_cast<std::size_t>(
+                            static_cast<double>(std::min(scroll_info->offset.y, max_offset)) / max_offset * (track_len - thumb_len));
+                        const std::size_t track_row = row - 1;
+                        if (track_row < thumb_start) {
+                            list.Scroll(-static_cast<int>(list_area.size.y));
+                        } else if (track_row >= thumb_start + thumb_len) {
+                            list.Scroll(static_cast<int>(list_area.size.y));
+                        }
+                    }
+                    if (list.getSelected() != generated) {
+                        Generate();
+                    }
+                }
+            }
+        }
+        if ((mode == 1 || mode == 3) && map_area.Contains(absolute)) {
             const Position pos(origin.x + absolute.x - map_area.corner.x, origin.y + absolute.y - map_area.corner.y);
 
             if (level.inside(pos) && level.get(pos).isPassable()) {
@@ -879,6 +957,14 @@ public:
     void Scroll(int lines) override
     {
         if (mode == 0) {
+            if (hover_position && hover_position->x <= list_area.Right()) {
+                list.Scroll(lines);
+                if (list.getSelected() != generated) {
+                    Generate();
+                }
+                return;
+            }
+
             const std::size_t maximum = level.getHeight() > map_area.size.y ? level.getHeight() - map_area.size.y : 0;
             const auto y = std::clamp(static_cast<std::int64_t>(origin.y) + lines,
                                       std::int64_t{0}, static_cast<std::int64_t>(maximum));
