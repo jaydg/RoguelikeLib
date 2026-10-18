@@ -77,6 +77,36 @@ public:
     }
 
     /**
+     * @brief Sets the tile type and glyph of a cell at given coordinates with bounds checking.
+     * @param x Horizontal column index.
+     * @param y Vertical row index.
+     * @param element Tile type name to assign.
+     * @param glyph Unicode glyph override to assign.
+     * @throws EOutOfBoundException If `(x, y)` is outside the map boundaries.
+     */
+    void SetCell(const std::size_t& x, const std::size_t& y, std::string_view element, char32_t glyph)
+    {
+        if (!inside(x, y)) {
+            throw EOutOfBoundException(Position(x, y), getSize());
+        }
+
+        get(x, y).setType(element);
+        get(x, y).setGlyph(glyph);
+    }
+
+    /**
+     * @brief Sets the tile type and glyph of a cell at a position with bounds checking.
+     * @param pos Coordinate position to modify.
+     * @param element Tile type name to assign.
+     * @param glyph Unicode glyph override to assign.
+     * @throws EOutOfBoundException If @p pos is outside the map boundaries.
+     */
+    void SetCell(const Position &pos, std::string_view element, char32_t glyph)
+    {
+        SetCell(pos.x, pos.y, element, glyph);
+    }
+
+    /**
      * @brief Blits and stamps a source map into this map at a given origin offset.
      *
      * Copies whole tiles directly from @p source to preserve glyphs, colors,

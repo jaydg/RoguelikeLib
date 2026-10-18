@@ -247,10 +247,19 @@ void TestSymmetricStructure()
                 if (!horiz_walls && !vert_walls) {
                     invalid_doors++;
                 }
+                const auto& door_tile = void_castle.get(x, y);
+                if (t == "door_closed") {
+                    if (horiz_walls && door_tile.getGlyph() != U'-') {
+                        invalid_doors++;
+                    }
+                    if (vert_walls && door_tile.getGlyph() != U'|') {
+                        invalid_doors++;
+                    }
+                }
             }
         }
     }
-    Check(total_doors > 0 && invalid_doors == 0, "all internal doors are framed by opposing walls without orphan doors");
+    Check(total_doors > 0 && invalid_doors == 0, "all internal doors are framed with directional '-' or '|' glyphs");
 
     // Test castle with outside entrance door
     RL::CMap entrance_castle(RL::Size(79, 50));
@@ -303,6 +312,13 @@ void TestSymmetricStructure()
                     invalid_windows++;
                 }
 
+                if (horiz_framed && tile.getGlyph() != U'-') {
+                    invalid_windows++;
+                }
+                if (vert_framed && tile.getGlyph() != U'|') {
+                    invalid_windows++;
+                }
+
                 // Check vertical mirror symmetry
                 const std::size_t mx = window_castle.getWidth() - 1 - x;
                 if (window_castle.get(mx, y).getType() != "window") {
@@ -312,7 +328,7 @@ void TestSymmetricStructure()
         }
     }
     Check(total_windows > 0, "castle generates outside windows when requested");
-    Check(invalid_windows == 0, "all castle windows are transparent, impassable, and on framed outside walls");
+    Check(invalid_windows == 0, "all castle windows are transparent, impassable, and have '-' or '|' glyphs matching wall framing");
     Check(symmetric_windows, "castle windows are vertically symmetric");
 
     // Test space shuttle with outside windows
@@ -346,6 +362,13 @@ void TestSymmetricStructure()
                                          ((is_int(west) && is_ext(east)) || (is_int(east) && is_ext(west)));
 
                 if (!horiz_framed && !vert_framed) {
+                    invalid_shuttle_windows++;
+                }
+
+                if (horiz_framed && tile.getGlyph() != U'-') {
+                    invalid_shuttle_windows++;
+                }
+                if (vert_framed && tile.getGlyph() != U'|') {
                     invalid_shuttle_windows++;
                 }
 

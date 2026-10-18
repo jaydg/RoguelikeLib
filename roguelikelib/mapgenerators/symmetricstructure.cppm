@@ -253,8 +253,8 @@ void CreateSymmetricStructure(CMap &level, const int& max_number_of_rooms = 15,
                                 level.SetCell(x_left, k, "corridor");
                                 level.SetCell(x_right, k, "corridor");
                             }
-                            level.SetCell(x_left, y, "door_closed");
-                            level.SetCell(x_right, y, "door_closed");
+                            level.SetCell(x_left, y, "door_closed", U'-');
+                            level.SetCell(x_right, y, "door_closed", U'-');
                             return true;
                         }
                     }
@@ -303,8 +303,8 @@ void CreateSymmetricStructure(CMap &level, const int& max_number_of_rooms = 15,
                                 level.SetCell(k, y_top, "corridor");
                                 level.SetCell(k, y_bottom, "corridor");
                             }
-                            level.SetCell(x, y_top, "door_closed");
-                            level.SetCell(x, y_bottom, "door_closed");
+                            level.SetCell(x, y_top, "door_closed", U'|');
+                            level.SetCell(x, y_bottom, "door_closed", U'|');
                             return true;
                         }
                     }
@@ -411,8 +411,8 @@ void CreateSymmetricStructure(CMap &level, const int& max_number_of_rooms = 15,
             return false;
         };
 
-        auto is_outside_wall = [&](int x, int y) -> bool {
-            if (level.get(x, y).getType() != "wall") return false;
+        auto get_outside_wall_glyph = [&](int x, int y) -> char32_t {
+            if (level.get(x, y).getType() != "wall") return 0;
 
             // Horizontal wall candidate:
             if (x > 0 && x + 1 < w &&
@@ -423,7 +423,7 @@ void CreateSymmetricStructure(CMap &level, const int& max_number_of_rooms = 15,
                 const bool north_ext = is_exterior(x, y - 1);
                 const bool south_ext = is_exterior(x, y + 1);
                 if ((north_int && south_ext) || (south_int && north_ext)) {
-                    return true;
+                    return U'-';
                 }
             }
 
@@ -436,11 +436,11 @@ void CreateSymmetricStructure(CMap &level, const int& max_number_of_rooms = 15,
                 const bool west_ext = is_exterior(x - 1, y);
                 const bool east_ext = is_exterior(x + 1, y);
                 if ((west_int && east_ext) || (east_int && west_ext)) {
-                    return true;
+                    return U'|';
                 }
             }
 
-            return false;
+            return 0;
         };
 
         const int max_x = (axis == ESymmetryAxis::Vertical) ? (w / 2) : (w - 1);
@@ -448,13 +448,15 @@ void CreateSymmetricStructure(CMap &level, const int& max_number_of_rooms = 15,
 
         for (int y = 0; y <= max_y; ++y) {
             for (int x = 0; x <= max_x; ++x) {
-                if (!is_outside_wall(x, y)) continue;
+                const char32_t g = get_outside_wall_glyph(x, y);
+                if (g == 0) continue;
 
                 const Position mirror_p = get_mirror(x, y);
                 const int mx = static_cast<int>(mirror_p.x);
                 const int my = static_cast<int>(mirror_p.y);
 
-                if (!is_outside_wall(mx, my)) continue;
+                const char32_t mg = get_outside_wall_glyph(mx, my);
+                if (mg == 0) continue;
 
                 if (near_door(x, y) || near_door(mx, my)) continue;
                 if (near_window(x, y) || near_window(mx, my)) continue;
@@ -472,11 +474,13 @@ void CreateSymmetricStructure(CMap &level, const int& max_number_of_rooms = 15,
                     }
                 }
 
-                level.SetCell(x, y, "window");
-                level.SetCell(mx, my, "window");
+                level.SetCell(x, y, "window", g);
+                level.SetCell(mx, my, "window", mg);
             }
         }
     }
+
+    UpdateDoorAndWindowGlyphs(level);
 }
 
 void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool void_outside = false, bool outside_door = false, float window_probability = 0.0f)

@@ -274,13 +274,47 @@ void AddDoors(CMap &level, float door_probability, float open_probability)
                         if (is_open < open_probability) {
                             level.SetCell(x, y, "door_open");
                         } else {
-                            level.SetCell(x, y, "door_closed");
+                            const char32_t glyph = horiz_flanked ? U'-' : U'|';
+                            level.SetCell(x, y, "door_closed", glyph);
                         }
                     }
                 }
             } // if corridor at position
         } // for y < level height
     } // for x < level width
+}
+
+/**
+ * @brief Updates closed door and window glyphs to match horizontal ('-') or vertical ('|') wall orientation.
+ * @param level Map whose doors and windows will be resolved.
+ */
+void UpdateDoorAndWindowGlyphs(CMap &level)
+{
+    auto is_solid = [&](int nx, int ny) -> bool {
+        if (nx < 0 || nx >= static_cast<int>(level.getWidth()) ||
+            ny < 0 || ny >= static_cast<int>(level.getHeight())) {
+            return true;
+        }
+        return !level.get(nx, ny).isPassable();
+    };
+
+    for (std::size_t y = 0; y < level.getHeight(); ++y) {
+        for (std::size_t x = 0; x < level.getWidth(); ++x) {
+            const auto type = level.get(x, y).getType();
+            if (type == "door_closed" || type == "window") {
+                const int ix = static_cast<int>(x);
+                const int iy = static_cast<int>(y);
+                const bool horiz_flanked = is_solid(ix - 1, iy) && is_solid(ix + 1, iy);
+                const bool vert_flanked = is_solid(ix, iy - 1) && is_solid(ix, iy + 1);
+
+                if (horiz_flanked && !vert_flanked) {
+                    level.get(x, y).setGlyph(U'-');
+                } else if (vert_flanked && !horiz_flanked) {
+                    level.get(x, y).setGlyph(U'|');
+                }
+            }
+        }
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////

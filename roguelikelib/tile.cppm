@@ -222,6 +222,15 @@ export {
         }
 
         /**
+         * @brief Sets the Unicode glyph representing this tile.
+         * @param g 32-bit Unicode code point (e.g., `U'-'`, `U'|'`).
+         */
+        void setGlyph(char32_t g) noexcept
+        {
+            glyph = g;
+        }
+
+        /**
          * @brief Returns the packed RGB color value (`0x00RRGGBB`).
          */
         [[nodiscard]] std::uint32_t getColor() const
