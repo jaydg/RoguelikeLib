@@ -11,7 +11,7 @@ export import rl.mapgenerators.maze;
 export import rl.mapgenerators.antnest;
 export import rl.mapgenerators.mines;
 export import rl.mapgenerators.caves;
-export import rl.mapgenerators.spaceshuttle;
+export import rl.mapgenerators.symmetricstructure;
 export import rl.mapgenerators.simplecity;
 export import rl.mapgenerators.growthtown;
 export import rl.mapgenerators.delve;

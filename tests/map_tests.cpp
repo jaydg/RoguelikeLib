@@ -138,5 +138,49 @@ void TestTownRoads()
         }
         Check(preserved, "connecting generated towns preserves all stamped tiles");
     }
-
 }
+
+void TestSymmetricStructure()
+{
+    RL::InitRandomness(1234);
+    RL::CMap shuttle(RL::Size(79, 50));
+    RL::CreateSpaceShuttle(shuttle, 20);
+
+    std::size_t shuttle_rooms = 0;
+    std::size_t shuttle_walls = 0;
+    for (std::size_t y = 0; y < shuttle.getHeight(); ++y) {
+        for (std::size_t x = 0; x < shuttle.getWidth(); ++x) {
+            if (shuttle.get(x, y).getType() == "room") shuttle_rooms++;
+            if (shuttle.get(x, y).getType() == "wall") shuttle_walls++;
+        }
+    }
+    Check(shuttle_rooms > 200 && shuttle_walls > 200, "space shuttle generates rooms and walls");
+
+    RL::InitRandomness(1234);
+    RL::CMap castle(RL::Size(79, 50));
+    RL::CreateCastle(castle, 20);
+
+    std::size_t castle_rooms = 0;
+    std::size_t castle_walls = 0;
+    std::size_t lr_matches = 0;
+    for (std::size_t y = 0; y < castle.getHeight(); ++y) {
+        for (std::size_t x = 0; x < castle.getWidth() / 2; ++x) {
+            const auto& left = castle.get(x, y);
+            const auto& right = castle.get(castle.getWidth() - 1 - x, y);
+            if (left.getType() == right.getType()) {
+                lr_matches++;
+            }
+        }
+    }
+    for (std::size_t y = 0; y < castle.getHeight(); ++y) {
+        for (std::size_t x = 0; x < castle.getWidth(); ++x) {
+            if (castle.get(x, y).getType() == "room") castle_rooms++;
+            if (castle.get(x, y).getType() == "wall") castle_walls++;
+        }
+    }
+    Check(castle_rooms > 200 && castle_walls > 200, "castle generates rooms and walls");
+    // Most cells in the left and right halves should match symmetrically
+    const std::size_t total_half_cells = (castle.getWidth() / 2) * castle.getHeight();
+    Check(lr_matches > total_half_cells * 9 / 10, "castle exhibits strong left-right symmetry");
+}
+

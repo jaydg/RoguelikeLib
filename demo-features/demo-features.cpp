@@ -348,6 +348,12 @@ std::vector<SGenerator> Generators(std::shared_ptr<CCaveGladeConfig> cave_glade_
             }
         },
         {
+            "Castle", [](CMap & map)
+            {
+                CreateCastle(map, 25);
+            }
+        },
+        {
             "Riverland", [riverland_config](CMap & map)
             {
                 if (riverland_config) {

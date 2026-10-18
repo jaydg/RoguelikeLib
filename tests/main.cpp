@@ -21,6 +21,7 @@ void TestWindingRoad();
 void TestForestRoads();
 void TestMapStamp();
 void TestTownRoads();
+void TestSymmetricStructure();
 void TestScreen();
 void TestCamera();
 void TestRectangles();
@@ -65,6 +66,7 @@ int main(int argc, char* argv[])
         {"RiverlandRoads", TestForestRoads},
         {"MapStamp", TestMapStamp},
         {"TownRoads", TestTownRoads},
+        {"SymmetricStructure", TestSymmetricStructure},
         {"Screen", TestScreen},
         {"Camera", TestCamera},
         {"Rectangles", TestRectangles},
