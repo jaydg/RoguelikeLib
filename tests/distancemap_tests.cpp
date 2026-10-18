@@ -78,6 +78,23 @@ void TestDistanceMap()
     Check(Walk(cheap, paths, RL::Position(0, 0), costs) == 7, "following the steps costs what the distance says");
     Check(Walk(cheap, paths, RL::Position(0, 2), costs) == cheap.Distance(RL::Position(0, 2)), "from anywhere");
 
+    // A cost names its type by its letters, wherever the name is kept; a
+    // type nobody registered changes nothing, and the first cost given for
+    // a type is the one that counts
+    const std::string spelled = std::string("gra") + "ss";
+    const std::array named{RL::SStepCost{"no such tile", 5}, RL::SStepCost{spelled, 3}, RL::SStepCost{"grass", 9}};
+    const RL::CDistanceMap same(paths, corner, named);
+    bool alike = true;
+
+    for (std::size_t y = 0; y < 3; ++y) {
+        for (std::size_t x = 0; x < 6; ++x) {
+            alike = alike && same.Distance(RL::Position(x, y)) == cheap.Distance(RL::Position(x, y)) &&
+                    same.NextStep(RL::Position(x, y)) == cheap.NextStep(RL::Position(x, y));
+        }
+    }
+
+    Check(alike, "a name spelled at runtime, unknown types and later duplicates");
+
     // What cannot be walked on is not walked through
     const RL::CMap walled = RL::tests::MakeMap({
         "..T..",

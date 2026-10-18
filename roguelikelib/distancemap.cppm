@@ -101,6 +101,8 @@ public:
      * @param map Reference to the tile level.
      * @param goals Collection of target destination coordinates to propagate outwards from.
      * @param costs Optional list of tile archetype cost overrides (defaults to uniform cost 1).
+     *              Types not registered in @ref CTileData are ignored; if a type is listed
+     *              more than once, its first entry applies. Each cell's cost is resolved once.
      * @param a_neighbors Connectivity mode (All8 allows diagonal movement, Cardinal4 restricts to cardinal directions).
      * @param max_distance Maximum cumulative distance to explore. Cells beyond this limit are marked as unreachable.
      * @throws std::invalid_argument If any entry in @p costs has a cost strictly less than 1.
@@ -170,10 +172,31 @@ public:
             }
         } else {
             // DIJKSTRA FOR VARIABLE COSTS
-            const auto cost_of = [&costs](const CTile& tile) {
-                for (const auto& listed : costs) {
-                    if (tile.getType() == listed.type) {
-                        return listed.cost;
+            // Every tile views its type's name in the registry, so a type is
+            // known by the address of that name, which is far cheaper to
+            // compare than its letters. A type nobody registered cannot be on
+            // the map; the first cost given for a type is the one that counts.
+            std::vector<std::pair<const char*, int>> by_name;
+            by_name.reserve(costs.size());
+
+            for (const SStepCost& listed : costs) {
+                if (!CTileData::has(listed.type)) {
+                    continue;
+                }
+
+                const char* name = CTileData::get(listed.type).first.data();
+
+                if (std::ranges::find(by_name, name, &std::pair<const char*, int>::first) == by_name.end()) {
+                    by_name.emplace_back(name, listed.cost);
+                }
+            }
+
+            const auto cost_of = [&by_name](const CTile& tile) {
+                const char* name = tile.getType().data();
+
+                for (const auto& [listed, cost] : by_name) {
+                    if (listed == name) {
+                        return cost;
                     }
                 }
                 return 1;
@@ -227,7 +250,13 @@ public:
                             auto& from_cell = grid.get_unchecked(unx, uny);
                             if (new_dist < from_cell.distance) {
                                 from_cell.distance = new_dist;
-                                from_cell.step_cost = cost_of(from_tile);
+
+                                // A passable cell's cost is at least 1 and
+                                // never changes, so it is looked up once
+                                if (from_cell.step_cost == 0) {
+                                    from_cell.step_cost = cost_of(from_tile);
+                                }
+
                                 queue.push({new_dist, Position(unx, uny)});
                             }
                         }
