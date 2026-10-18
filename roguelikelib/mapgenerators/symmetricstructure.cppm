@@ -19,7 +19,8 @@ enum class ESymmetryAxis
 };
 
 void CreateSymmetricStructure(CMap &level, const int& max_number_of_rooms = 15,
-                              ESymmetryAxis axis = ESymmetryAxis::Horizontal)
+                              ESymmetryAxis axis = ESymmetryAxis::Horizontal,
+                              bool void_outside = false)
 {
     constexpr int room_max_size = 15;
     constexpr int room_min_size = 3;
@@ -178,16 +179,54 @@ void CreateSymmetricStructure(CMap &level, const int& max_number_of_rooms = 15,
     }
 
     AddDoors(level, 1, 0);
+
+    if (void_outside) {
+        std::vector<Position> outside_walls;
+        outside_walls.reserve(level.getWidth() * level.getHeight());
+        for (std::size_t y = 0; y < level.getHeight(); ++y) {
+            for (std::size_t x = 0; x < level.getWidth(); ++x) {
+                if (level.get(x, y).getType() == "wall") {
+                    bool has_interior = false;
+                    for (int dy = -1; dy <= 1; ++dy) {
+                        for (int dx = -1; dx <= 1; ++dx) {
+                            if (dx == 0 && dy == 0) {
+                                continue;
+                            }
+                            const int nx = static_cast<int>(x) + dx;
+                            const int ny = static_cast<int>(y) + dy;
+                            if (nx >= 0 && nx < static_cast<int>(level.getWidth()) &&
+                                    ny >= 0 && ny < static_cast<int>(level.getHeight())) {
+                                const auto type = level.get(nx, ny).getType();
+                                if (type != "wall" && type != "void") {
+                                    has_interior = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (has_interior) {
+                            break;
+                        }
+                    }
+                    if (!has_interior) {
+                        outside_walls.push_back(Position(x, y));
+                    }
+                }
+            }
+        }
+        for (const auto& pos : outside_walls) {
+            level.SetCell(pos, "void");
+        }
+    }
 }
 
-void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15)
+void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool void_outside = false)
 {
-    CreateSymmetricStructure(level, max_number_of_rooms, ESymmetryAxis::Horizontal);
+    CreateSymmetricStructure(level, max_number_of_rooms, ESymmetryAxis::Horizontal, void_outside);
 }
 
-void CreateCastle(CMap &level, const int& max_number_of_rooms = 15)
+void CreateCastle(CMap &level, const int& max_number_of_rooms = 15, bool void_outside = false)
 {
-    CreateSymmetricStructure(level, max_number_of_rooms, ESymmetryAxis::Vertical);
+    CreateSymmetricStructure(level, max_number_of_rooms, ESymmetryAxis::Vertical, void_outside);
 }
 
 } // end of namespace RL

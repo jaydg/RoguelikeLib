@@ -59,6 +59,7 @@ export {
         {
             // *INDENT-OFF* (keep astyle from ruining this beauty)
             static TileRegistry tiles = {
+                { "void",        { U' ', 0x000000, true,  false } },
                 { "wall",        { U'#', 0x888888, false, false } },
                 { "corridor",    { U'.', 0xCCCCCC, true,  true } },
                 { "grass",       { U'"', 0xA7CC7C, true,  true } },

@@ -300,8 +300,192 @@ struct CRiverlandConfig {
     }
 };
 
+struct CCastleConfig {
+    enum class EBgType {
+        Riverland,
+        Biome,
+        Void,
+        SolidRock
+    };
+
+    struct BgEntry {
+        std::string label;
+        EBgType type;
+        std::function<TerrainBiome()> biome_fn;
+    };
+
+    struct RoomEntry {
+        std::string label;
+        std::size_t count;
+    };
+
+    struct ScaleEntry {
+        std::string label;
+        double factor;
+    };
+
+    struct VoidEntry {
+        std::string label;
+        bool value;
+    };
+
+    struct PresetEntry {
+        std::string label;
+        std::size_t bg;
+        std::size_t scale;
+        std::size_t rooms;
+        std::size_t void_mode;
+    };
+
+    std::vector<BgEntry> backgrounds = {
+        {"Riverland (Woodland)", EBgType::Riverland, []() -> TerrainBiome {
+            return SForestBiome{.vegetation_density = 0.65f, .tree_tile = "pine"};
+        }},
+        {"Riverland (Wildwood)", EBgType::Riverland, []() -> TerrainBiome {
+            return SForestBiome{.tree_density = 0.85f, .vegetation_density = 0.85f, .patchiness = 0.4f, .tree_tile = "pine"};
+        }},
+        {"Grassland Pine (Unicode)", EBgType::Biome, []() -> TerrainBiome {
+            return SGrasslandBiome{.tree_tile = "pine"};
+        }},
+        {"Grassland (ASCII)", EBgType::Biome, []() -> TerrainBiome {
+            return SGrasslandBiome{};
+        }},
+        {"Forest Pine (Unicode)", EBgType::Biome, []() -> TerrainBiome {
+            return SForestBiome{.vegetation_density = 0.65f, .tree_tile = "pine"};
+        }},
+        {"Rolling Hills", EBgType::Biome, []() -> TerrainBiome {
+            return SHillsBiome{};
+        }},
+        {"Bogland", EBgType::Biome, []() -> TerrainBiome {
+            return SBogBiome{};
+        }},
+        {"None (Void Space)", EBgType::Void, nullptr},
+        {"Solid Rock (Dungeon)", EBgType::SolidRock, nullptr}
+    };
+
+    std::vector<ScaleEntry> scales = {
+        {"Standard (75%)", 0.75},
+        {"Compact (55%)", 0.55},
+        {"Full Map (100%)", 1.00}
+    };
+
+    std::vector<RoomEntry> rooms = {
+        {"20 Rooms (Castle)", 20},
+        {"25 Rooms (Citadel)", 25},
+        {"30 Rooms (Fortress)", 30},
+        {"15 Rooms (Keep)", 15},
+        {"10 Rooms (Outpost)", 10}
+    };
+
+    std::vector<VoidEntry> void_modes = {
+        {"Void (Transparent)", true},
+        {"Solid Wall (Opaque)", false}
+    };
+
+    std::vector<PresetEntry> presets = {
+        {"River Fortress", 0, 0, 0, 0},
+        {"Plains Palace", 2, 0, 1, 0},
+        {"Woodland Stronghold", 4, 0, 0, 0},
+        {"Hilltop Citadel", 5, 1, 3, 0},
+        {"Marsh Bastion", 6, 0, 0, 0},
+        {"Void Monolith", 7, 2, 1, 0},
+        {"Mountain Dungeon", 8, 2, 0, 1}
+    };
+
+    std::size_t bg_idx = 0;
+    std::size_t scale_idx = 0;
+    std::size_t rooms_idx = 0;
+    std::size_t void_idx = 0;
+    std::optional<std::size_t> preset_idx = 0;
+
+    void CheckPresetMatch()
+    {
+        preset_idx.reset();
+        for (std::size_t i = 0; i < presets.size(); ++i) {
+            if (presets[i].bg == bg_idx &&
+                presets[i].scale == scale_idx &&
+                presets[i].rooms == rooms_idx &&
+                presets[i].void_mode == void_idx) {
+                preset_idx = i;
+                break;
+            }
+        }
+    }
+
+    void ApplyPreset(std::size_t idx)
+    {
+        if (idx < presets.size()) {
+            preset_idx = idx;
+            bg_idx = presets[idx].bg;
+            scale_idx = presets[idx].scale;
+            rooms_idx = presets[idx].rooms;
+            void_idx = presets[idx].void_mode;
+        }
+    }
+
+    void Generate(CMap& map) const
+    {
+        RegisterBiomeTiles();
+        const auto& bg = backgrounds[bg_idx];
+
+        // 1. Generate background
+        if (bg.type == EBgType::Riverland) {
+            CreateRiverland(map, bg.biome_fn ? bg.biome_fn() : SForestBiome{}, 3, 4, 1, 4);
+        } else if (bg.type == EBgType::Biome) {
+            CMatrix<bool> mask(map.getSize(), true);
+            FillBiome(map, mask, bg.biome_fn());
+        } else if (bg.type == EBgType::Void) {
+            map.Clear("void");
+        } else {
+            map.Clear("wall");
+        }
+
+        // 2. Generate and stamp castle
+        const int num_rooms = static_cast<int>(rooms[rooms_idx].count);
+        const bool void_out = void_modes[void_idx].value;
+        const double scale = scales[scale_idx].factor;
+
+        if (scale >= 0.99 || bg.type == EBgType::SolidRock) {
+            if (bg.type == EBgType::SolidRock && !void_out) {
+                CreateCastle(map, num_rooms, false);
+            } else {
+                CMap castle(map.getSize());
+                CreateCastle(castle, num_rooms, void_out);
+                if (void_out) {
+                    const std::array<std::string_view, 1> skip{"void"};
+                    map.Stamp(castle, Position(0, 0), skip);
+                } else {
+                    map.Stamp(castle, Position(0, 0));
+                }
+            }
+        } else {
+            const std::size_t c_w = std::clamp(static_cast<std::size_t>(map.getWidth() * scale), std::size_t{20}, map.getWidth());
+            const std::size_t c_h = std::clamp(static_cast<std::size_t>(map.getHeight() * scale), std::size_t{15}, map.getHeight());
+            const Position origin((map.getWidth() - c_w) / 2, (map.getHeight() - c_h) / 2);
+
+            CMap castle(Size(c_w, c_h));
+            CreateCastle(castle, num_rooms, void_out);
+            if (void_out) {
+                const std::array<std::string_view, 1> skip{"void"};
+                map.Stamp(castle, origin, skip);
+            } else {
+                map.Stamp(castle, origin);
+            }
+        }
+    }
+
+    [[nodiscard]] std::string Summary() const
+    {
+        if (preset_idx) {
+            return std::format("{} | C: configure", presets[*preset_idx].label);
+        }
+        return std::format("{} / {} | C: configure", backgrounds[bg_idx].label, rooms[rooms_idx].label);
+    }
+};
+
 std::vector<SGenerator> Generators(std::shared_ptr<CCaveGladeConfig> cave_glade_config = nullptr,
-                                  std::shared_ptr<CRiverlandConfig> riverland_config = nullptr)
+                                   std::shared_ptr<CRiverlandConfig> riverland_config = nullptr,
+                                   std::shared_ptr<CCastleConfig> castle_config = nullptr)
 {
     const auto voronoi_buildings = std::make_shared<bool>(false);
     std::vector<SGenerator> result = {
@@ -348,9 +532,17 @@ std::vector<SGenerator> Generators(std::shared_ptr<CCaveGladeConfig> cave_glade_
             }
         },
         {
-            "Castle", [](CMap & map)
+            "Castle", [castle_config](CMap & map)
             {
-                CreateCastle(map, 25);
+                if (castle_config) {
+                    castle_config->Generate(map);
+                } else {
+                    CreateCastle(map, 20);
+                }
+            },
+            [castle_config]()
+            {
+                return castle_config ? castle_config->Summary() : "C: configure";
             }
         },
         {
@@ -748,6 +940,146 @@ public:
     }
 };
 
+// Configuration dialog for Castle background and dimensions
+class CCastleConfigWindow : public CWindow
+{
+    std::shared_ptr<CCastleConfig> config;
+    std::function<void()> on_change;
+    std::size_t selected_row = 0;
+    bool done = false;
+
+public:
+    CCastleConfigWindow(std::shared_ptr<CCastleConfig> a_config, std::function<void()> a_on_change)
+        : CWindow("Castle Studio", {Position(4, 3), Size(50, 10)},
+                  EWindowOptions::NoResize | EWindowOptions::NoMove | EWindowOptions::NoClose),
+          config(std::move(a_config)), on_change(std::move(a_on_change))
+    {
+    }
+
+    [[nodiscard]] bool TakeDone()
+    {
+        const bool res = done;
+        done = false;
+        return res;
+    }
+
+    void CycleRow(int dir)
+    {
+        if (!config) return;
+        if (selected_row == 0) {
+            const int count = static_cast<int>(config->presets.size());
+            const int cur = config->preset_idx ? static_cast<int>(*config->preset_idx) : 0;
+            const int next = (cur + dir + count) % count;
+            config->ApplyPreset(static_cast<std::size_t>(next));
+        } else if (selected_row == 1) {
+            const int count = static_cast<int>(config->backgrounds.size());
+            config->bg_idx = (static_cast<int>(config->bg_idx) + dir + count) % count;
+            config->CheckPresetMatch();
+        } else if (selected_row == 2) {
+            const int count = static_cast<int>(config->scales.size());
+            config->scale_idx = (static_cast<int>(config->scale_idx) + dir + count) % count;
+            config->CheckPresetMatch();
+        } else if (selected_row == 3) {
+            const int count = static_cast<int>(config->rooms.size());
+            config->rooms_idx = (static_cast<int>(config->rooms_idx) + dir + count) % count;
+            config->CheckPresetMatch();
+        } else if (selected_row == 4) {
+            const int count = static_cast<int>(config->void_modes.size());
+            config->void_idx = (static_cast<int>(config->void_idx) + dir + count) % count;
+            config->CheckPresetMatch();
+        }
+        if (on_change) {
+            on_change();
+        }
+    }
+
+    void Draw(CScreen& screen, const SRect& inside) override
+    {
+        if (inside.Empty() || !config) return;
+
+        const std::string preset_str = config->preset_idx ? config->presets[*config->preset_idx].label : "(Custom)";
+
+        struct RowDisplay {
+            std::string label;
+            std::string value;
+        };
+
+        const std::array<RowDisplay, 5> rows = {{
+            {"Preset:", preset_str},
+            {"Background:", config->backgrounds[config->bg_idx].label},
+            {"Extent:", config->scales[config->scale_idx].label},
+            {"Rooms:", config->rooms[config->rooms_idx].label},
+            {"Outside:", config->void_modes[config->void_idx].label}
+        }};
+
+        for (std::size_t i = 0; i < rows.size(); ++i) {
+            if (i >= inside.size.y) break;
+            const bool is_selected = (i == selected_row);
+            const std::string prefix = is_selected ? "> " : "  ";
+            const std::uint32_t colour = is_selected ? 0xFFFF70 : 0xC0C0C0;
+
+            const std::string text = std::format("{}{:13} ◄ {:^24} ►",
+                                                 prefix, rows[i].label, rows[i].value);
+            screen.Print(inside.corner.x + 1, inside.corner.y + i, text, colour, is_selected);
+        }
+
+        if (inside.size.y > 6) {
+            screen.Print(inside.corner.x + 1, inside.corner.y + 6,
+                         "↑/↓: row | ←/→: cycle | R: re-roll | Enter: done",
+                         0x808080);
+        }
+    }
+
+    bool HandleKey(const SKey& key) override
+    {
+        if (key.type == EKey::Closed || key.type == EKey::Escape ||
+            (key.type == EKey::Char && (key.ch == U'q' || key.ch == U'Q' || key.ch == 3))) {
+            done = true;
+            return true;
+        }
+        if (key.type == EKey::Enter || (key.type == EKey::Char && (key.ch == U'c' || key.ch == U'C'))) {
+            done = true;
+            return true;
+        }
+        if (key.type == EKey::Up || (key.type == EKey::Char && key.ch == U'k')) {
+            selected_row = (selected_row + 4) % 5;
+            return true;
+        }
+        if (key.type == EKey::Down || (key.type == EKey::Char && key.ch == U'j')) {
+            selected_row = (selected_row + 1) % 5;
+            return true;
+        }
+        if (key.type == EKey::Left || (key.type == EKey::Char && key.ch == U'h')) {
+            CycleRow(-1);
+            return true;
+        }
+        if (key.type == EKey::Right || (key.type == EKey::Char && (key.ch == U'l' || key.ch == U' '))) {
+            CycleRow(1);
+            return true;
+        }
+        if (key.type == EKey::Char && (key.ch == U'r' || key.ch == U'R')) {
+            if (on_change) on_change();
+            return true;
+        }
+        return false;
+    }
+
+    void Click(Position at, EMouseButton button) override
+    {
+        if (button != EMouseButton::Left) return;
+        if (at.y < 5) {
+            selected_row = at.y;
+            if (at.x < 24) {
+                CycleRow(-1);
+            } else {
+                CycleRow(1);
+            }
+        } else if (at.y >= 6) {
+            done = true;
+        }
+    }
+};
+
 // Each tab owns its demonstration state. The generator tab embeds the
 // library list widget, forwarding input in its sidebar to that widget.
 class CFeatureWindow : public CWindow
@@ -924,6 +1256,7 @@ public:
     CFeatureWindow(std::string title, int a_mode, std::optional<Size> map_size = {},
                    std::shared_ptr<CCaveGladeConfig> a_cave_glade_config = nullptr,
                    std::shared_ptr<CRiverlandConfig> a_riverland_config = nullptr,
+                   std::shared_ptr<CCastleConfig> a_castle_config = nullptr,
                    std::function<void(std::string_view)> a_open_config = nullptr)
         : CWindow(std::move(title),
     {
@@ -932,7 +1265,7 @@ public:
       open_config_cb(std::move(a_open_config))
     {
         if (mode == 0) {
-            generators = Generators(a_cave_glade_config, a_riverland_config);
+            generators = Generators(a_cave_glade_config, a_riverland_config, a_castle_config);
             std::vector<std::string> labels;
 
             for (const auto& generator : generators) {
@@ -942,7 +1275,7 @@ public:
             list.setItems(std::move(labels));
             list.setOnActivate([this](std::size_t index) {
                 const auto& name = generators[index].name;
-                if ((name == "Cave and Glade" || name == "Riverland") && open_config_cb) {
+                if ((name == "Cave and Glade" || name == "Riverland" || name == "Castle") && open_config_cb) {
                     open_config_cb(name);
                 } else {
                     Generate();
@@ -1355,6 +1688,7 @@ int main(int argc, char* argv[])
         windows.setAllowTabClosing(false);
         auto cave_glade_config = std::make_shared<CCaveGladeConfig>();
         auto riverland_config = std::make_shared<CRiverlandConfig>();
+        auto castle_config = std::make_shared<CCastleConfig>();
         std::vector<std::unique_ptr<CFeatureWindow>> tabs;
         const std::array titles = {"Map generators", "FOV", "Path finding", "Distance map", "Scheduler", "Calendar"};
 
@@ -1369,8 +1703,14 @@ int main(int argc, char* argv[])
                 tabs[0]->Generate();
             }
         });
+        CCastleConfigWindow castle_config_window(castle_config, [&] {
+            if (!tabs.empty() && tabs[0]) {
+                tabs[0]->Generate();
+            }
+        });
         bool configuring_cave = false;
         bool configuring_riverland = false;
+        bool configuring_castle = false;
         auto close_config = [&] {
             windows.Close(config_window);
             windows.Focus(*tabs[active]);
@@ -1380,6 +1720,11 @@ int main(int argc, char* argv[])
             windows.Close(riverland_config_window);
             windows.Focus(*tabs[active]);
             configuring_riverland = false;
+        };
+        auto close_castle_config = [&] {
+            windows.Close(castle_config_window);
+            windows.Focus(*tabs[active]);
+            configuring_castle = false;
         };
         auto open_config = [&](std::string_view target_generator = {}) {
             if (active != 0) {
@@ -1391,6 +1736,8 @@ int main(int argc, char* argv[])
                 const auto selected = tabs[0]->getSelectedGeneratorName();
                 if (selected == "Riverland") {
                     target = "Riverland";
+                } else if (selected == "Castle") {
+                    target = "Castle";
                 } else {
                     target = "Cave and Glade";
                 }
@@ -1411,6 +1758,22 @@ int main(int argc, char* argv[])
                 });
                 windows.Open(riverland_config_window);
                 windows.Focus(riverland_config_window);
+            } else if (target == "Castle") {
+                tabs[0]->SelectGenerator("Castle");
+                configuring_castle = true;
+                for (auto& tab : tabs) tab->Hover(std::nullopt);
+                const Size scr_size = screen.getSize();
+                const std::size_t win_w = std::min<std::size_t>(50, scr_size.x > 4 ? scr_size.x - 2 : scr_size.x);
+                const std::size_t win_h = std::min<std::size_t>(10, scr_size.y > 4 ? scr_size.y - 2 : scr_size.y);
+                const Position pos(scr_size.x > win_w ? (scr_size.x - win_w) / 2 : 1,
+                                   scr_size.y > win_h ? (scr_size.y - win_h) / 2 : 1);
+                windows.setLayout(castle_config_window, SWindowLayout{
+                    .open = true,
+                    .dock = EDock::None,
+                    .floating = SRect(pos, Size(win_w, win_h))
+                });
+                windows.Open(castle_config_window);
+                windows.Focus(castle_config_window);
             } else {
                 tabs[0]->SelectGenerator("Cave and Glade");
                 configuring_cave = true;
@@ -1432,7 +1795,7 @@ int main(int argc, char* argv[])
 
         for (std::size_t index = 0; index < titles.size(); ++index) {
             tabs.push_back(std::make_unique<CFeatureWindow>(titles[index], static_cast<int>(index), map_size,
-                                                            cave_glade_config, riverland_config,
+                                                            cave_glade_config, riverland_config, castle_config,
                                                             [&](std::string_view name) { open_config(name); }));
             tabs.back()->setFrameTitle("RoguelikeLib features demo");
             windows.Open(*tabs.back());
@@ -1509,7 +1872,7 @@ int main(int argc, char* argv[])
 
             if (key.type == EKey::Mouse) {
                 for (auto& tab : tabs) {
-                    tab->Hover((editing_size || configuring_cave || configuring_riverland) ? std::nullopt : std::optional(key.mouse.position));
+                    tab->Hover((editing_size || configuring_cave || configuring_riverland || configuring_castle) ? std::nullopt : std::optional(key.mouse.position));
                 }
             }
 
@@ -1536,11 +1899,18 @@ int main(int argc, char* argv[])
                 }
                 continue;
             }
-            if (!editing_size && !configuring_cave && !configuring_riverland && key.type == EKey::Char && (key.ch == U'c' || key.ch == U'C')) {
+            if (configuring_castle && key.type != EKey::Closed && !(key.type == EKey::Char && key.ch == 3)) {
+                castle_config_window.HandleKey(key);
+                if (castle_config_window.TakeDone()) {
+                    close_castle_config();
+                }
+                continue;
+            }
+            if (!editing_size && !configuring_cave && !configuring_riverland && !configuring_castle && key.type == EKey::Char && (key.ch == U'c' || key.ch == U'C')) {
                 open_config(tabs[0] ? tabs[0]->getSelectedGeneratorName() : "");
                 continue;
             }
-            if (!editing_size && !configuring_cave && !configuring_riverland && key.type == EKey::Char && (key.ch == U'm' || key.ch == U'M')) {
+            if (!editing_size && !configuring_cave && !configuring_riverland && !configuring_castle && key.type == EKey::Char && (key.ch == U'm' || key.ch == U'M')) {
                 const auto dimensions = tabs[active < 4 ? active : 0]->getMapSize();
                 size_entry.Begin(dimensions);
                 editing_size = true;
@@ -1562,6 +1932,9 @@ int main(int argc, char* argv[])
                 }
                 if (configuring_riverland && riverland_config_window.TakeDone()) {
                     close_riverland_config();
+                }
+                if (configuring_castle && castle_config_window.TakeDone()) {
+                    close_castle_config();
                 }
 
                 for (std::size_t index = 0; index < tabs.size(); ++index) {

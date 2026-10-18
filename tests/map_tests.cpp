@@ -182,5 +182,51 @@ void TestSymmetricStructure()
     // Most cells in the left and right halves should match symmetrically
     const std::size_t total_half_cells = (castle.getWidth() / 2) * castle.getHeight();
     Check(lr_matches > total_half_cells * 9 / 10, "castle exhibits strong left-right symmetry");
+
+    // Test void_outside
+    RL::InitRandomness(1234);
+    RL::CMap void_castle(RL::Size(79, 50));
+    RL::CreateCastle(void_castle, 20, true);
+    std::size_t void_tiles = 0;
+    bool valid_voids = true;
+    for (std::size_t y = 0; y < void_castle.getHeight(); ++y) {
+        for (std::size_t x = 0; x < void_castle.getWidth(); ++x) {
+            if (void_castle.get(x, y).getType() == "void") {
+                void_tiles++;
+                for (int dy = -1; dy <= 1; ++dy) {
+                    for (int dx = -1; dx <= 1; ++dx) {
+                        const int nx = static_cast<int>(x) + dx;
+                        const int ny = static_cast<int>(y) + dy;
+                        if (nx >= 0 && nx < static_cast<int>(void_castle.getWidth()) &&
+                            ny >= 0 && ny < static_cast<int>(void_castle.getHeight())) {
+                            const auto type = void_castle.get(nx, ny).getType();
+                            if (type != "wall" && type != "void") {
+                                valid_voids = false;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Check(void_tiles > 500, "void_outside generates outside void tiles");
+    Check(valid_voids, "void tiles never border room interiors directly without walls");
+
+    // Test stamping void_castle into a background
+    RL::CMap background(RL::Size(79, 50));
+    background.Clear("grass");
+    const std::array<std::string_view, 1> skip{"void"};
+    background.Stamp(void_castle, RL::Position(0, 0), skip);
+
+    std::size_t preserved_grass = 0;
+    std::size_t stamped_rooms = 0;
+    for (std::size_t y = 0; y < background.getHeight(); ++y) {
+        for (std::size_t x = 0; x < background.getWidth(); ++x) {
+            if (background.get(x, y).getType() == "grass") preserved_grass++;
+            if (background.get(x, y).getType() == "room") stamped_rooms++;
+        }
+    }
+    Check(preserved_grass == void_tiles, "stamping with void mask preserves exact outside background");
+    Check(stamped_rooms == castle_rooms, "stamping transfers all castle rooms onto background");
 }
 
