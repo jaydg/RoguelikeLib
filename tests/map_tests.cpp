@@ -268,5 +268,110 @@ void TestSymmetricStructure()
         }
     }
     Check(outside_doors >= 1, "outside_door generates entrance gate connecting void to interior");
+
+    // Test castle with outside windows
+    RL::CMap window_castle(RL::Size(79, 50));
+    RL::CreateCastle(window_castle, 20, true, true, true);
+    std::size_t total_windows = 0;
+    std::size_t invalid_windows = 0;
+    bool symmetric_windows = true;
+
+    for (std::size_t y = 0; y < window_castle.getHeight(); ++y) {
+        for (std::size_t x = 0; x < window_castle.getWidth(); ++x) {
+            const auto& tile = window_castle.get(x, y);
+            if (tile.getType() == "window") {
+                total_windows++;
+
+                if (!tile.isTransparent() || tile.isPassable()) {
+                    invalid_windows++;
+                }
+
+                const auto north = (y > 0) ? window_castle.get(x, y - 1).getType() : "void";
+                const auto south = (y + 1 < window_castle.getHeight()) ? window_castle.get(x, y + 1).getType() : "void";
+                const auto west = (x > 0) ? window_castle.get(x - 1, y).getType() : "void";
+                const auto east = (x + 1 < window_castle.getWidth()) ? window_castle.get(x + 1, y).getType() : "void";
+
+                auto is_int = [](std::string_view t) { return t == "room" || t == "corridor"; };
+                auto is_ext = [](std::string_view t) { return t == "void"; };
+
+                const bool horiz_framed = (west == "wall" && east == "wall") &&
+                                          ((is_int(north) && is_ext(south)) || (is_int(south) && is_ext(north)));
+                const bool vert_framed = (north == "wall" && south == "wall") &&
+                                         ((is_int(west) && is_ext(east)) || (is_int(east) && is_ext(west)));
+
+                if (!horiz_framed && !vert_framed) {
+                    invalid_windows++;
+                }
+
+                // Check vertical mirror symmetry
+                const std::size_t mx = window_castle.getWidth() - 1 - x;
+                if (window_castle.get(mx, y).getType() != "window") {
+                    symmetric_windows = false;
+                }
+            }
+        }
+    }
+    Check(total_windows > 0, "castle generates outside windows when requested");
+    Check(invalid_windows == 0, "all castle windows are transparent, impassable, and on framed outside walls");
+    Check(symmetric_windows, "castle windows are vertically symmetric");
+
+    // Test space shuttle with outside windows
+    RL::CMap window_shuttle(RL::Size(80, 40));
+    RL::CreateSpaceShuttle(window_shuttle, 20, true, false, 0.40f);
+    std::size_t shuttle_windows = 0;
+    std::size_t invalid_shuttle_windows = 0;
+    bool symmetric_shuttle_windows = true;
+
+    for (std::size_t y = 0; y < window_shuttle.getHeight(); ++y) {
+        for (std::size_t x = 0; x < window_shuttle.getWidth(); ++x) {
+            const auto& tile = window_shuttle.get(x, y);
+            if (tile.getType() == "window") {
+                shuttle_windows++;
+
+                if (!tile.isTransparent() || tile.isPassable()) {
+                    invalid_shuttle_windows++;
+                }
+
+                const auto north = (y > 0) ? window_shuttle.get(x, y - 1).getType() : "void";
+                const auto south = (y + 1 < window_shuttle.getHeight()) ? window_shuttle.get(x, y + 1).getType() : "void";
+                const auto west = (x > 0) ? window_shuttle.get(x - 1, y).getType() : "void";
+                const auto east = (x + 1 < window_shuttle.getWidth()) ? window_shuttle.get(x + 1, y).getType() : "void";
+
+                auto is_int = [](std::string_view t) { return t == "room" || t == "corridor"; };
+                auto is_ext = [](std::string_view t) { return t == "void"; };
+
+                const bool horiz_framed = (west == "wall" && east == "wall") &&
+                                          ((is_int(north) && is_ext(south)) || (is_int(south) && is_ext(north)));
+                const bool vert_framed = (north == "wall" && south == "wall") &&
+                                         ((is_int(west) && is_ext(east)) || (is_int(east) && is_ext(west)));
+
+                if (!horiz_framed && !vert_framed) {
+                    invalid_shuttle_windows++;
+                }
+
+                // Check horizontal mirror symmetry
+                const std::size_t my = window_shuttle.getHeight() - 1 - y;
+                if (window_shuttle.get(x, my).getType() != "window") {
+                    symmetric_shuttle_windows = false;
+                }
+            }
+        }
+    }
+    Check(shuttle_windows > 0, "space shuttle generates outside windows when requested");
+    Check(invalid_shuttle_windows == 0, "all space shuttle windows are transparent, impassable, and on framed outside walls");
+    Check(symmetric_shuttle_windows, "space shuttle windows are horizontally symmetric");
+
+    // Test zero probability produces no windows
+    RL::CMap no_window_castle(RL::Size(79, 50));
+    RL::CreateCastle(no_window_castle, 20, true, true, 0.0f);
+    std::size_t zero_windows = 0;
+    for (std::size_t y = 0; y < no_window_castle.getHeight(); ++y) {
+        for (std::size_t x = 0; x < no_window_castle.getWidth(); ++x) {
+            if (no_window_castle.get(x, y).getType() == "window") {
+                zero_windows++;
+            }
+        }
+    }
+    Check(zero_windows == 0, "window_probability = 0 produces no windows");
 }
 

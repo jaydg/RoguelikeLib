@@ -341,6 +341,12 @@ struct CCastleConfig {
         std::size_t rooms;
         std::size_t void_mode;
         std::size_t door_mode;
+        std::size_t window_mode;
+    };
+
+    struct WindowEntry {
+        std::string label;
+        float value;
     };
 
     std::vector<BgEntry> backgrounds = {
@@ -393,14 +399,21 @@ struct CCastleConfig {
         {"None (Enclosed)", false}
     };
 
+    std::vector<WindowEntry> window_modes = {
+        {"Sparse Windows", 0.30f},
+        {"Medium Windows", 0.60f},
+        {"Dense Windows", 1.00f},
+        {"None (Solid Walls)", 0.00f}
+    };
+
     std::vector<PresetEntry> presets = {
-        {"River Fortress", 0, 0, 0, 0, 0},
-        {"Plains Palace", 2, 0, 1, 0, 0},
-        {"Woodland Stronghold", 4, 0, 0, 0, 0},
-        {"Hilltop Citadel", 5, 1, 3, 0, 0},
-        {"Marsh Bastion", 6, 0, 0, 0, 0},
-        {"Void Monolith", 7, 2, 1, 0, 1},
-        {"Mountain Dungeon", 8, 2, 0, 1, 1}
+        {"River Fortress", 0, 0, 0, 0, 0, 0},
+        {"Plains Palace", 2, 0, 1, 0, 0, 0},
+        {"Woodland Stronghold", 4, 0, 0, 0, 0, 0},
+        {"Hilltop Citadel", 5, 1, 3, 0, 0, 0},
+        {"Marsh Bastion", 6, 0, 0, 0, 0, 0},
+        {"Void Monolith", 7, 2, 1, 0, 1, 3},
+        {"Mountain Dungeon", 8, 2, 0, 1, 1, 3}
     };
 
     std::size_t bg_idx = 0;
@@ -408,6 +421,7 @@ struct CCastleConfig {
     std::size_t rooms_idx = 0;
     std::size_t void_idx = 0;
     std::size_t door_idx = 0;
+    std::size_t window_idx = 0;
     std::optional<std::size_t> preset_idx = 0;
 
     void CheckPresetMatch()
@@ -418,7 +432,8 @@ struct CCastleConfig {
                 presets[i].scale == scale_idx &&
                 presets[i].rooms == rooms_idx &&
                 presets[i].void_mode == void_idx &&
-                presets[i].door_mode == door_idx) {
+                presets[i].door_mode == door_idx &&
+                presets[i].window_mode == window_idx) {
                 preset_idx = i;
                 break;
             }
@@ -434,6 +449,7 @@ struct CCastleConfig {
             rooms_idx = presets[idx].rooms;
             void_idx = presets[idx].void_mode;
             door_idx = presets[idx].door_mode;
+            window_idx = presets[idx].window_mode;
         }
     }
 
@@ -458,14 +474,15 @@ struct CCastleConfig {
         const int num_rooms = static_cast<int>(rooms[rooms_idx].count);
         const bool void_out = void_modes[void_idx].value;
         const bool out_door = door_modes[door_idx].value;
+        const float out_windows = window_modes[window_idx].value;
         const double scale = scales[scale_idx].factor;
 
         if (scale >= 0.99 || bg.type == EBgType::SolidRock) {
             if (bg.type == EBgType::SolidRock && !void_out) {
-                CreateCastle(map, num_rooms, false, out_door);
+                CreateCastle(map, num_rooms, false, out_door, out_windows);
             } else {
                 CMap castle(map.getSize());
-                CreateCastle(castle, num_rooms, void_out, out_door);
+                CreateCastle(castle, num_rooms, void_out, out_door, out_windows);
                 if (void_out) {
                     const std::array<std::string_view, 1> skip{"void"};
                     map.Stamp(castle, Position(0, 0), skip);
@@ -479,7 +496,7 @@ struct CCastleConfig {
             const Position origin((map.getWidth() - c_w) / 2, (map.getHeight() - c_h) / 2);
 
             CMap castle(Size(c_w, c_h));
-            CreateCastle(castle, num_rooms, void_out, out_door);
+            CreateCastle(castle, num_rooms, void_out, out_door, out_windows);
             if (void_out) {
                 const std::array<std::string_view, 1> skip{"void"};
                 map.Stamp(castle, origin, skip);
@@ -543,7 +560,7 @@ std::vector<SGenerator> Generators(std::shared_ptr<CCaveGladeConfig> cave_glade_
         {
             "Space shuttle", [](CMap & map)
             {
-                CreateSpaceShuttle(map, 25);
+                CreateSpaceShuttle(map, 25, true, false, 0.30f);
             }
         },
         {
@@ -965,7 +982,7 @@ class CCastleConfigWindow : public CWindow
 
 public:
     CCastleConfigWindow(std::shared_ptr<CCastleConfig> a_config, std::function<void()> a_on_change)
-        : CWindow("Castle Studio", {Position(4, 3), Size(50, 10)},
+        : CWindow("Castle Studio", {Position(4, 3), Size(50, 11)},
                   EWindowOptions::NoResize | EWindowOptions::NoMove | EWindowOptions::NoClose),
           config(std::move(a_config)), on_change(std::move(a_on_change))
     {
@@ -1006,6 +1023,10 @@ public:
             const int count = static_cast<int>(config->door_modes.size());
             config->door_idx = (static_cast<int>(config->door_idx) + dir + count) % count;
             config->CheckPresetMatch();
+        } else if (selected_row == 6) {
+            const int count = static_cast<int>(config->window_modes.size());
+            config->window_idx = (static_cast<int>(config->window_idx) + dir + count) % count;
+            config->CheckPresetMatch();
         }
         if (on_change) {
             on_change();
@@ -1023,13 +1044,14 @@ public:
             std::string value;
         };
 
-        const std::array<RowDisplay, 6> rows = {{
+        const std::array<RowDisplay, 7> rows = {{
             {"Preset:", preset_str},
             {"Background:", config->backgrounds[config->bg_idx].label},
             {"Extent:", config->scales[config->scale_idx].label},
             {"Rooms:", config->rooms[config->rooms_idx].label},
             {"Outside:", config->void_modes[config->void_idx].label},
-            {"Entrance:", config->door_modes[config->door_idx].label}
+            {"Entrance:", config->door_modes[config->door_idx].label},
+            {"Windows:", config->window_modes[config->window_idx].label}
         }};
 
         for (std::size_t i = 0; i < rows.size(); ++i) {
@@ -1043,8 +1065,8 @@ public:
             screen.Print(inside.corner.x + 1, inside.corner.y + i, text, colour, is_selected);
         }
 
-        if (inside.size.y > 7) {
-            screen.Print(inside.corner.x + 1, inside.corner.y + 7,
+        if (inside.size.y > 8) {
+            screen.Print(inside.corner.x + 1, inside.corner.y + 8,
                          "↑/↓: row | ←/→: cycle | R: re-roll | Enter: done",
                          0x808080);
         }
@@ -1062,11 +1084,11 @@ public:
             return true;
         }
         if (key.type == EKey::Up || (key.type == EKey::Char && key.ch == U'k')) {
-            selected_row = (selected_row + 5) % 6;
+            selected_row = (selected_row + 6) % 7;
             return true;
         }
         if (key.type == EKey::Down || (key.type == EKey::Char && key.ch == U'j')) {
-            selected_row = (selected_row + 1) % 6;
+            selected_row = (selected_row + 1) % 7;
             return true;
         }
         if (key.type == EKey::Left || (key.type == EKey::Char && key.ch == U'h')) {
@@ -1087,14 +1109,14 @@ public:
     void Click(Position at, EMouseButton button) override
     {
         if (button != EMouseButton::Left) return;
-        if (at.y < 6) {
+        if (at.y < 7) {
             selected_row = at.y;
             if (at.x < 24) {
                 CycleRow(-1);
             } else {
                 CycleRow(1);
             }
-        } else if (at.y >= 7) {
+        } else if (at.y >= 8) {
             done = true;
         }
     }

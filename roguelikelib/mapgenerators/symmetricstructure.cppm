@@ -21,7 +21,8 @@ enum class ESymmetryAxis
 void CreateSymmetricStructure(CMap &level, const int& max_number_of_rooms = 15,
                               ESymmetryAxis axis = ESymmetryAxis::Horizontal,
                               bool void_outside = false,
-                              bool outside_door = false)
+                              bool outside_door = false,
+                              float window_probability = 0.0f)
 {
     constexpr int room_max_size = 15;
     constexpr int room_min_size = 3;
@@ -323,16 +324,184 @@ void CreateSymmetricStructure(CMap &level, const int& max_number_of_rooms = 15,
             }
         }
     }
+
+    if (window_probability > 0.0f) {
+        const int w = static_cast<int>(level.getWidth());
+        const int h = static_cast<int>(level.getHeight());
+
+        CMatrix<bool> exterior_filler(Size(w, h), false);
+        if (!void_outside) {
+            for (int y = 0; y < h; ++y) {
+                for (int x = 0; x < w; ++x) {
+                    if (level.get(x, y).getType() == "wall") {
+                        bool has_interior = false;
+                        for (int dy = -1; dy <= 1; ++dy) {
+                            for (int dx = -1; dx <= 1; ++dx) {
+                                if (dx == 0 && dy == 0) continue;
+                                const int nx = x + dx;
+                                const int ny = y + dy;
+                                if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+                                    const auto type = level.get(nx, ny).getType();
+                                    if (type != "wall" && type != "void") {
+                                        has_interior = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (has_interior) break;
+                        }
+                        if (!has_interior) {
+                            exterior_filler.set(x, y, true);
+                        }
+                    }
+                }
+            }
+        }
+
+        auto is_interior = [&](int nx, int ny) -> bool {
+            if (nx < 0 || nx >= w || ny < 0 || ny >= h) return false;
+            const auto t = level.get(nx, ny).getType();
+            return t == "room" || t == "corridor";
+        };
+
+        auto is_exterior = [&](int nx, int ny) -> bool {
+            if (nx < 0 || nx >= w || ny < 0 || ny >= h) return true;
+            const auto t = level.get(nx, ny).getType();
+            if (t == "void") return true;
+            if (!void_outside && exterior_filler.get(nx, ny)) return true;
+            return false;
+        };
+
+        auto get_mirror = [&](int x, int y) -> Position {
+            if (axis == ESymmetryAxis::Vertical) {
+                return Position(static_cast<std::size_t>(w - 1 - x), static_cast<std::size_t>(y));
+            } else {
+                return Position(static_cast<std::size_t>(x), static_cast<std::size_t>(h - 1 - y));
+            }
+        };
+
+        auto near_door = [&](int px, int py) -> bool {
+            for (int dy = -1; dy <= 1; ++dy) {
+                for (int dx = -1; dx <= 1; ++dx) {
+                    const int nx = px + dx;
+                    const int ny = py + dy;
+                    if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+                        const auto t = level.get(nx, ny).getType();
+                        if (t == "door_closed" || t == "door_open") {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        };
+
+        auto near_window = [&](int px, int py) -> bool {
+            for (int dy = -2; dy <= 2; ++dy) {
+                for (int dx = -2; dx <= 2; ++dx) {
+                    const int nx = px + dx;
+                    const int ny = py + dy;
+                    if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+                        if (level.get(nx, ny).getType() == "window") {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        };
+
+        auto is_outside_wall = [&](int x, int y) -> bool {
+            if (level.get(x, y).getType() != "wall") return false;
+
+            // Horizontal wall candidate:
+            if (x > 0 && x + 1 < w &&
+                level.get(x - 1, y).getType() == "wall" &&
+                level.get(x + 1, y).getType() == "wall") {
+                const bool north_int = is_interior(x, y - 1);
+                const bool south_int = is_interior(x, y + 1);
+                const bool north_ext = is_exterior(x, y - 1);
+                const bool south_ext = is_exterior(x, y + 1);
+                if ((north_int && south_ext) || (south_int && north_ext)) {
+                    return true;
+                }
+            }
+
+            // Vertical wall candidate:
+            if (y > 0 && y + 1 < h &&
+                level.get(x, y - 1).getType() == "wall" &&
+                level.get(x, y + 1).getType() == "wall") {
+                const bool west_int = is_interior(x - 1, y);
+                const bool east_int = is_interior(x + 1, y);
+                const bool west_ext = is_exterior(x - 1, y);
+                const bool east_ext = is_exterior(x + 1, y);
+                if ((west_int && east_ext) || (east_int && west_ext)) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
+        const int max_x = (axis == ESymmetryAxis::Vertical) ? (w / 2) : (w - 1);
+        const int max_y = (axis == ESymmetryAxis::Horizontal) ? (h / 2) : (h - 1);
+
+        for (int y = 0; y <= max_y; ++y) {
+            for (int x = 0; x <= max_x; ++x) {
+                if (!is_outside_wall(x, y)) continue;
+
+                const Position mirror_p = get_mirror(x, y);
+                const int mx = static_cast<int>(mirror_p.x);
+                const int my = static_cast<int>(mirror_p.y);
+
+                if (!is_outside_wall(mx, my)) continue;
+
+                if (near_door(x, y) || near_door(mx, my)) continue;
+                if (near_window(x, y) || near_window(mx, my)) continue;
+
+                if (x != mx || y != my) {
+                    if (std::max(std::abs(x - mx), std::abs(y - my)) <= 2) {
+                        continue;
+                    }
+                }
+
+                if (window_probability < 1.0f) {
+                    const float roll = static_cast<float>(Random(1000)) / 1000.0f;
+                    if (roll >= window_probability) {
+                        continue;
+                    }
+                }
+
+                level.SetCell(x, y, "window");
+                level.SetCell(mx, my, "window");
+            }
+        }
+    }
 }
 
-void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool void_outside = false, bool outside_door = false)
+void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool void_outside = false, bool outside_door = false, float window_probability = 0.0f)
 {
-    CreateSymmetricStructure(level, max_number_of_rooms, ESymmetryAxis::Horizontal, void_outside, outside_door);
+    CreateSymmetricStructure(level, max_number_of_rooms, ESymmetryAxis::Horizontal, void_outside, outside_door, window_probability);
 }
 
-void CreateCastle(CMap &level, const int& max_number_of_rooms = 15, bool void_outside = false, bool outside_door = false)
+void CreateCastle(CMap &level, const int& max_number_of_rooms = 15, bool void_outside = false, bool outside_door = false, float window_probability = 0.0f)
 {
-    CreateSymmetricStructure(level, max_number_of_rooms, ESymmetryAxis::Vertical, void_outside, outside_door);
+    CreateSymmetricStructure(level, max_number_of_rooms, ESymmetryAxis::Vertical, void_outside, outside_door, window_probability);
+}
+
+inline void CreateSymmetricStructure(CMap &level, const int& max_number_of_rooms, ESymmetryAxis axis, bool void_outside, bool outside_door, bool windows)
+{
+    CreateSymmetricStructure(level, max_number_of_rooms, axis, void_outside, outside_door, windows ? 0.30f : 0.0f);
+}
+
+inline void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms, bool void_outside, bool outside_door, bool windows)
+{
+    CreateSpaceShuttle(level, max_number_of_rooms, void_outside, outside_door, windows ? 0.30f : 0.0f);
+}
+
+inline void CreateCastle(CMap &level, const int& max_number_of_rooms, bool void_outside, bool outside_door, bool windows)
+{
+    CreateCastle(level, max_number_of_rooms, void_outside, outside_door, windows ? 0.30f : 0.0f);
 }
 
 } // end of namespace RL
