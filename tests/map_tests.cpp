@@ -398,3 +398,124 @@ void TestSymmetricStructure()
     Check(zero_windows == 0, "window_probability = 0 produces no windows");
 }
 
+void TestDoubleDoors()
+{
+    // 1. Horizontal double door in a horizontal wall: '#' '#' 'D' 'D' '#' '#'
+    RL::CMap h_map(RL::Size(8, 5));
+    h_map.Clear("room");
+    for (std::size_t x = 0; x < 8; ++x) {
+        h_map.SetCell(x, 2, "wall");
+    }
+    // Place double doors at (3, 2) and (4, 2)
+    h_map.SetCell(3, 2, "door_closed");
+    h_map.SetCell(4, 2, "door_closed");
+    RL::UpdateDoorAndWindowGlyphs(h_map);
+
+    Check(h_map.get(3, 2).getGlyph() == U'-', "horizontal closed double door left has '-' glyph");
+    Check(h_map.get(4, 2).getGlyph() == U'-', "horizontal closed double door right has '-' glyph");
+
+    // Open left door
+    RL::OpenDoor(h_map, 3, 2);
+    Check(h_map.get(3, 2).getType() == "door_open" && h_map.get(3, 2).getGlyph() == U'/',
+          "opening left door of horizontal double door assigns '/'");
+    Check(h_map.get(4, 2).getType() == "door_closed" && h_map.get(4, 2).getGlyph() == U'-',
+          "right door remains closed with '-'");
+
+    // Open right door
+    RL::OpenDoor(h_map, 4, 2);
+    Check(h_map.get(3, 2).getType() == "door_open" && h_map.get(3, 2).getGlyph() == U'/',
+          "opened horizontal double door left has '/' glyph");
+    Check(h_map.get(4, 2).getType() == "door_open" && h_map.get(4, 2).getGlyph() == U'\\',
+          "opened horizontal double door right has '\\' glyph");
+
+    // Close right door
+    RL::CloseDoor(h_map, 4, 2);
+    Check(h_map.get(4, 2).getType() == "door_closed" && h_map.get(4, 2).getGlyph() == U'-',
+          "closing right door restores 'door_closed' with '-' glyph");
+    Check(h_map.get(3, 2).getType() == "door_open" && h_map.get(3, 2).getGlyph() == U'/',
+          "left door remains open with '/'");
+
+    // Close left door
+    RL::CloseDoor(h_map, 3, 2);
+    Check(h_map.get(3, 2).getType() == "door_closed" && h_map.get(3, 2).getGlyph() == U'-',
+          "closing left door restores 'door_closed' with '-' glyph");
+
+    // 2. Vertical double door in a vertical wall:
+    RL::CMap v_map(RL::Size(5, 8));
+    v_map.Clear("room");
+    for (std::size_t y = 0; y < 8; ++y) {
+        v_map.SetCell(2, y, "wall");
+    }
+    // Place double doors at (2, 3) and (2, 4)
+    v_map.SetCell(2, 3, "door_closed");
+    v_map.SetCell(2, 4, "door_closed");
+    RL::UpdateDoorAndWindowGlyphs(v_map);
+
+    Check(v_map.get(2, 3).getGlyph() == U'|', "vertical closed double door top has '|' glyph");
+    Check(v_map.get(2, 4).getGlyph() == U'|', "vertical closed double door bottom has '|' glyph");
+
+    // Open top door
+    RL::OpenDoor(v_map, 2, 3);
+    Check(v_map.get(2, 3).getType() == "door_open" && v_map.get(2, 3).getGlyph() == U'\\',
+          "opening top door of vertical double door assigns '\\'");
+    Check(v_map.get(2, 4).getType() == "door_closed" && v_map.get(2, 4).getGlyph() == U'|',
+          "bottom door remains closed with '|'");
+
+    // Open bottom door
+    RL::OpenDoor(v_map, 2, 4);
+    Check(v_map.get(2, 3).getType() == "door_open" && v_map.get(2, 3).getGlyph() == U'\\',
+          "opened vertical double door top has '\\' glyph");
+    Check(v_map.get(2, 4).getType() == "door_open" && v_map.get(2, 4).getGlyph() == U'/',
+          "opened vertical double door bottom has '/' glyph");
+
+    // Close top door
+    RL::CloseDoor(v_map, 2, 3);
+    Check(v_map.get(2, 3).getType() == "door_closed" && v_map.get(2, 3).getGlyph() == U'|',
+          "closing top door restores 'door_closed' with '|' glyph");
+    Check(v_map.get(2, 4).getType() == "door_open" && v_map.get(2, 4).getGlyph() == U'/',
+          "bottom door remains open with '/'");
+
+    // 3. Single doors
+    RL::CMap s_map(RL::Size(5, 5));
+    s_map.Clear("room");
+    s_map.SetCell(1, 2, "wall");
+    s_map.SetCell(2, 2, "door_closed");
+    s_map.SetCell(3, 2, "wall");
+    RL::UpdateDoorAndWindowGlyphs(s_map);
+    Check(s_map.get(2, 2).getGlyph() == U'-', "single horizontal closed door has '-' glyph");
+    RL::OpenDoor(s_map, 2, 2);
+    Check(s_map.get(2, 2).getType() == "door_open" && s_map.get(2, 2).getGlyph() == U'/',
+          "single horizontal open door has '/' glyph");
+
+    s_map.SetCell(2, 1, "wall");
+    s_map.SetCell(2, 2, "door_closed");
+    s_map.SetCell(2, 3, "wall");
+    s_map.SetCell(1, 2, "room");
+    s_map.SetCell(3, 2, "room");
+    RL::UpdateDoorAndWindowGlyphs(s_map);
+    Check(s_map.get(2, 2).getGlyph() == U'|', "single vertical closed door has '|' glyph");
+    RL::OpenDoor(s_map, 2, 2);
+    Check(s_map.get(2, 2).getType() == "door_open" && s_map.get(2, 2).getGlyph() == U'/',
+          "single vertical open door has '/' glyph");
+
+    // 4. UpdateOpenDoorGlyphs across entire map
+    RL::CMap batch_map(RL::Size(10, 10));
+    batch_map.Clear("room");
+    // Horizontal pair at (3, 3) and (4, 3)
+    batch_map.SetCell(2, 3, "wall");
+    batch_map.SetCell(3, 3, "door_open");
+    batch_map.SetCell(4, 3, "door_open");
+    batch_map.SetCell(5, 3, "wall");
+    // Vertical pair at (7, 6) and (7, 7)
+    batch_map.SetCell(7, 5, "wall");
+    batch_map.SetCell(7, 6, "door_open");
+    batch_map.SetCell(7, 7, "door_open");
+    batch_map.SetCell(7, 8, "wall");
+
+    RL::UpdateOpenDoorGlyphs(batch_map);
+    Check(batch_map.get(3, 3).getGlyph() == U'/' && batch_map.get(4, 3).getGlyph() == U'\\',
+          "UpdateOpenDoorGlyphs resolves horizontal double door to '/\\'");
+    Check(batch_map.get(7, 6).getGlyph() == U'\\' && batch_map.get(7, 7).getGlyph() == U'/',
+          "UpdateOpenDoorGlyphs resolves vertical double door to '\\' over '/'");
+}
+

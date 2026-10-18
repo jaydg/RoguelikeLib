@@ -331,7 +331,7 @@ struct CCastleConfig {
 
     struct DoorEntry {
         std::string label;
-        bool value;
+        int mode; // 0 = none, 1 = closed gate, 2 = open gate
     };
 
     struct PresetEntry {
@@ -395,8 +395,9 @@ struct CCastleConfig {
     };
 
     std::vector<DoorEntry> door_modes = {
-        {"Outside Gate", true},
-        {"None (Enclosed)", false}
+        {"Closed Gate", 1},
+        {"Open Gate", 2},
+        {"None (Enclosed)", 0}
     };
 
     std::vector<WindowEntry> window_modes = {
@@ -408,12 +409,12 @@ struct CCastleConfig {
 
     std::vector<PresetEntry> presets = {
         {"River Fortress", 0, 0, 0, 0, 0, 0},
-        {"Plains Palace", 2, 0, 1, 0, 0, 0},
+        {"Plains Palace", 2, 0, 1, 0, 1, 0},
         {"Woodland Stronghold", 4, 0, 0, 0, 0, 0},
         {"Hilltop Citadel", 5, 1, 3, 0, 0, 0},
         {"Marsh Bastion", 6, 0, 0, 0, 0, 0},
-        {"Void Monolith", 7, 2, 1, 0, 1, 3},
-        {"Mountain Dungeon", 8, 2, 0, 1, 1, 3}
+        {"Void Monolith", 7, 2, 1, 0, 2, 3},
+        {"Mountain Dungeon", 8, 2, 0, 1, 2, 3}
     };
 
     std::size_t bg_idx = 0;
@@ -473,16 +474,43 @@ struct CCastleConfig {
         // 2. Generate and stamp castle
         const int num_rooms = static_cast<int>(rooms[rooms_idx].count);
         const bool void_out = void_modes[void_idx].value;
-        const bool out_door = door_modes[door_idx].value;
+        const int door_mode = door_modes[door_idx].mode;
+        const bool out_door = (door_mode != 0);
+        const bool open_gate = (door_mode == 2);
         const float out_windows = window_modes[window_idx].value;
         const double scale = scales[scale_idx].factor;
+
+        auto apply_open_gate = [&](CMap& target) {
+            if (!open_gate) return;
+            for (std::size_t y = 0; y < target.getHeight(); ++y) {
+                for (std::size_t x = 0; x < target.getWidth(); ++x) {
+                    if (target.get(x, y).getType() == "door_closed") {
+                        bool near_ext = false;
+                        for (int dy = -1; dy <= 1; ++dy) {
+                            for (int dx = -1; dx <= 1; ++dx) {
+                                const int nx = static_cast<int>(x) + dx;
+                                const int ny = static_cast<int>(y) + dy;
+                                if (!target.inside(nx, ny) || target.get(nx, ny).getType() == "void") {
+                                    near_ext = true;
+                                }
+                            }
+                        }
+                        if (near_ext) {
+                            OpenDoor(target, x, y);
+                        }
+                    }
+                }
+            }
+        };
 
         if (scale >= 0.99 || bg.type == EBgType::SolidRock) {
             if (bg.type == EBgType::SolidRock && !void_out) {
                 CreateCastle(map, num_rooms, false, out_door, out_windows);
+                apply_open_gate(map);
             } else {
                 CMap castle(map.getSize());
                 CreateCastle(castle, num_rooms, void_out, out_door, out_windows);
+                apply_open_gate(castle);
                 if (void_out) {
                     const std::array<std::string_view, 1> skip{"void"};
                     map.Stamp(castle, Position(0, 0), skip);
@@ -497,6 +525,7 @@ struct CCastleConfig {
 
             CMap castle(Size(c_w, c_h));
             CreateCastle(castle, num_rooms, void_out, out_door, out_windows);
+            apply_open_gate(castle);
             if (void_out) {
                 const std::array<std::string_view, 1> skip{"void"};
                 map.Stamp(castle, origin, skip);

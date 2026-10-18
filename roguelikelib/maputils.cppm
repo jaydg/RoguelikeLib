@@ -285,17 +285,131 @@ void AddDoors(CMap &level, float door_probability, float open_probability)
 }
 
 /**
- * @brief Updates closed door and window glyphs to match horizontal ('-') or vertical ('|') wall orientation.
- * @param level Map whose doors and windows will be resolved.
+ * @brief Returns the appropriate glyph for an opened door based on wall orientation and double door layout.
+ *
+ * For opened double doors in horizontal walls, returns '/' for the left door and '\' for the right door ('/\').
+ * For opened double doors in vertical walls, returns '\' for the top door and '/' for the bottom door ('\' above '/').
+ * Single opened doors return '/'.
+ *
+ * @param level Map containing the door.
+ * @param x Horizontal column index.
+ * @param y Vertical row index.
+ * @return 32-bit Unicode code point (U'/' or U'\\').
  */
-void UpdateDoorAndWindowGlyphs(CMap &level)
+[[nodiscard]]
+char32_t GetOpenDoorGlyph(const CMap &level, std::size_t x, std::size_t y)
 {
+    const int ix = static_cast<int>(x);
+    const int iy = static_cast<int>(y);
+
+    auto is_door = [&](int nx, int ny) -> bool {
+        if (nx < 0 || nx >= static_cast<int>(level.getWidth()) ||
+            ny < 0 || ny >= static_cast<int>(level.getHeight())) {
+            return false;
+        }
+        const auto t = level.get(nx, ny).getType();
+        return t == "door_open" || t == "door_closed";
+    };
+
     auto is_solid = [&](int nx, int ny) -> bool {
         if (nx < 0 || nx >= static_cast<int>(level.getWidth()) ||
             ny < 0 || ny >= static_cast<int>(level.getHeight())) {
             return true;
         }
-        return !level.get(nx, ny).isPassable();
+        const auto& tile = level.get(nx, ny);
+        return !tile.isPassable() && tile.getType() != "door_closed";
+    };
+
+    const bool door_west = is_door(ix - 1, iy);
+    const bool door_east = is_door(ix + 1, iy);
+    const bool door_north = is_door(ix, iy - 1);
+    const bool door_south = is_door(ix, iy + 1);
+
+    const bool horiz_context = (door_west || door_east) ||
+        (is_solid(ix - 1, iy) && is_solid(ix + 1, iy));
+    const bool vert_context = (door_north || door_south) ||
+        (is_solid(ix, iy - 1) && is_solid(ix, iy + 1));
+
+    if (vert_context && !horiz_context) {
+        if (door_south && !door_north) {
+            return U'\\'; // Top door of vertical double door
+        }
+        if (door_north && !door_south) {
+            return U'/';  // Bottom door of vertical double door
+        }
+        return U'/';
+    }
+
+    if (horiz_context && !vert_context) {
+        if (door_east && !door_west) {
+            return U'/';  // Left door of horizontal double door
+        }
+        if (door_west && !door_east) {
+            return U'\\'; // Right door of horizontal double door
+        }
+        return U'/';
+    }
+
+    // Fallback if orientation context is ambiguous
+    if (door_south && !door_north) {
+        return U'\\';
+    }
+    if (door_north && !door_south) {
+        return U'/';
+    }
+    if (door_east && !door_west) {
+        return U'/';
+    }
+    if (door_west && !door_east) {
+        return U'\\';
+    }
+
+    return U'/';
+}
+
+[[nodiscard]]
+inline char32_t GetOpenDoorGlyph(const CMap &level, const Position &pos)
+{
+    return GetOpenDoorGlyph(level, pos.x, pos.y);
+}
+
+/**
+ * @brief Updates open door glyphs across the map, dynamically resolving single doors ('/') and double doors ('/\' or '\' above '/').
+ * @param level Map whose opened doors will be resolved.
+ */
+void UpdateOpenDoorGlyphs(CMap &level)
+{
+    for (std::size_t y = 0; y < level.getHeight(); ++y) {
+        for (std::size_t x = 0; x < level.getWidth(); ++x) {
+            if (level.get(x, y).getType() == "door_open") {
+                level.get(x, y).setGlyph(GetOpenDoorGlyph(level, x, y));
+            }
+        }
+    }
+}
+
+/**
+ * @brief Updates opened double door glyphs across the map.
+ * @param level Map whose opened double doors will be resolved.
+ */
+inline void UpdateDoubleDoorGlyphs(CMap &level)
+{
+    UpdateOpenDoorGlyphs(level);
+}
+
+/**
+ * @brief Updates closed door, opened door, and window glyphs to match orientation and double door layout.
+ * @param level Map whose doors and windows will be resolved.
+ */
+void UpdateDoorAndWindowGlyphs(CMap &level)
+{
+    auto is_solid_or_door = [&](int nx, int ny) -> bool {
+        if (nx < 0 || nx >= static_cast<int>(level.getWidth()) ||
+            ny < 0 || ny >= static_cast<int>(level.getHeight())) {
+            return true;
+        }
+        const auto& t = level.get(nx, ny).getType();
+        return !level.get(nx, ny).isPassable() || t == "door_closed" || t == "door_open";
     };
 
     for (std::size_t y = 0; y < level.getHeight(); ++y) {
@@ -304,17 +418,74 @@ void UpdateDoorAndWindowGlyphs(CMap &level)
             if (type == "door_closed" || type == "window") {
                 const int ix = static_cast<int>(x);
                 const int iy = static_cast<int>(y);
-                const bool horiz_flanked = is_solid(ix - 1, iy) && is_solid(ix + 1, iy);
-                const bool vert_flanked = is_solid(ix, iy - 1) && is_solid(ix, iy + 1);
+                const bool horiz_flanked = is_solid_or_door(ix - 1, iy) && is_solid_or_door(ix + 1, iy);
+                const bool vert_flanked = is_solid_or_door(ix, iy - 1) && is_solid_or_door(ix, iy + 1);
 
                 if (horiz_flanked && !vert_flanked) {
                     level.get(x, y).setGlyph(U'-');
                 } else if (vert_flanked && !horiz_flanked) {
                     level.get(x, y).setGlyph(U'|');
                 }
+            } else if (type == "door_open") {
+                level.get(x, y).setGlyph(GetOpenDoorGlyph(level, x, y));
             }
         }
     }
+}
+
+/**
+ * @brief Opens a door at the specified coordinates, dynamically updating open door glyphs for single or double doors.
+ * @param level Map containing the door.
+ * @param x Horizontal column index.
+ * @param y Vertical row index.
+ * @return True if a closed door was opened, false otherwise.
+ */
+bool OpenDoor(CMap &level, std::size_t x, std::size_t y)
+{
+    if (!level.inside(x, y) || level.get(x, y).getType() != "door_closed") {
+        return false;
+    }
+    level.SetCell(x, y, "door_open", GetOpenDoorGlyph(level, x, y));
+
+    // Update adjacent door if part of an opened double door
+    const int ix = static_cast<int>(x);
+    const int iy = static_cast<int>(y);
+    const std::pair<int, int> neighbors[] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+    for (const auto& [dx, dy] : neighbors) {
+        const int nx = ix + dx;
+        const int ny = iy + dy;
+        if (level.inside(nx, ny) && level.get(nx, ny).getType() == "door_open") {
+            level.get(nx, ny).setGlyph(GetOpenDoorGlyph(level, nx, ny));
+        }
+    }
+    return true;
+}
+
+inline bool OpenDoor(CMap &level, const Position &pos)
+{
+    return OpenDoor(level, pos.x, pos.y);
+}
+
+/**
+ * @brief Closes a door at the specified coordinates, dynamically updating glyphs for single or double doors.
+ * @param level Map containing the door.
+ * @param x Horizontal column index.
+ * @param y Vertical row index.
+ * @return True if an open door was closed, false otherwise.
+ */
+bool CloseDoor(CMap &level, std::size_t x, std::size_t y)
+{
+    if (!level.inside(x, y) || level.get(x, y).getType() != "door_open") {
+        return false;
+    }
+    level.SetCell(x, y, "door_closed");
+    UpdateDoorAndWindowGlyphs(level);
+    return true;
+}
+
+inline bool CloseDoor(CMap &level, const Position &pos)
+{
+    return CloseDoor(level, pos.x, pos.y);
 }
 
 //////////////////////////////////////////////////////////////////////////
