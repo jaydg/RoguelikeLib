@@ -39,6 +39,10 @@ void TestDistance();
 void TestMatrix();
 void TestRandomness();
 void TestBiomes();
+void TestScrollbarGeometry();
+void TestScrollbarDrawing();
+void TestScrollbarInteraction();
+void TestScrollbarAttachment();
 
 int main(int argc, char* argv[])
 {
@@ -84,7 +88,11 @@ int main(int argc, char* argv[])
         {"Distance", TestDistance},
         {"Matrix", TestMatrix},
         {"Randomness", TestRandomness},
-        {"Biomes", TestBiomes}
+        {"Biomes", TestBiomes},
+        {"ScrollbarGeometry", TestScrollbarGeometry},
+        {"ScrollbarDrawing", TestScrollbarDrawing},
+        {"ScrollbarInteraction", TestScrollbarInteraction},
+        {"ScrollbarAttachment", TestScrollbarAttachment}
     };
     const std::vector<std::string_view> named(argv + 1, argv + argc);
 
