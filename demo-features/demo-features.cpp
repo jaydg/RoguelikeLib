@@ -21,7 +21,150 @@ struct SGenerator {
     std::function<std::string()> variant{};
 };
 
-std::vector<SGenerator> Generators()
+struct CCaveGladeConfig {
+    struct BiomeEntry {
+        std::string label;
+        std::function<TerrainBiome()> create;
+    };
+
+    struct ShapeEntry {
+        std::string label;
+        SCaveAndGladeShape shape;
+    };
+
+    struct WaterEntry {
+        std::string label;
+        SCaveAndGladeWater water;
+    };
+
+    struct PresetEntry {
+        std::string label;
+        std::size_t wall;
+        std::size_t floor;
+        std::size_t shape;
+        std::size_t water;
+    };
+
+    std::vector<BiomeEntry> walls = {
+        {"Forest Pine (Unicode)", []() -> TerrainBiome {
+            return SForestBiome{.vegetation_density = 0.85f, .tree_tile = "pine"};
+        }},
+        {"Forest (ASCII)", []() -> TerrainBiome {
+            return SForestBiome{.vegetation_density = 0.85f};
+        }},
+        {"Solid Wall", []() -> TerrainBiome {
+            return SSolidBiome{"wall"};
+        }},
+        {"Solid Trees", []() -> TerrainBiome {
+            return SSolidBiome{"tree"};
+        }},
+        {"Solid Pine (Unicode)", []() -> TerrainBiome {
+            return SSolidBiome{"pine"};
+        }},
+        {"Rolling Hills", []() -> TerrainBiome {
+            return SHillsBiome{};
+        }},
+        {"Bogland", []() -> TerrainBiome {
+            return SBogBiome{};
+        }}
+    };
+
+    std::vector<BiomeEntry> floors = {
+        {"Grassland Pine (Unicode)", []() -> TerrainBiome {
+            return SGrasslandBiome{.tree_tile = "pine"};
+        }},
+        {"Grassland (ASCII)", []() -> TerrainBiome {
+            return SGrasslandBiome{};
+        }},
+        {"Dungeon Room", []() -> TerrainBiome {
+            return SSolidBiome{"room"};
+        }},
+        {"Plain Grass", []() -> TerrainBiome {
+            return SSolidBiome{"grass"};
+        }},
+        {"Bogland", []() -> TerrainBiome {
+            return SBogBiome{};
+        }},
+        {"Rolling Hills", []() -> TerrainBiome {
+            return SHillsBiome{};
+        }}
+    };
+
+    std::vector<ShapeEntry> shapes = {
+        {"Glade (Looping)", GladeShape},
+        {"Cave (Standard)", CaveShape},
+        {"Small Cave", SCaveAndGladeShape{.min_areas = 7, .max_areas = 11, .scale = 2}},
+        {"Grand Cavern", SCaveAndGladeShape{.min_areas = 6, .max_areas = 10, .scale = 4, .loop_odds = 35}}
+    };
+
+    std::vector<WaterEntry> waters = {
+        {"Unicode Ponds", SCaveAndGladeWater{.shallow = "pond", .level = 12, .deep_level = 35, .grain = 20}},
+        {"Glade Ponds (ASCII)", GladeWater},
+        {"Cave Pools", CaveWater},
+        {"None (Dry)", SCaveAndGladeWater{.shallow = {}}},
+        {"Flooded Swamp", SCaveAndGladeWater{.shallow = "water", .level = 28, .deep_level = 50, .grain = 16}}
+    };
+
+    std::vector<PresetEntry> presets = {
+        {"Unicode Glade", 0, 0, 0, 0},
+        {"Cave and Glade - Glade", 3, 3, 0, 1},
+        {"Cave and Glade - Cave", 2, 2, 1, 2},
+        {"Small Cave", 2, 2, 2, 3},
+        {"Bog Cavern", 2, 4, 1, 3},
+        {"Mountain Meadow", 5, 0, 0, 0}
+    };
+
+    std::size_t wall_idx = 0;
+    std::size_t floor_idx = 0;
+    std::size_t shape_idx = 0;
+    std::size_t water_idx = 0;
+    std::optional<std::size_t> preset_idx = 0;
+
+    void CheckPresetMatch()
+    {
+        preset_idx.reset();
+        for (std::size_t i = 0; i < presets.size(); ++i) {
+            if (presets[i].wall == wall_idx &&
+                presets[i].floor == floor_idx &&
+                presets[i].shape == shape_idx &&
+                presets[i].water == water_idx) {
+                preset_idx = i;
+                break;
+            }
+        }
+    }
+
+    void ApplyPreset(std::size_t idx)
+    {
+        if (idx < presets.size()) {
+            preset_idx = idx;
+            wall_idx = presets[idx].wall;
+            floor_idx = presets[idx].floor;
+            shape_idx = presets[idx].shape;
+            water_idx = presets[idx].water;
+        }
+    }
+
+    void Generate(CMap& map) const
+    {
+        RegisterBiomeTiles();
+        CreateCaveAndGlade(map,
+                           walls[wall_idx].create(),
+                           floors[floor_idx].create(),
+                           shapes[shape_idx].shape,
+                           waters[water_idx].water);
+    }
+
+    [[nodiscard]] std::string Summary() const
+    {
+        if (preset_idx) {
+            return std::format("{} | C: configure", presets[*preset_idx].label);
+        }
+        return std::format("{} / {} | C: configure", walls[wall_idx].label, floors[floor_idx].label);
+    }
+};
+
+std::vector<SGenerator> Generators(std::shared_ptr<CCaveGladeConfig> cave_glade_config = nullptr)
 {
     const auto voronoi_buildings = std::make_shared<bool>(false);
     std::vector<SGenerator> result = {
@@ -74,36 +217,17 @@ std::vector<SGenerator> Generators()
             }
         },
         {
-            "Cave and Glade - Cave", [](CMap & map)
+            "Cave and Glade", [cave_glade_config](CMap & map)
             {
-                CreateCaveAndGlade(map, "wall", "room", CaveShape, CaveWater);
-            }
-        },
-        {
-            "Small cave", [](CMap & map)
+                if (cave_glade_config) {
+                    cave_glade_config->Generate(map);
+                } else {
+                    CreateCaveAndGlade(map, "wall", "room", CaveShape, CaveWater);
+                }
+            },
+            [cave_glade_config]()
             {
-                CreateCaveAndGlade(map, "wall", "room", {.min_areas = 7, .max_areas = 11, .scale = 2}, {.shallow = {}});
-            }
-        },
-        {
-            "Cave and Glade - Glade", [](CMap & map)
-            {
-                CreateCaveAndGlade(map, "tree", "grass", GladeShape, GladeWater);
-            }
-        },
-        {
-            "Unicode glade", [](CMap & map)
-            {
-                CreateCaveAndGlade(map,
-                                   SForestBiome{
-                                       .vegetation_density = 0.85f,
-                                       .tree_tile = "pine",
-                                   },
-                                   SGrasslandBiome{
-                                       .tree_tile = "pine",
-                                   },
-                                   GladeShape,
-                                   {.shallow = "pond", .level = 12, .deep_level = 35, .grain = 20});
+                return cave_glade_config ? cave_glade_config->Summary() : "C: configure";
             }
         },
         {
@@ -188,6 +312,146 @@ public:
     }
 };
 
+// Configuration dialog for Cave and Glade biome combination
+class CCaveGladeConfigWindow : public CWindow
+{
+    std::shared_ptr<CCaveGladeConfig> config;
+    std::function<void()> on_change;
+    std::size_t selected_row = 0;
+    bool done = false;
+
+public:
+    CCaveGladeConfigWindow(std::shared_ptr<CCaveGladeConfig> a_config, std::function<void()> a_on_change)
+        : CWindow("Cave & Glade Biome Studio", {Position(4, 3), Size(50, 10)},
+                  EWindowOptions::NoResize | EWindowOptions::NoMove | EWindowOptions::NoClose),
+          config(std::move(a_config)), on_change(std::move(a_on_change))
+    {
+    }
+
+    [[nodiscard]] bool TakeDone()
+    {
+        const bool res = done;
+        done = false;
+        return res;
+    }
+
+    void CycleRow(int dir)
+    {
+        if (!config) return;
+        if (selected_row == 0) {
+            const int count = static_cast<int>(config->presets.size());
+            int cur = config->preset_idx.value_or(0);
+            cur = (cur + dir + count) % count;
+            config->ApplyPreset(static_cast<std::size_t>(cur));
+        } else if (selected_row == 1) {
+            const int count = static_cast<int>(config->walls.size());
+            config->wall_idx = (static_cast<int>(config->wall_idx) + dir + count) % count;
+            config->CheckPresetMatch();
+        } else if (selected_row == 2) {
+            const int count = static_cast<int>(config->floors.size());
+            config->floor_idx = (static_cast<int>(config->floor_idx) + dir + count) % count;
+            config->CheckPresetMatch();
+        } else if (selected_row == 3) {
+            const int count = static_cast<int>(config->shapes.size());
+            config->shape_idx = (static_cast<int>(config->shape_idx) + dir + count) % count;
+            config->CheckPresetMatch();
+        } else if (selected_row == 4) {
+            const int count = static_cast<int>(config->waters.size());
+            config->water_idx = (static_cast<int>(config->water_idx) + dir + count) % count;
+            config->CheckPresetMatch();
+        }
+        if (on_change) {
+            on_change();
+        }
+    }
+
+    void Draw(CScreen& screen, const SRect& inside) override
+    {
+        if (inside.Empty() || !config) return;
+
+        const std::string preset_str = config->preset_idx ? config->presets[*config->preset_idx].label : "(Custom)";
+
+        struct RowDisplay {
+            std::string label;
+            std::string value;
+        };
+
+        const std::array<RowDisplay, 5> rows = {{
+            {"Preset:", preset_str},
+            {"Wall Biome:", config->walls[config->wall_idx].label},
+            {"Floor Biome:", config->floors[config->floor_idx].label},
+            {"Layout:", config->shapes[config->shape_idx].label},
+            {"Water:", config->waters[config->water_idx].label}
+        }};
+
+        for (std::size_t i = 0; i < rows.size(); ++i) {
+            if (i >= inside.size.y) break;
+            const bool is_selected = (i == selected_row);
+            const std::string prefix = is_selected ? "> " : "  ";
+            const std::uint32_t colour = is_selected ? 0xFFFF70 : 0xC0C0C0;
+
+            const std::string text = std::format("{}{:13} ◄ {:^24} ►",
+                                                 prefix, rows[i].label, rows[i].value);
+            screen.Print(inside.corner.x + 1, inside.corner.y + i, text, colour, is_selected);
+        }
+
+        if (inside.size.y > 6) {
+            screen.Print(inside.corner.x + 1, inside.corner.y + 6,
+                         "↑/↓: row | ←/→: cycle | R: re-roll | Enter: done",
+                         0x808080);
+        }
+    }
+
+    bool HandleKey(const SKey& key) override
+    {
+        if (key.type == EKey::Closed || key.type == EKey::Escape ||
+            (key.type == EKey::Char && (key.ch == U'q' || key.ch == U'Q' || key.ch == 3))) {
+            done = true;
+            return true;
+        }
+        if (key.type == EKey::Enter || (key.type == EKey::Char && (key.ch == U'c' || key.ch == U'C'))) {
+            done = true;
+            return true;
+        }
+        if (key.type == EKey::Up || (key.type == EKey::Char && key.ch == U'k')) {
+            selected_row = (selected_row + 4) % 5;
+            return true;
+        }
+        if (key.type == EKey::Down || (key.type == EKey::Char && key.ch == U'j')) {
+            selected_row = (selected_row + 1) % 5;
+            return true;
+        }
+        if (key.type == EKey::Left || (key.type == EKey::Char && key.ch == U'h')) {
+            CycleRow(-1);
+            return true;
+        }
+        if (key.type == EKey::Right || (key.type == EKey::Char && (key.ch == U'l' || key.ch == U' '))) {
+            CycleRow(1);
+            return true;
+        }
+        if (key.type == EKey::Char && (key.ch == U'r' || key.ch == U'R')) {
+            if (on_change) on_change();
+            return true;
+        }
+        return false;
+    }
+
+    void Click(Position at, EMouseButton button) override
+    {
+        if (button != EMouseButton::Left) return;
+        if (at.y < 5) {
+            selected_row = at.y;
+            if (at.x < 24) {
+                CycleRow(-1);
+            } else {
+                CycleRow(1);
+            }
+        } else if (at.y >= 6) {
+            done = true;
+        }
+    }
+};
+
 // Each tab owns its demonstration state. The generator tab embeds the
 // library list widget, forwarding input in its sidebar to that widget.
 class CFeatureWindow : public CWindow
@@ -217,6 +481,7 @@ private:
     CClock clock{30};
     CCalendar calendar{{{"Thawmoon", 30}, {"Seedmoon", 30}, {"Sunmoon", 30}, {"Frostmoon", 30}}};
     CDailySchedule<std::string> phases;
+    std::function<void()> open_config_cb;
 
     Position FirstFloor(bool last = false) const
     {
@@ -235,41 +500,6 @@ private:
         }
 
         return found;
-    }
-
-    void Generate()
-    {
-        scroll_origin.reset();
-        level.Clear();
-        path.clear();
-
-        if (mode == 0) {
-            generated = list.getSelected().value_or(0);
-            generators[generated].generate(level);
-            detail = std::format("{} ({}x{})", generators[generated].name, level.getWidth(), level.getHeight());
-            if (generators[generated].variant) {
-                detail += ": " + generators[generated].variant();
-            }
-            focus = Position(level.getWidth() / 2, level.getHeight() / 2);
-        } else if (mode == 1) {
-            CreateSimpleCity(level, 15);
-            focus = FirstFloor();
-            detail = "Arrows move observer; visible tiles are bright";
-        } else if (mode == 2) {
-            CreateMaze(level);
-            start = FirstFloor();
-            goal = FirstFloor(true);
-            const bool found = FindPath(level, start, goal, path, false);
-            focus = start;
-            detail = found ? std::format("Path: {} steps; S start / E end / + trail", path.size()) : "No path found";
-        } else if (mode == 3) {
-            CreateCaves(level, 3);
-            goal = FirstFloor();
-            focus = goal;
-            detail = "Click a floor to set goal; digits show distance to @";
-        }
-
-        ready = true;
     }
 
     void Step()
@@ -306,6 +536,56 @@ private:
     }
 
 public:
+    void Generate()
+    {
+        scroll_origin.reset();
+        level.Clear();
+        path.clear();
+
+        if (mode == 0) {
+            generated = list.getSelected().value_or(0);
+            generators[generated].generate(level);
+            detail = std::format("{} ({}x{})", generators[generated].name, level.getWidth(), level.getHeight());
+            if (generators[generated].variant) {
+                detail += ": " + generators[generated].variant();
+            }
+            focus = Position(level.getWidth() / 2, level.getHeight() / 2);
+        } else if (mode == 1) {
+            CreateSimpleCity(level, 15);
+            focus = FirstFloor();
+            detail = "Arrows move observer; visible tiles are bright";
+        } else if (mode == 2) {
+            CreateMaze(level);
+            start = FirstFloor();
+            goal = FirstFloor(true);
+            const bool found = FindPath(level, start, goal, path, false);
+            focus = start;
+            detail = found ? std::format("Path: {} steps; S start / E end / + trail", path.size()) : "No path found";
+        } else if (mode == 3) {
+            CreateCaves(level, 3);
+            goal = FirstFloor();
+            focus = goal;
+            detail = "Click a floor to set goal; digits show distance to @";
+        }
+
+        ready = true;
+    }
+
+    bool SelectGenerator(std::string_view name)
+    {
+        if (mode != 0) {
+            return false;
+        }
+        for (std::size_t i = 0; i < generators.size(); ++i) {
+            if (generators[i].name == name) {
+                list.Select(i);
+                Generate();
+                return true;
+            }
+        }
+        return false;
+    }
+
     [[nodiscard]] Size getMapSize() const { return level.getSize(); }
 
     void Hover(std::optional<Position> position) { hover_position = position; }
@@ -329,14 +609,17 @@ public:
         }
     }
 
-    CFeatureWindow(std::string title, int a_mode, std::optional<Size> map_size = {})
+    CFeatureWindow(std::string title, int a_mode, std::optional<Size> map_size = {},
+                   std::shared_ptr<CCaveGladeConfig> a_cave_glade_config = nullptr,
+                   std::function<void()> a_open_config = nullptr)
         : CWindow(std::move(title),
     {
         Position(0, 0), Size(100, 30)
-    }), mode(a_mode), custom_size(map_size), level(map_size.value_or(Size(79, 50)))
+    }), mode(a_mode), custom_size(map_size), level(map_size.value_or(Size(79, 50))),
+      open_config_cb(std::move(a_open_config))
     {
         if (mode == 0) {
-            generators = Generators();
+            generators = Generators(a_cave_glade_config);
             std::vector<std::string> labels;
 
             for (const auto& generator : generators) {
@@ -344,8 +627,12 @@ public:
             }
 
             list.setItems(std::move(labels));
-            list.setOnActivate([this](std::size_t) {
-                Generate();
+            list.setOnActivate([this](std::size_t index) {
+                if (generators[index].name == "Cave and Glade" && open_config_cb) {
+                    open_config_cb();
+                } else {
+                    Generate();
+                }
             });
         }
 
@@ -498,6 +785,13 @@ public:
             }
 
             return true;
+        }
+
+        if (mode == 0 && key.type == EKey::Char && (key.ch == U'c' || key.ch == U'C')) {
+            if (open_config_cb) {
+                open_config_cb();
+                return true;
+            }
         }
 
         if (key.type == EKey::Char && (key.ch == U'r' || key.ch == U'R') && mode < 4) {
@@ -659,11 +953,47 @@ int main(int argc, char* argv[])
         CWindowManager windows;
         windows.setAllowTabUndocking(false);
         windows.setAllowTabClosing(false);
+        auto cave_glade_config = std::make_shared<CCaveGladeConfig>();
         std::vector<std::unique_ptr<CFeatureWindow>> tabs;
         const std::array titles = {"Map generators", "FOV", "Path finding", "Distance map", "Scheduler", "Calendar"};
 
+        std::size_t active = 0;
+        CCaveGladeConfigWindow config_window(cave_glade_config, [&] {
+            if (!tabs.empty() && tabs[0]) {
+                tabs[0]->Generate();
+            }
+        });
+        bool configuring_cave = false;
+        auto close_config = [&] {
+            windows.Close(config_window);
+            windows.Focus(*tabs[active]);
+            configuring_cave = false;
+        };
+        auto open_config = [&] {
+            if (active != 0) {
+                active = 0;
+                windows.Open(*tabs[0]);
+            }
+            tabs[0]->SelectGenerator("Cave and Glade");
+            configuring_cave = true;
+            for (auto& tab : tabs) tab->Hover(std::nullopt);
+            const Size scr_size = screen.getSize();
+            const std::size_t win_w = std::min<std::size_t>(50, scr_size.x > 4 ? scr_size.x - 2 : scr_size.x);
+            const std::size_t win_h = std::min<std::size_t>(10, scr_size.y > 4 ? scr_size.y - 2 : scr_size.y);
+            const Position pos(scr_size.x > win_w ? (scr_size.x - win_w) / 2 : 1,
+                               scr_size.y > win_h ? (scr_size.y - win_h) / 2 : 1);
+            windows.setLayout(config_window, SWindowLayout{
+                .open = true,
+                .dock = EDock::None,
+                .floating = SRect(pos, Size(win_w, win_h))
+            });
+            windows.Open(config_window);
+            windows.Focus(config_window);
+        };
+
         for (std::size_t index = 0; index < titles.size(); ++index) {
-            tabs.push_back(std::make_unique<CFeatureWindow>(titles[index], static_cast<int>(index), map_size));
+            tabs.push_back(std::make_unique<CFeatureWindow>(titles[index], static_cast<int>(index), map_size,
+                                                            cave_glade_config, [&] { open_config(); }));
             tabs.back()->setFrameTitle("RoguelikeLib features demo");
             windows.Open(*tabs.back());
             windows.Dock(*tabs.back(), EDock::Top, 1000);
@@ -674,7 +1004,6 @@ int main(int argc, char* argv[])
         }
 
         windows.Focus(*tabs.front());
-        std::size_t active = 0;
         CMapSizeInput size_entry;
         bool editing_size = false;
         auto close_size = [&] {
@@ -729,7 +1058,7 @@ int main(int argc, char* argv[])
             } else {
                 windows.Layout({Position(0, 0), Size(size.x, size.y - 1)});
                 windows.Draw(screen);
-                screen.Print(0, size.y - 1, "1-6/Tab: tabs | M: map size | R: regenerate | hjkl: pan | Q: quit");
+                screen.Print(0, size.y - 1, "1-6/Tab: tabs | C: configure | M: map size | R: regenerate | hjkl: pan | Q: quit");
             }
 
             terminal.Write(screen.Compose(false, displayed ? &*displayed : nullptr));
@@ -740,7 +1069,7 @@ int main(int argc, char* argv[])
 
             if (key.type == EKey::Mouse) {
                 for (auto& tab : tabs) {
-                    tab->Hover(editing_size ? std::nullopt : std::optional(key.mouse.position));
+                    tab->Hover((editing_size || configuring_cave) ? std::nullopt : std::optional(key.mouse.position));
                 }
             }
 
@@ -753,7 +1082,18 @@ int main(int argc, char* argv[])
                 }
                 continue;
             }
-            if (key.type == EKey::Char && (key.ch == U'm' || key.ch == U'M')) {
+            if (configuring_cave && key.type != EKey::Closed && !(key.type == EKey::Char && key.ch == 3)) {
+                config_window.HandleKey(key);
+                if (config_window.TakeDone()) {
+                    close_config();
+                }
+                continue;
+            }
+            if (!editing_size && !configuring_cave && key.type == EKey::Char && (key.ch == U'c' || key.ch == U'C')) {
+                open_config();
+                continue;
+            }
+            if (!editing_size && !configuring_cave && key.type == EKey::Char && (key.ch == U'm' || key.ch == U'M')) {
                 const auto dimensions = tabs[active < 4 ? active : 0]->getMapSize();
                 size_entry.Begin(dimensions);
                 editing_size = true;
@@ -769,6 +1109,10 @@ int main(int argc, char* argv[])
 
             if (key.type == EKey::Mouse && size.x >= 40 && size.y >= 10) {
                 windows.HandleMouse(key.mouse);
+
+                if (configuring_cave && config_window.TakeDone()) {
+                    close_config();
+                }
 
                 for (std::size_t index = 0; index < tabs.size(); ++index) {
                     if (windows.getFocused() == tabs[index].get()) {
