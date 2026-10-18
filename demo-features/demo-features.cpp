@@ -164,7 +164,144 @@ struct CCaveGladeConfig {
     }
 };
 
-std::vector<SGenerator> Generators(std::shared_ptr<CCaveGladeConfig> cave_glade_config = nullptr)
+struct CRiverlandConfig {
+    struct BiomeEntry {
+        std::string label;
+        std::function<TerrainBiome()> create;
+    };
+
+    struct CountEntry {
+        std::string label;
+        std::size_t count;
+    };
+
+    struct PresetEntry {
+        std::string label;
+        std::size_t biome;
+        std::size_t rivers;
+        std::size_t streams;
+        std::size_t clearings;
+        std::size_t paths;
+    };
+
+    std::vector<BiomeEntry> biomes = {
+        {"Forest Pine (Unicode)", []() -> TerrainBiome {
+            return SForestBiome{.vegetation_density = 0.65f, .tree_tile = "pine"};
+        }},
+        {"Forest (ASCII)", []() -> TerrainBiome {
+            return SForestBiome{.vegetation_density = 0.65f};
+        }},
+        {"Dense Pine Wildwood", []() -> TerrainBiome {
+            return SForestBiome{.tree_density = 0.85f, .vegetation_density = 0.85f, .patchiness = 0.4f, .tree_tile = "pine"};
+        }},
+        {"Rolling Hills", []() -> TerrainBiome {
+            return SHillsBiome{};
+        }},
+        {"Bogland", []() -> TerrainBiome {
+            return SBogBiome{};
+        }},
+        {"Grassland Pine (Unicode)", []() -> TerrainBiome {
+            return SGrasslandBiome{.tree_tile = "pine"};
+        }},
+        {"Grassland (ASCII)", []() -> TerrainBiome {
+            return SGrasslandBiome{};
+        }}
+    };
+
+    std::vector<CountEntry> rivers = {
+        {"1 River", 1},
+        {"2 Rivers", 2},
+        {"None (Dry)", 0},
+        {"3 Rivers", 3}
+    };
+
+    std::vector<CountEntry> streams = {
+        {"8 Streams", 8},
+        {"4 Streams", 4},
+        {"None", 0},
+        {"12 Streams", 12}
+    };
+
+    std::vector<CountEntry> clearings = {
+        {"5 Clearings", 5},
+        {"3 Clearings", 3},
+        {"8 Clearings", 8},
+        {"None (Wild)", 0}
+    };
+
+    std::vector<CountEntry> paths = {
+        {"8 Roads", 8},
+        {"4 Roads", 4},
+        {"None", 0},
+        {"12 Roads", 12}
+    };
+
+    std::vector<PresetEntry> presets = {
+        {"Pine Forest (Unicode)", 0, 0, 0, 0, 0},
+        {"Standard Forest", 1, 0, 0, 0, 0},
+        {"Bog & Fenland", 4, 1, 3, 1, 1},
+        {"Rolling Hills", 3, 0, 1, 2, 0},
+        {"Open Grassland", 5, 1, 1, 2, 3},
+        {"Dense Wildwood", 2, 0, 3, 3, 2}
+    };
+
+    std::size_t biome_idx = 0;
+    std::size_t rivers_idx = 0;
+    std::size_t streams_idx = 0;
+    std::size_t clearings_idx = 0;
+    std::size_t paths_idx = 0;
+    std::optional<std::size_t> preset_idx = 0;
+
+    void CheckPresetMatch()
+    {
+        preset_idx.reset();
+        for (std::size_t i = 0; i < presets.size(); ++i) {
+            if (presets[i].biome == biome_idx &&
+                presets[i].rivers == rivers_idx &&
+                presets[i].streams == streams_idx &&
+                presets[i].clearings == clearings_idx &&
+                presets[i].paths == paths_idx) {
+                preset_idx = i;
+                break;
+            }
+        }
+    }
+
+    void ApplyPreset(std::size_t idx)
+    {
+        if (idx < presets.size()) {
+            preset_idx = idx;
+            biome_idx = presets[idx].biome;
+            rivers_idx = presets[idx].rivers;
+            streams_idx = presets[idx].streams;
+            clearings_idx = presets[idx].clearings;
+            paths_idx = presets[idx].paths;
+        }
+    }
+
+    void Generate(CMap& map) const
+    {
+        RegisterBiomeTiles();
+        CreateRiverland(map,
+                        biomes[biome_idx].create(),
+                        clearings[clearings_idx].count,
+                        paths[paths_idx].count,
+                        rivers[rivers_idx].count,
+                        streams[streams_idx].count);
+    }
+
+    [[nodiscard]] std::string Summary() const
+    {
+        if (preset_idx) {
+            return std::format("{} | C: configure", presets[*preset_idx].label);
+        }
+        return std::format("{} / {} / {} | C: configure",
+                           biomes[biome_idx].label, rivers[rivers_idx].label, clearings[clearings_idx].label);
+    }
+};
+
+std::vector<SGenerator> Generators(std::shared_ptr<CCaveGladeConfig> cave_glade_config = nullptr,
+                                  std::shared_ptr<CRiverlandConfig> riverland_config = nullptr)
 {
     const auto voronoi_buildings = std::make_shared<bool>(false);
     std::vector<SGenerator> result = {
@@ -211,9 +348,17 @@ std::vector<SGenerator> Generators(std::shared_ptr<CCaveGladeConfig> cave_glade_
             }
         },
         {
-            "Riverland", [](CMap & map)
+            "Riverland", [riverland_config](CMap & map)
             {
-                CreateRiverland(map);
+                if (riverland_config) {
+                    riverland_config->Generate(map);
+                } else {
+                    CreateRiverland(map);
+                }
+            },
+            [riverland_config]()
+            {
+                return riverland_config ? riverland_config->Summary() : "C: configure";
             }
         },
         {
@@ -452,6 +597,151 @@ public:
     }
 };
 
+// Configuration dialog for Riverland biome and geography combination
+class CRiverlandConfigWindow : public CWindow
+{
+    std::shared_ptr<CRiverlandConfig> config;
+    std::function<void()> on_change;
+    std::size_t selected_row = 0;
+    bool done = false;
+
+public:
+    CRiverlandConfigWindow(std::shared_ptr<CRiverlandConfig> a_config, std::function<void()> a_on_change)
+        : CWindow("Riverland Biome Studio", {Position(4, 3), Size(50, 11)},
+                  EWindowOptions::NoResize | EWindowOptions::NoMove | EWindowOptions::NoClose),
+          config(std::move(a_config)), on_change(std::move(a_on_change))
+    {
+    }
+
+    [[nodiscard]] bool TakeDone()
+    {
+        const bool res = done;
+        done = false;
+        return res;
+    }
+
+    void CycleRow(int dir)
+    {
+        if (!config) return;
+        if (selected_row == 0) {
+            const int count = static_cast<int>(config->presets.size());
+            int cur = config->preset_idx.value_or(0);
+            cur = (cur + dir + count) % count;
+            config->ApplyPreset(static_cast<std::size_t>(cur));
+        } else if (selected_row == 1) {
+            const int count = static_cast<int>(config->biomes.size());
+            config->biome_idx = (static_cast<int>(config->biome_idx) + dir + count) % count;
+            config->CheckPresetMatch();
+        } else if (selected_row == 2) {
+            const int count = static_cast<int>(config->rivers.size());
+            config->rivers_idx = (static_cast<int>(config->rivers_idx) + dir + count) % count;
+            config->CheckPresetMatch();
+        } else if (selected_row == 3) {
+            const int count = static_cast<int>(config->streams.size());
+            config->streams_idx = (static_cast<int>(config->streams_idx) + dir + count) % count;
+            config->CheckPresetMatch();
+        } else if (selected_row == 4) {
+            const int count = static_cast<int>(config->clearings.size());
+            config->clearings_idx = (static_cast<int>(config->clearings_idx) + dir + count) % count;
+            config->CheckPresetMatch();
+        } else if (selected_row == 5) {
+            const int count = static_cast<int>(config->paths.size());
+            config->paths_idx = (static_cast<int>(config->paths_idx) + dir + count) % count;
+            config->CheckPresetMatch();
+        }
+        if (on_change) {
+            on_change();
+        }
+    }
+
+    void Draw(CScreen& screen, const SRect& inside) override
+    {
+        if (inside.Empty() || !config) return;
+
+        const std::string preset_str = config->preset_idx ? config->presets[*config->preset_idx].label : "(Custom)";
+
+        struct RowDisplay {
+            std::string label;
+            std::string value;
+        };
+
+        const std::array<RowDisplay, 6> rows = {{
+            {"Preset:", preset_str},
+            {"Biome:", config->biomes[config->biome_idx].label},
+            {"Rivers:", config->rivers[config->rivers_idx].label},
+            {"Streams:", config->streams[config->streams_idx].label},
+            {"Clearings:", config->clearings[config->clearings_idx].label},
+            {"Roads:", config->paths[config->paths_idx].label}
+        }};
+
+        for (std::size_t i = 0; i < rows.size(); ++i) {
+            if (i >= inside.size.y) break;
+            const bool is_selected = (i == selected_row);
+            const std::string prefix = is_selected ? "> " : "  ";
+            const std::uint32_t colour = is_selected ? 0xFFFF70 : 0xC0C0C0;
+
+            const std::string text = std::format("{}{:13} ◄ {:^24} ►",
+                                                 prefix, rows[i].label, rows[i].value);
+            screen.Print(inside.corner.x + 1, inside.corner.y + i, text, colour, is_selected);
+        }
+
+        if (inside.size.y > 7) {
+            screen.Print(inside.corner.x + 1, inside.corner.y + 7,
+                         "↑/↓: row | ←/→: cycle | R: re-roll | Enter: done",
+                         0x808080);
+        }
+    }
+
+    bool HandleKey(const SKey& key) override
+    {
+        if (key.type == EKey::Closed || key.type == EKey::Escape ||
+            (key.type == EKey::Char && (key.ch == U'q' || key.ch == U'Q' || key.ch == 3))) {
+            done = true;
+            return true;
+        }
+        if (key.type == EKey::Enter || (key.type == EKey::Char && (key.ch == U'c' || key.ch == U'C'))) {
+            done = true;
+            return true;
+        }
+        if (key.type == EKey::Up || (key.type == EKey::Char && key.ch == U'k')) {
+            selected_row = (selected_row + 5) % 6;
+            return true;
+        }
+        if (key.type == EKey::Down || (key.type == EKey::Char && key.ch == U'j')) {
+            selected_row = (selected_row + 1) % 6;
+            return true;
+        }
+        if (key.type == EKey::Left || (key.type == EKey::Char && key.ch == U'h')) {
+            CycleRow(-1);
+            return true;
+        }
+        if (key.type == EKey::Right || (key.type == EKey::Char && (key.ch == U'l' || key.ch == U' '))) {
+            CycleRow(1);
+            return true;
+        }
+        if (key.type == EKey::Char && (key.ch == U'r' || key.ch == U'R')) {
+            if (on_change) on_change();
+            return true;
+        }
+        return false;
+    }
+
+    void Click(Position at, EMouseButton button) override
+    {
+        if (button != EMouseButton::Left) return;
+        if (at.y < 6) {
+            selected_row = at.y;
+            if (at.x < 24) {
+                CycleRow(-1);
+            } else {
+                CycleRow(1);
+            }
+        } else if (at.y >= 7) {
+            done = true;
+        }
+    }
+};
+
 // Each tab owns its demonstration state. The generator tab embeds the
 // library list widget, forwarding input in its sidebar to that widget.
 class CFeatureWindow : public CWindow
@@ -481,7 +771,7 @@ private:
     CClock clock{30};
     CCalendar calendar{{{"Thawmoon", 30}, {"Seedmoon", 30}, {"Sunmoon", 30}, {"Frostmoon", 30}}};
     CDailySchedule<std::string> phases;
-    std::function<void()> open_config_cb;
+    std::function<void(std::string_view)> open_config_cb;
 
     Position FirstFloor(bool last = false) const
     {
@@ -586,6 +876,22 @@ public:
         return false;
     }
 
+    [[nodiscard]] std::string getSelectedGeneratorName() const
+    {
+        if (mode == 0 && list.getSelected() && *list.getSelected() < generators.size()) {
+            return generators[*list.getSelected()].name;
+        }
+        return {};
+    }
+
+    [[nodiscard]] bool IsGeneratorSelected(std::string_view name) const
+    {
+        if (mode != 0 || !list.getSelected() || *list.getSelected() >= generators.size()) {
+            return false;
+        }
+        return generators[*list.getSelected()].name == name;
+    }
+
     [[nodiscard]] Size getMapSize() const { return level.getSize(); }
 
     void Hover(std::optional<Position> position) { hover_position = position; }
@@ -611,7 +917,8 @@ public:
 
     CFeatureWindow(std::string title, int a_mode, std::optional<Size> map_size = {},
                    std::shared_ptr<CCaveGladeConfig> a_cave_glade_config = nullptr,
-                   std::function<void()> a_open_config = nullptr)
+                   std::shared_ptr<CRiverlandConfig> a_riverland_config = nullptr,
+                   std::function<void(std::string_view)> a_open_config = nullptr)
         : CWindow(std::move(title),
     {
         Position(0, 0), Size(100, 30)
@@ -619,7 +926,7 @@ public:
       open_config_cb(std::move(a_open_config))
     {
         if (mode == 0) {
-            generators = Generators(a_cave_glade_config);
+            generators = Generators(a_cave_glade_config, a_riverland_config);
             std::vector<std::string> labels;
 
             for (const auto& generator : generators) {
@@ -628,8 +935,9 @@ public:
 
             list.setItems(std::move(labels));
             list.setOnActivate([this](std::size_t index) {
-                if (generators[index].name == "Cave and Glade" && open_config_cb) {
-                    open_config_cb();
+                const auto& name = generators[index].name;
+                if ((name == "Cave and Glade" || name == "Riverland") && open_config_cb) {
+                    open_config_cb(name);
                 } else {
                     Generate();
                 }
@@ -838,7 +1146,7 @@ public:
 
         if (mode == 0 && key.type == EKey::Char && (key.ch == U'c' || key.ch == U'C')) {
             if (open_config_cb) {
-                open_config_cb();
+                open_config_cb(getSelectedGeneratorName());
                 return true;
             }
         }
@@ -1040,6 +1348,7 @@ int main(int argc, char* argv[])
         windows.setAllowTabUndocking(false);
         windows.setAllowTabClosing(false);
         auto cave_glade_config = std::make_shared<CCaveGladeConfig>();
+        auto riverland_config = std::make_shared<CRiverlandConfig>();
         std::vector<std::unique_ptr<CFeatureWindow>> tabs;
         const std::array titles = {"Map generators", "FOV", "Path finding", "Distance map", "Scheduler", "Calendar"};
 
@@ -1049,37 +1358,76 @@ int main(int argc, char* argv[])
                 tabs[0]->Generate();
             }
         });
+        CRiverlandConfigWindow riverland_config_window(riverland_config, [&] {
+            if (!tabs.empty() && tabs[0]) {
+                tabs[0]->Generate();
+            }
+        });
         bool configuring_cave = false;
+        bool configuring_riverland = false;
         auto close_config = [&] {
             windows.Close(config_window);
             windows.Focus(*tabs[active]);
             configuring_cave = false;
         };
-        auto open_config = [&] {
+        auto close_riverland_config = [&] {
+            windows.Close(riverland_config_window);
+            windows.Focus(*tabs[active]);
+            configuring_riverland = false;
+        };
+        auto open_config = [&](std::string_view target_generator = {}) {
             if (active != 0) {
                 active = 0;
                 windows.Open(*tabs[0]);
             }
-            tabs[0]->SelectGenerator("Cave and Glade");
-            configuring_cave = true;
-            for (auto& tab : tabs) tab->Hover(std::nullopt);
-            const Size scr_size = screen.getSize();
-            const std::size_t win_w = std::min<std::size_t>(50, scr_size.x > 4 ? scr_size.x - 2 : scr_size.x);
-            const std::size_t win_h = std::min<std::size_t>(10, scr_size.y > 4 ? scr_size.y - 2 : scr_size.y);
-            const Position pos(scr_size.x > win_w ? (scr_size.x - win_w) / 2 : 1,
-                               scr_size.y > win_h ? (scr_size.y - win_h) / 2 : 1);
-            windows.setLayout(config_window, SWindowLayout{
-                .open = true,
-                .dock = EDock::None,
-                .floating = SRect(pos, Size(win_w, win_h))
-            });
-            windows.Open(config_window);
-            windows.Focus(config_window);
+            std::string target(target_generator);
+            if (target.empty() && !tabs.empty() && tabs[0]) {
+                const auto selected = tabs[0]->getSelectedGeneratorName();
+                if (selected == "Riverland") {
+                    target = "Riverland";
+                } else {
+                    target = "Cave and Glade";
+                }
+            }
+            if (target == "Riverland") {
+                tabs[0]->SelectGenerator("Riverland");
+                configuring_riverland = true;
+                for (auto& tab : tabs) tab->Hover(std::nullopt);
+                const Size scr_size = screen.getSize();
+                const std::size_t win_w = std::min<std::size_t>(50, scr_size.x > 4 ? scr_size.x - 2 : scr_size.x);
+                const std::size_t win_h = std::min<std::size_t>(11, scr_size.y > 4 ? scr_size.y - 2 : scr_size.y);
+                const Position pos(scr_size.x > win_w ? (scr_size.x - win_w) / 2 : 1,
+                                   scr_size.y > win_h ? (scr_size.y - win_h) / 2 : 1);
+                windows.setLayout(riverland_config_window, SWindowLayout{
+                    .open = true,
+                    .dock = EDock::None,
+                    .floating = SRect(pos, Size(win_w, win_h))
+                });
+                windows.Open(riverland_config_window);
+                windows.Focus(riverland_config_window);
+            } else {
+                tabs[0]->SelectGenerator("Cave and Glade");
+                configuring_cave = true;
+                for (auto& tab : tabs) tab->Hover(std::nullopt);
+                const Size scr_size = screen.getSize();
+                const std::size_t win_w = std::min<std::size_t>(50, scr_size.x > 4 ? scr_size.x - 2 : scr_size.x);
+                const std::size_t win_h = std::min<std::size_t>(10, scr_size.y > 4 ? scr_size.y - 2 : scr_size.y);
+                const Position pos(scr_size.x > win_w ? (scr_size.x - win_w) / 2 : 1,
+                                   scr_size.y > win_h ? (scr_size.y - win_h) / 2 : 1);
+                windows.setLayout(config_window, SWindowLayout{
+                    .open = true,
+                    .dock = EDock::None,
+                    .floating = SRect(pos, Size(win_w, win_h))
+                });
+                windows.Open(config_window);
+                windows.Focus(config_window);
+            }
         };
 
         for (std::size_t index = 0; index < titles.size(); ++index) {
             tabs.push_back(std::make_unique<CFeatureWindow>(titles[index], static_cast<int>(index), map_size,
-                                                            cave_glade_config, [&] { open_config(); }));
+                                                            cave_glade_config, riverland_config,
+                                                            [&](std::string_view name) { open_config(name); }));
             tabs.back()->setFrameTitle("RoguelikeLib features demo");
             windows.Open(*tabs.back());
             windows.Dock(*tabs.back(), EDock::Top, 1000);
@@ -1155,7 +1503,7 @@ int main(int argc, char* argv[])
 
             if (key.type == EKey::Mouse) {
                 for (auto& tab : tabs) {
-                    tab->Hover((editing_size || configuring_cave) ? std::nullopt : std::optional(key.mouse.position));
+                    tab->Hover((editing_size || configuring_cave || configuring_riverland) ? std::nullopt : std::optional(key.mouse.position));
                 }
             }
 
@@ -1175,11 +1523,18 @@ int main(int argc, char* argv[])
                 }
                 continue;
             }
-            if (!editing_size && !configuring_cave && key.type == EKey::Char && (key.ch == U'c' || key.ch == U'C')) {
-                open_config();
+            if (configuring_riverland && key.type != EKey::Closed && !(key.type == EKey::Char && key.ch == 3)) {
+                riverland_config_window.HandleKey(key);
+                if (riverland_config_window.TakeDone()) {
+                    close_riverland_config();
+                }
                 continue;
             }
-            if (!editing_size && !configuring_cave && key.type == EKey::Char && (key.ch == U'm' || key.ch == U'M')) {
+            if (!editing_size && !configuring_cave && !configuring_riverland && key.type == EKey::Char && (key.ch == U'c' || key.ch == U'C')) {
+                open_config(tabs[0] ? tabs[0]->getSelectedGeneratorName() : "");
+                continue;
+            }
+            if (!editing_size && !configuring_cave && !configuring_riverland && key.type == EKey::Char && (key.ch == U'm' || key.ch == U'M')) {
                 const auto dimensions = tabs[active < 4 ? active : 0]->getMapSize();
                 size_entry.Begin(dimensions);
                 editing_size = true;
@@ -1198,6 +1553,9 @@ int main(int argc, char* argv[])
 
                 if (configuring_cave && config_window.TakeDone()) {
                     close_config();
+                }
+                if (configuring_riverland && riverland_config_window.TakeDone()) {
+                    close_riverland_config();
                 }
 
                 for (std::size_t index = 0; index < tabs.size(); ++index) {
