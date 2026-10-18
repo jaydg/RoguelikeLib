@@ -228,5 +228,45 @@ void TestSymmetricStructure()
     }
     Check(preserved_grass == void_tiles, "stamping with void mask preserves exact outside background");
     Check(stamped_rooms == castle_rooms, "stamping transfers all castle rooms onto background");
+
+    // Door validity check
+    std::size_t invalid_doors = 0;
+    std::size_t total_doors = 0;
+    for (std::size_t y = 0; y < void_castle.getHeight(); ++y) {
+        for (std::size_t x = 0; x < void_castle.getWidth(); ++x) {
+            const auto t = void_castle.get(x, y).getType();
+            if (t == "door_closed" || t == "door_open") {
+                total_doors++;
+                const auto north = (y > 0) ? void_castle.get(x, y - 1).getType() : "void";
+                const auto south = (y + 1 < void_castle.getHeight()) ? void_castle.get(x, y + 1).getType() : "void";
+                const auto west = (x > 0) ? void_castle.get(x - 1, y).getType() : "void";
+                const auto east = (x + 1 < void_castle.getWidth()) ? void_castle.get(x + 1, y).getType() : "void";
+
+                const bool horiz_walls = (west == "wall" && east == "wall");
+                const bool vert_walls = (north == "wall" && south == "wall");
+                if (!horiz_walls && !vert_walls) {
+                    invalid_doors++;
+                }
+            }
+        }
+    }
+    Check(total_doors > 0 && invalid_doors == 0, "all internal doors are framed by opposing walls without orphan doors");
+
+    // Test castle with outside entrance door
+    RL::CMap entrance_castle(RL::Size(79, 50));
+    RL::CreateCastle(entrance_castle, 20, true, true);
+    std::size_t outside_doors = 0;
+    for (std::size_t y = 0; y < entrance_castle.getHeight(); ++y) {
+        for (std::size_t x = 0; x < entrance_castle.getWidth(); ++x) {
+            if (entrance_castle.get(x, y).getType() == "door_closed") {
+                const auto north = (y > 0) ? entrance_castle.get(x, y - 1).getType() : "void";
+                const auto south = (y + 1 < entrance_castle.getHeight()) ? entrance_castle.get(x, y + 1).getType() : "void";
+                if ((north == "void" && south != "void") || (south == "void" && north != "void")) {
+                    outside_doors++;
+                }
+            }
+        }
+    }
+    Check(outside_doors >= 1, "outside_door generates entrance gate connecting void to interior");
 }
 

@@ -329,12 +329,18 @@ struct CCastleConfig {
         bool value;
     };
 
+    struct DoorEntry {
+        std::string label;
+        bool value;
+    };
+
     struct PresetEntry {
         std::string label;
         std::size_t bg;
         std::size_t scale;
         std::size_t rooms;
         std::size_t void_mode;
+        std::size_t door_mode;
     };
 
     std::vector<BgEntry> backgrounds = {
@@ -382,20 +388,26 @@ struct CCastleConfig {
         {"Solid Wall (Opaque)", false}
     };
 
+    std::vector<DoorEntry> door_modes = {
+        {"Outside Gate", true},
+        {"None (Enclosed)", false}
+    };
+
     std::vector<PresetEntry> presets = {
-        {"River Fortress", 0, 0, 0, 0},
-        {"Plains Palace", 2, 0, 1, 0},
-        {"Woodland Stronghold", 4, 0, 0, 0},
-        {"Hilltop Citadel", 5, 1, 3, 0},
-        {"Marsh Bastion", 6, 0, 0, 0},
-        {"Void Monolith", 7, 2, 1, 0},
-        {"Mountain Dungeon", 8, 2, 0, 1}
+        {"River Fortress", 0, 0, 0, 0, 0},
+        {"Plains Palace", 2, 0, 1, 0, 0},
+        {"Woodland Stronghold", 4, 0, 0, 0, 0},
+        {"Hilltop Citadel", 5, 1, 3, 0, 0},
+        {"Marsh Bastion", 6, 0, 0, 0, 0},
+        {"Void Monolith", 7, 2, 1, 0, 1},
+        {"Mountain Dungeon", 8, 2, 0, 1, 1}
     };
 
     std::size_t bg_idx = 0;
     std::size_t scale_idx = 0;
     std::size_t rooms_idx = 0;
     std::size_t void_idx = 0;
+    std::size_t door_idx = 0;
     std::optional<std::size_t> preset_idx = 0;
 
     void CheckPresetMatch()
@@ -405,7 +417,8 @@ struct CCastleConfig {
             if (presets[i].bg == bg_idx &&
                 presets[i].scale == scale_idx &&
                 presets[i].rooms == rooms_idx &&
-                presets[i].void_mode == void_idx) {
+                presets[i].void_mode == void_idx &&
+                presets[i].door_mode == door_idx) {
                 preset_idx = i;
                 break;
             }
@@ -420,6 +433,7 @@ struct CCastleConfig {
             scale_idx = presets[idx].scale;
             rooms_idx = presets[idx].rooms;
             void_idx = presets[idx].void_mode;
+            door_idx = presets[idx].door_mode;
         }
     }
 
@@ -443,14 +457,15 @@ struct CCastleConfig {
         // 2. Generate and stamp castle
         const int num_rooms = static_cast<int>(rooms[rooms_idx].count);
         const bool void_out = void_modes[void_idx].value;
+        const bool out_door = door_modes[door_idx].value;
         const double scale = scales[scale_idx].factor;
 
         if (scale >= 0.99 || bg.type == EBgType::SolidRock) {
             if (bg.type == EBgType::SolidRock && !void_out) {
-                CreateCastle(map, num_rooms, false);
+                CreateCastle(map, num_rooms, false, out_door);
             } else {
                 CMap castle(map.getSize());
-                CreateCastle(castle, num_rooms, void_out);
+                CreateCastle(castle, num_rooms, void_out, out_door);
                 if (void_out) {
                     const std::array<std::string_view, 1> skip{"void"};
                     map.Stamp(castle, Position(0, 0), skip);
@@ -464,7 +479,7 @@ struct CCastleConfig {
             const Position origin((map.getWidth() - c_w) / 2, (map.getHeight() - c_h) / 2);
 
             CMap castle(Size(c_w, c_h));
-            CreateCastle(castle, num_rooms, void_out);
+            CreateCastle(castle, num_rooms, void_out, out_door);
             if (void_out) {
                 const std::array<std::string_view, 1> skip{"void"};
                 map.Stamp(castle, origin, skip);
@@ -987,6 +1002,10 @@ public:
             const int count = static_cast<int>(config->void_modes.size());
             config->void_idx = (static_cast<int>(config->void_idx) + dir + count) % count;
             config->CheckPresetMatch();
+        } else if (selected_row == 5) {
+            const int count = static_cast<int>(config->door_modes.size());
+            config->door_idx = (static_cast<int>(config->door_idx) + dir + count) % count;
+            config->CheckPresetMatch();
         }
         if (on_change) {
             on_change();
@@ -1004,12 +1023,13 @@ public:
             std::string value;
         };
 
-        const std::array<RowDisplay, 5> rows = {{
+        const std::array<RowDisplay, 6> rows = {{
             {"Preset:", preset_str},
             {"Background:", config->backgrounds[config->bg_idx].label},
             {"Extent:", config->scales[config->scale_idx].label},
             {"Rooms:", config->rooms[config->rooms_idx].label},
-            {"Outside:", config->void_modes[config->void_idx].label}
+            {"Outside:", config->void_modes[config->void_idx].label},
+            {"Entrance:", config->door_modes[config->door_idx].label}
         }};
 
         for (std::size_t i = 0; i < rows.size(); ++i) {
@@ -1023,8 +1043,8 @@ public:
             screen.Print(inside.corner.x + 1, inside.corner.y + i, text, colour, is_selected);
         }
 
-        if (inside.size.y > 6) {
-            screen.Print(inside.corner.x + 1, inside.corner.y + 6,
+        if (inside.size.y > 7) {
+            screen.Print(inside.corner.x + 1, inside.corner.y + 7,
                          "↑/↓: row | ←/→: cycle | R: re-roll | Enter: done",
                          0x808080);
         }
@@ -1042,11 +1062,11 @@ public:
             return true;
         }
         if (key.type == EKey::Up || (key.type == EKey::Char && key.ch == U'k')) {
-            selected_row = (selected_row + 4) % 5;
+            selected_row = (selected_row + 5) % 6;
             return true;
         }
         if (key.type == EKey::Down || (key.type == EKey::Char && key.ch == U'j')) {
-            selected_row = (selected_row + 1) % 5;
+            selected_row = (selected_row + 1) % 6;
             return true;
         }
         if (key.type == EKey::Left || (key.type == EKey::Char && key.ch == U'h')) {
@@ -1067,14 +1087,14 @@ public:
     void Click(Position at, EMouseButton button) override
     {
         if (button != EMouseButton::Left) return;
-        if (at.y < 5) {
+        if (at.y < 6) {
             selected_row = at.y;
             if (at.x < 24) {
                 CycleRow(-1);
             } else {
                 CycleRow(1);
             }
-        } else if (at.y >= 6) {
+        } else if (at.y >= 7) {
             done = true;
         }
     }

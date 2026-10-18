@@ -20,7 +20,8 @@ enum class ESymmetryAxis
 
 void CreateSymmetricStructure(CMap &level, const int& max_number_of_rooms = 15,
                               ESymmetryAxis axis = ESymmetryAxis::Horizontal,
-                              bool void_outside = false)
+                              bool void_outside = false,
+                              bool outside_door = false)
 {
     constexpr int room_max_size = 15;
     constexpr int room_min_size = 3;
@@ -78,7 +79,6 @@ void CreateSymmetricStructure(CMap &level, const int& max_number_of_rooms = 15,
                 if (room.IsInRoom(Position(u1, v1))) {
                     if (!room.IsInRoom(Position(u2, v2))) {
                         rand_again = false;
-                        room.type++;
                     }
 
                     break;
@@ -87,7 +87,6 @@ void CreateSymmetricStructure(CMap &level, const int& max_number_of_rooms = 15,
                 if (room.IsInRoom(Position(u2, v2))) {
                     if (!room.IsInRoom(Position(u1, v1))) {
                         rand_again = false;
-                        room.type++;
                     }
 
                     break;
@@ -174,7 +173,7 @@ void CreateSymmetricStructure(CMap &level, const int& max_number_of_rooms = 15,
             continue;
         }
 
-        ConnectClosestRooms(level, true);
+        ConnectClosestRooms(level, true, true);
         break;
     }
 
@@ -217,16 +216,123 @@ void CreateSymmetricStructure(CMap &level, const int& max_number_of_rooms = 15,
             level.SetCell(pos, "void");
         }
     }
+
+    if (outside_door) {
+        const int w = static_cast<int>(level.getWidth());
+        const int h = static_cast<int>(level.getHeight());
+
+        if (axis == ESymmetryAxis::Vertical) {
+            const int center_x = w / 2;
+            const bool is_even = (w % 2 == 0);
+
+            auto is_interior = [&](const auto& tile) -> bool {
+                return tile.getType() != "wall" && tile.getType() != "void";
+            };
+
+            auto try_place = [&](int x_left, int x_right) -> bool {
+                for (int y = h - 2; y >= 1; --y) {
+                    const auto t_left = level.get(x_left, y).getType();
+                    const auto t_right = level.get(x_right, y).getType();
+                    if (t_left == "wall" && t_right == "wall") {
+                        const auto south_left = (y + 1 < h) ? level.get(x_left, y + 1).getType() : "void";
+                        const auto south_right = (y + 1 < h) ? level.get(x_right, y + 1).getType() : "void";
+                        if (south_left != "void" && south_right != "void") {
+                            continue;
+                        }
+
+                        int y_in = -1;
+                        for (int ny = y - 1; ny >= std::max(1, y - 4); --ny) {
+                            if (is_interior(level.get(x_left, ny)) && is_interior(level.get(x_right, ny))) {
+                                y_in = ny;
+                                break;
+                            }
+                        }
+                        if (y_in != -1) {
+                            for (int k = y_in + 1; k < y; ++k) {
+                                level.SetCell(x_left, k, "corridor");
+                                level.SetCell(x_right, k, "corridor");
+                            }
+                            level.SetCell(x_left, y, "door_closed");
+                            level.SetCell(x_right, y, "door_closed");
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            };
+
+            bool placed = is_even ? try_place(center_x - 1, center_x) : try_place(center_x, center_x);
+            if (!placed) {
+                for (int offset = 1; offset < w / 2; ++offset) {
+                    const int xl = is_even ? (center_x - 1 - offset) : (center_x - offset);
+                    const int xr = center_x + offset;
+                    if (xl >= 0 && xr < w && try_place(xl, xr)) {
+                        break;
+                    }
+                }
+            }
+        } else {
+            const int center_y = h / 2;
+            const bool is_even = (h % 2 == 0);
+
+            auto is_interior_h = [&](const auto& tile) -> bool {
+                return tile.getType() != "wall" && tile.getType() != "void";
+            };
+
+            auto try_place_h = [&](int y_top, int y_bottom) -> bool {
+                for (int x = w - 2; x >= 1; --x) {
+                    const auto t_top = level.get(x, y_top).getType();
+                    const auto t_bottom = level.get(x, y_bottom).getType();
+                    if (t_top == "wall" && t_bottom == "wall") {
+                        const auto east_top = (x + 1 < w) ? level.get(x + 1, y_top).getType() : "void";
+                        const auto east_bottom = (x + 1 < w) ? level.get(x + 1, y_bottom).getType() : "void";
+                        if (east_top != "void" && east_bottom != "void") {
+                            continue;
+                        }
+
+                        int x_in = -1;
+                        for (int nx = x - 1; nx >= std::max(1, x - 4); --nx) {
+                            if (is_interior_h(level.get(nx, y_top)) && is_interior_h(level.get(nx, y_bottom))) {
+                                x_in = nx;
+                                break;
+                            }
+                        }
+                        if (x_in != -1) {
+                            for (int k = x_in + 1; k < x; ++k) {
+                                level.SetCell(k, y_top, "corridor");
+                                level.SetCell(k, y_bottom, "corridor");
+                            }
+                            level.SetCell(x, y_top, "door_closed");
+                            level.SetCell(x, y_bottom, "door_closed");
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            };
+
+            bool placed = is_even ? try_place_h(center_y - 1, center_y) : try_place_h(center_y, center_y);
+            if (!placed) {
+                for (int offset = 1; offset < h / 2; ++offset) {
+                    const int yt = is_even ? (center_y - 1 - offset) : (center_y - offset);
+                    const int yb = center_y + offset;
+                    if (yt >= 0 && yb < h && try_place_h(yt, yb)) {
+                        break;
+                    }
+                }
+            }
+        }
+    }
 }
 
-void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool void_outside = false)
+void CreateSpaceShuttle(CMap &level, const int& max_number_of_rooms = 15, bool void_outside = false, bool outside_door = false)
 {
-    CreateSymmetricStructure(level, max_number_of_rooms, ESymmetryAxis::Horizontal, void_outside);
+    CreateSymmetricStructure(level, max_number_of_rooms, ESymmetryAxis::Horizontal, void_outside, outside_door);
 }
 
-void CreateCastle(CMap &level, const int& max_number_of_rooms = 15, bool void_outside = false)
+void CreateCastle(CMap &level, const int& max_number_of_rooms = 15, bool void_outside = false, bool outside_door = false)
 {
-    CreateSymmetricStructure(level, max_number_of_rooms, ESymmetryAxis::Vertical, void_outside);
+    CreateSymmetricStructure(level, max_number_of_rooms, ESymmetryAxis::Vertical, void_outside, outside_door);
 }
 
 } // end of namespace RL

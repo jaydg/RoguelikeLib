@@ -209,18 +209,63 @@ bool FindOnMapRandomRectangleOfType(CMap &level, std::string_view type, Position
 
 void AddDoors(CMap &level, float door_probability, float open_probability)
 {
+    auto is_solid = [&](int nx, int ny) -> bool {
+        if (nx < 0 || nx >= static_cast<int>(level.getWidth()) ||
+            ny < 0 || ny >= static_cast<int>(level.getHeight())) {
+            return true;
+        }
+        return !level.get(nx, ny).isPassable();
+    };
+
+    auto is_walkable = [&](int nx, int ny) -> bool {
+        if (nx < 0 || nx >= static_cast<int>(level.getWidth()) ||
+            ny < 0 || ny >= static_cast<int>(level.getHeight())) {
+            return false;
+        }
+        const auto& tile = level.get(nx, ny);
+        return tile.isPassable() || tile.getType() == "door_closed";
+    };
+
     for (std::size_t x = 0; x < level.getWidth(); ++x) {
         for (std::size_t y = 0; y < level.getHeight(); ++y) {
             Position pos(x, y);
             int room_cells = level.CountNeighbors(pos, CTile::ByType("room"));
-            int corridor_cells = level.CountNeighbors(pos, CTile::ByType("corridor"));
             int open_door_cells = level.CountNeighbors(pos, CTile::ByType("door_open"));
             int close_door_cells = level.CountNeighbors(pos, CTile::ByType("door_closed"));
             int door_cells = open_door_cells + close_door_cells;
 
             if (level.get(x, y).getType() == "corridor") {
-                if ((corridor_cells == 1 && door_cells == 0 && room_cells > 0 && room_cells < 4) ||
-                        (corridor_cells == 0 && door_cells == 0)) {
+                const int ix = static_cast<int>(x);
+                const int iy = static_cast<int>(y);
+                const bool horiz_flanked = is_solid(ix - 1, iy) && is_solid(ix + 1, iy);
+                const bool vert_open = is_walkable(ix, iy - 1) && is_walkable(ix, iy + 1);
+
+                const bool vert_flanked = is_solid(ix, iy - 1) && is_solid(ix, iy + 1);
+                const bool horiz_open = is_walkable(ix - 1, iy) && is_walkable(ix + 1, iy);
+
+                const bool valid_doorway = (horiz_flanked && vert_open && !vert_flanked) ||
+                                           (vert_flanked && horiz_open && !horiz_flanked);
+
+                bool has_nearby_door = false;
+                for (int dy = -2; dy <= 2; ++dy) {
+                    for (int dx = -2; dx <= 2; ++dx) {
+                        if (std::abs(dx) + std::abs(dy) <= 2 && (dx != 0 || dy != 0)) {
+                            const int nx = ix + dx;
+                            const int ny = iy + dy;
+                            if (nx >= 0 && nx < static_cast<int>(level.getWidth()) &&
+                                ny >= 0 && ny < static_cast<int>(level.getHeight())) {
+                                const auto t = level.get(nx, ny).getType();
+                                if (t == "door_closed" || t == "door_open") {
+                                    has_nearby_door = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (has_nearby_door) break;
+                }
+
+                if (door_cells == 0 && !has_nearby_door && room_cells > 0 && valid_doorway) {
                     float exist = (static_cast<float>(Random(1000))) / 1000.0f;
 
                     if (exist < door_probability) {
@@ -503,9 +548,9 @@ void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool str
             }
         }
 
-        for (a = 0; a < rooms.size(); a++) {
-            for (b = 0; b < rooms.size(); b++) {
-                if (transitive_closure[a][b] && a != b) {
+        for (b = 0; b < rooms.size(); b++) {
+            for (a = 0; a < rooms.size(); a++) {
+                if (transitive_closure[a][b]) {
                     for (c = 0; c < rooms.size(); c++) {
                         if (transitive_closure[b][c]) {
                             transitive_closure[a][c] = true;
@@ -529,16 +574,24 @@ void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool str
         }
 
         if (to_connect_a != -1) {
-            int to_connect_b;
+            std::size_t best_a = 0;
+            std::size_t best_b = 0;
+            std::size_t min_dist = std::numeric_limits<std::size_t>::max();
 
-            // connect rooms a & b
-            do {
-                to_connect_b = static_cast<int>(Random(rooms.size()));
-            } while (to_connect_b == to_connect_a);
+            for (std::size_t a_idx = 0; a_idx < rooms.size(); ++a_idx) {
+                for (std::size_t b_idx = 0; b_idx < rooms.size(); ++b_idx) {
+                    if (a_idx != b_idx && !transitive_closure[a_idx][b_idx]) {
+                        const std::size_t dist = distance_matrix[a_idx][b_idx];
+                        if (dist < min_dist) {
+                            min_dist = dist;
+                            best_a = a_idx;
+                            best_b = b_idx;
+                        }
+                    }
+                }
+            }
 
-            std::pair < Position, Position > closest_cells;
-            closest_cells = closest_cells_matrix[to_connect_a][to_connect_b];
-
+            std::pair<Position, Position> closest_cells = closest_cells_matrix[best_a][best_b];
             std::size_t x1 = closest_cells.first.x;
             std::size_t y1 = closest_cells.first.y;
             std::size_t x2 = closest_cells.second.x;
@@ -546,8 +599,8 @@ void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool str
 
             AddCorridor(level, x1, y1, x2, y2, straight_connections);
 
-            room_connections[to_connect_a][to_connect_b] = true;
-            room_connections[to_connect_b][to_connect_a] = true;
+            room_connections[best_a][best_b] = true;
+            room_connections[best_b][best_a] = true;
         }
     }
 }
