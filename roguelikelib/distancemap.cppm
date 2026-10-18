@@ -105,10 +105,15 @@ public:
      *              more than once, its first entry applies. Each cell's cost is resolved once.
      * @param a_neighbors Connectivity mode (All8 allows diagonal movement, Cardinal4 restricts to cardinal directions).
      * @param max_distance Maximum cumulative distance to explore. Cells beyond this limit are marked as unreachable.
+     * @param until Optional positions whose distances are all that is needed. The search stops as soon as
+     *              each of them has its final distance, which is exactly what the complete search would give;
+     *              cells farther away may then be left unreachable or with a larger distance. Positions off the
+     *              map are ignored; one that cannot be reached lets the search run to its end.
      * @throws std::invalid_argument If any entry in @p costs has a cost strictly less than 1.
      */
     CDistanceMap(const CMap& map, std::span<const Position> goals, std::span<const SStepCost> costs = {},
-                 Neighbors a_neighbors = Neighbors::All8, int max_distance = unreachable)
+                 Neighbors a_neighbors = Neighbors::All8, int max_distance = unreachable,
+                 std::span<const Position> until = {})
         : grid(map.getSize(), SCell{unreachable, 0}), neighbors(a_neighbors)
     {
         for (const SStepCost& cost : costs) {
@@ -126,6 +131,21 @@ public:
 
         const auto steps = Steps(neighbors);
 
+        // The positions still waiting for their final distance, if the
+        // caller needs only those; the search ends once none are left
+        std::vector<Position> waiting;
+
+        for (const Position& pos : until) {
+            if (map.inside(pos) && std::ranges::find(waiting, pos) == waiting.end()) {
+                waiting.push_back(pos);
+            }
+        }
+
+        const bool limited = !waiting.empty();
+        const auto settled = [&waiting, limited](const Position& pos) {
+            return limited && std::erase(waiting, pos) > 0 && waiting.empty();
+        };
+
         // Fast-path check: are all edge costs uniform (cost = 1)?
         const bool has_variable_costs = !costs.empty() && std::ranges::any_of(costs, [](const auto& c) { return c.cost > 1; });
 
@@ -134,15 +154,18 @@ public:
             std::vector<Position> queue;
             queue.reserve(std::min(width * height, std::size_t(4096)));
 
+            bool done = false;
+
             for (const Position& goal : goals) {
                 if (map.inside(goal)) {
                     grid.get_unchecked(goal.x, goal.y) = {0, 1};
                     queue.push_back(goal);
+                    done = settled(goal) || done;
                 }
             }
 
             std::size_t head = 0;
-            while (head < queue.size()) {
+            while (!done && head < queue.size()) {
                 const Position at = queue[head++];
                 const int next_dist = grid.get_unchecked(at.x, at.y).distance + 1;
 
@@ -166,6 +189,7 @@ public:
                             cell.distance = next_dist;
                             cell.step_cost = 1;
                             queue.push_back(Position(unx, uny));
+                            done = settled(Position(unx, uny)) || done;
                         }
                     }
                 }
@@ -225,6 +249,12 @@ public:
                 auto& at_cell = grid.get_unchecked(at.x, at.y);
                 if (so_far > at_cell.distance) {
                     continue;
+                }
+
+                // Taken from the queue at its own distance, a cell's
+                // distance is final
+                if (settled(at)) {
+                    break;
                 }
 
                 const int onto = at_cell.step_cost;

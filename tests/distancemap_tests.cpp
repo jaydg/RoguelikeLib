@@ -133,4 +133,44 @@ void TestDistanceMap()
     }
 
     Check(threw, "a step costing nothing is refused");
+
+    // Measured only until some positions are known: those come out exactly
+    // as the complete search has them, with or without differing costs
+    const RL::CMap wide = RL::tests::MakeMap({
+        "............",
+        "::::::::::::",
+        "....T.......",
+        "....T.......",
+        "............",
+    });
+    const std::array start{RL::Position(0, 0)};
+    const std::array wanted{RL::Position(5, 2), RL::Position(6, 3), RL::Position(5, 4)};
+
+    for (const bool costly : {true, false}) {
+        const std::span<const RL::SStepCost> paid = costly ? std::span<const RL::SStepCost>(costs) : std::span<const RL::SStepCost> {};
+        const RL::CDistanceMap complete(wide, start, paid);
+        const RL::CDistanceMap partial(wide, start, paid, RL::Neighbors::All8, RL::CDistanceMap::unreachable, wanted);
+        bool exact = true;
+
+        for (const auto pos : wanted) {
+            exact = exact && partial.Distance(pos) == complete.Distance(pos) && complete.Reachable(pos);
+        }
+
+        Check(exact, costly ? "the positions asked for are measured exactly, with costs" :
+              "the positions asked for are measured exactly, at uniform cost");
+    }
+
+    // A position that cannot be reached lets the search run to its end
+    const std::array beyond{RL::Position(4, 2), RL::Position(11, 4)};
+    const RL::CDistanceMap complete(wide, start, costs);
+    const RL::CDistanceMap partial(wide, start, costs, RL::Neighbors::All8, RL::CDistanceMap::unreachable, beyond);
+    bool whole = true;
+
+    for (std::size_t y = 0; y < wide.getHeight(); ++y) {
+        for (std::size_t x = 0; x < wide.getWidth(); ++x) {
+            whole = whole && partial.Distance(RL::Position(x, y)) == complete.Distance(RL::Position(x, y));
+        }
+    }
+
+    Check(whole, "asked for one that cannot be reached, the whole map is measured");
 }
