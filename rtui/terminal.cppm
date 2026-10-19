@@ -467,16 +467,39 @@ public:
     // through a pipe that read() drains, and reads the escape sequences
     // written back. Nothing is done about the mode of the terminal - the
     // browser terminal is raw already - and there are no signals.
+    //
+    // The browser cannot wait inside poll(), which returns at once. So the
+    // terminal looks for input and, while there is none, sleeps a little at
+    // a time: with Asyncify, each sleep gives the browser its turn, to
+    // deliver keys and draw. Even without time to wait, it yields once, so
+    // that a loop asking for keys never freezes the page.
     static EWait WaitForInput(int timeout_ms)
     {
-        pollfd descriptor{STDIN_FILENO, POLLIN, 0};
-        const int result = poll(&descriptor, 1, timeout_ms);
+        constexpr int slice_ms = 10;
+        int waited = 0;
+        bool yielded = false;
 
-        if (result < 0) {
-            throw std::system_error(errno, std::generic_category(), "waiting for the terminal");
+        for (;;) {
+            pollfd descriptor{STDIN_FILENO, POLLIN, 0};
+            const int result = poll(&descriptor, 1, 0);
+
+            if (result < 0) {
+                throw std::system_error(errno, std::generic_category(), "waiting for the terminal");
+            }
+
+            if (result > 0) {
+                return EWait::Ready;
+            }
+
+            if (timeout_ms >= 0 && waited >= timeout_ms && yielded) {
+                return EWait::Timeout;
+            }
+
+            const int slice = timeout_ms < 0 ? slice_ms : std::min(slice_ms, timeout_ms - waited);
+            emscripten_sleep(static_cast<unsigned>(std::max(slice, 0)));
+            waited += slice;
+            yielded = true;
         }
-
-        return result > 0 ? EWait::Ready : EWait::Timeout;
     }
 
     void ReadAvailable()
