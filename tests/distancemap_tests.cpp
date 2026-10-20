@@ -243,4 +243,64 @@ void TestDistanceMap()
     Check(!limited.Mend(changing, felled) && !stopped.Mend(changing, felled), "a map measured only partly is not mended");
     Check(!whole_map.Mend(changing, corner_goal) && !whole_map.Mend(changing, off_map) &&
           whole_map.Distance(RL::Position(4, 0)) == 4, "nor at a goal or off the map, and it stays as it was");
+
+    // The nearest of some goals, searched for towards them, is the one a map
+    // measured from the start finds nearest, the first of those as near
+    std::mt19937 chance(7);
+    bool nearest_alike = true;
+    int searched = 0;
+    int found = 0;
+
+    for (int round = 0; round < 400; ++round) {
+        RL::CMap map = RL::tests::MakeMap({
+            "..........T.......",
+            "....TT....T..~~...",
+            "::::::::::T..~~...",
+            "..&&......=..~~...",
+            "..&&...TTTT..~~...",
+            "..........:.......",
+            "TTTT......:...&&..",
+            "..........:.......",
+        });
+
+        for (int tiles = 0; tiles < 12; ++tiles) {
+            map.SetCell(chance() % map.getWidth(), chance() % map.getHeight(), kinds[chance() % kinds.size()]);
+        }
+
+        const std::span<const RL::SStepCost> paid = round % 2 == 0 ? std::span<const RL::SStepCost>(varied) :
+                                                    std::span<const RL::SStepCost> {};
+        const RL::Neighbors directions = round % 4 < 2 ? RL::Neighbors::All8 : RL::Neighbors::Cardinal4;
+        const RL::Position start(chance() % map.getWidth(), chance() % map.getHeight());
+        std::vector<RL::Position> goals;
+
+        for (std::uint32_t count = 1 + chance() % 8; count > 0; --count) {
+            goals.emplace_back(chance() % (map.getWidth() + 2), chance() % map.getHeight());
+        }
+
+        if (round % 7 == 0) {
+            goals.push_back(goals.front());
+        }
+
+        if (round % 11 == 0) {
+            goals.push_back(start);
+        }
+
+        const RL::CDistanceMap measured(map, std::span(&start, 1), paid, directions);
+        std::optional<std::pair<std::size_t, int>> expected;
+
+        for (std::size_t index = 0; index < goals.size(); ++index) {
+            const int distance = measured.Distance(goals[index]);
+
+            if (distance != RL::CDistanceMap::unreachable && (!expected || distance < expected->second)) {
+                expected = std::pair{index, distance};
+            }
+        }
+
+        const auto nearest = RL::CDistanceMap::Nearest(map, start, goals, paid, directions);
+        nearest_alike = nearest_alike && nearest == expected;
+        ++searched;
+        found += nearest ? 1 : 0;
+    }
+
+    Check(nearest_alike && searched == 400 && found > 200, "the nearest goal is the one a map from the start finds nearest");
 }

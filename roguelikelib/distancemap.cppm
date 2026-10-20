@@ -82,15 +82,49 @@ private:
      */
     [[nodiscard]] int CostOf(const CTile& tile) const
     {
+        return CostIn(by_name, tile);
+    }
+
+    /**
+     * @brief The cost of stepping onto a passable tile by a table of @ref CostsByName: its type's cost, or 1.
+     */
+    [[nodiscard]] static int CostIn(std::span<const std::pair<const char*, int>> table, const CTile& tile)
+    {
         const char* name = tile.getType().data();
 
-        for (const auto& [listed, cost] : by_name) {
+        for (const auto& [listed, cost] : table) {
             if (listed == name) {
                 return cost;
             }
         }
 
         return 1;
+    }
+
+    /**
+     * @brief The step costs by the address of the type's name in @ref CTileData.
+     *
+     * A type nobody registered cannot be on the map, and is left out; the first cost given for a
+     * type is the one that counts.
+     */
+    [[nodiscard]] static std::vector<std::pair<const char*, int>> CostsByName(std::span<const SStepCost> costs)
+    {
+        std::vector<std::pair<const char*, int>> table;
+        table.reserve(costs.size());
+
+        for (const SStepCost& listed : costs) {
+            if (!CTileData::has(listed.type)) {
+                continue;
+            }
+
+            const char* name = CTileData::get(listed.type).first.data();
+
+            if (std::ranges::find(table, name, &std::pair<const char*, int>::first) == table.end()) {
+                table.emplace_back(name, listed.cost);
+            }
+        }
+
+        return table;
     }
 
 
@@ -224,21 +258,7 @@ public:
             }
         } else {
             // DIJKSTRA FOR VARIABLE COSTS
-            // A type nobody registered cannot be on the map; the first cost
-            // given for a type is the one that counts.
-            by_name.reserve(costs.size());
-
-            for (const SStepCost& listed : costs) {
-                if (!CTileData::has(listed.type)) {
-                    continue;
-                }
-
-                const char* name = CTileData::get(listed.type).first.data();
-
-                if (std::ranges::find(by_name, name, &std::pair<const char*, int>::first) == by_name.end()) {
-                    by_name.emplace_back(name, listed.cost);
-                }
-            }
+            by_name = CostsByName(costs);
 
             const auto cost_of = [this](const CTile& tile) {
                 return CostOf(tile);
@@ -579,6 +599,166 @@ public:
         }
 
         return true;
+    }
+
+    /**
+     * @brief Finds which of some goals is nearest to a start, without measuring a map around it.
+     *
+     * Answers what a distance map measured from @p start - `CDistanceMap(map, {start}, costs, neighbors)` -
+     * would give as the smallest @ref Distance of the goals, and for which of them, but searches only
+     * towards the goals rather than in every direction (an A* search, by the steps it takes at the
+     * least to the nearest goal). Ties go to the goal listed first, as when going through the goals
+     * of such a map in order and keeping a nearer one only.
+     *
+     * @param map The map to search.
+     * @param start Where the distances are measured from, as the one goal of such a map.
+     * @param goals The positions of which the nearest is wanted; those off the map are ignored, and an
+     *              impassable one other than @p start is never reached.
+     * @param costs Optional tile archetype cost overrides, as for the constructor.
+     * @param a_neighbors Connectivity mode, as for the constructor.
+     * @return The index in @p goals of the nearest goal with its distance; nothing if none can be reached.
+     * @throws std::invalid_argument If any entry in @p costs has a cost strictly less than 1.
+     */
+    [[nodiscard]] static std::optional<std::pair<std::size_t, int>> Nearest(const CMap& map, const Position& start,
+            std::span<const Position> goals, std::span<const SStepCost> costs = {},
+            Neighbors a_neighbors = Neighbors::All8)
+    {
+        for (const SStepCost& cost : costs) {
+            if (cost.cost < 1) {
+                throw std::invalid_argument("walking onto " + std::string(cost.type) + " has to cost at least 1");
+            }
+        }
+
+        const std::size_t width = map.getWidth();
+        const std::size_t height = map.getHeight();
+
+        if (!map.inside(start)) {
+            return std::nullopt;
+        }
+
+        // The goals on the map, by their indices in order
+        std::vector<std::size_t> wanted;
+
+        for (std::size_t index = 0; index < goals.size(); ++index) {
+            if (map.inside(goals[index])) {
+                if (goals[index] == start) {
+                    return std::pair{index, 0};
+                }
+
+                wanted.push_back(index);
+            }
+        }
+
+        if (wanted.empty()) {
+            return std::nullopt;
+        }
+
+        const auto table = CostsByName(costs);
+        const auto steps = Steps(a_neighbors);
+        const bool diagonal = a_neighbors == Neighbors::All8;
+
+        // The fewest steps to the nearest goal, each costing at least 1:
+        // never more than the way there costs, and never falling by more
+        // than a step costs, so that a cell taken from the queue has its
+        // final distance
+        const auto estimate = [&](const Position& pos) {
+            int least = unreachable;
+
+            for (const std::size_t index : wanted) {
+                const int dx = std::abs(static_cast<int>(pos.x) - static_cast<int>(goals[index].x));
+                const int dy = std::abs(static_cast<int>(pos.y) - static_cast<int>(goals[index].y));
+                least = std::min(least, diagonal ? std::max(dx, dy) : dx + dy);
+            }
+
+            return least;
+        };
+        // What leaving a cell costs on a way to the start: stepping onto it
+        // on the way back, as the distance map measures it; the start, a
+        // goal of such a map, costs 1 when it is impassable
+        const auto step_of = [&](const Position& pos) {
+            const CTile& tile = map.get_unchecked(pos.x, pos.y);
+            return tile.isPassable() ? CostIn(table, tile) : 1;
+        };
+
+        // The distances so far, in a scratchpad kept from search to search,
+        // marked by the search that last touched each cell: one as large as
+        // the largest map searched serves every map
+        thread_local std::vector<std::pair<std::uint32_t, int>> known;
+        thread_local std::uint32_t search = 0;
+
+        if (known.size() < width * height) {
+            known.resize(width * height, {0, unreachable});
+        }
+
+        if (++search == 0) {
+            std::ranges::fill(known, std::pair<std::uint32_t, int> {0, unreachable});
+            search = 1;
+        }
+
+        const auto distance = [&](const Position& pos) -> std::pair<std::uint32_t, int>& {
+            return known[pos.y * width + pos.x];
+        };
+
+        struct SOpen {
+            int estimated;
+            int so_far;
+            Position pos;
+            bool operator>(const SOpen& other) const noexcept { return estimated > other.estimated; }
+        };
+
+        std::priority_queue<SOpen, std::vector<SOpen>, std::greater<SOpen>> open;
+        distance(start) = {search, 0};
+        open.push({estimate(start), 0, start});
+
+        std::optional<std::size_t> nearest;
+        int best = unreachable;
+
+        // Once nothing in the queue can come as near as the nearest goal
+        // found, no goal can, and every goal as near has been found
+        while (!open.empty() && open.top().estimated <= best) {
+            const SOpen at = open.top();
+            open.pop();
+
+            if (at.so_far > distance(at.pos).second) {
+                continue;
+            }
+
+            for (const std::size_t index : wanted) {
+                if (goals[index] == at.pos && (at.so_far < best || index < *nearest)) {
+                    best = at.so_far;
+                    nearest = index;
+                    break;
+                }
+            }
+
+            const int onward = at.so_far + step_of(at.pos);
+            const int ix = static_cast<int>(at.pos.x);
+            const int iy = static_cast<int>(at.pos.y);
+
+            for (const auto& [dx, dy] : steps) {
+                const int nx = ix + dx;
+                const int ny = iy + dy;
+
+                if (nx < 0 || ny < 0 || nx >= static_cast<int>(width) || ny >= static_cast<int>(height)) {
+                    continue;
+                }
+
+                const Position next(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny));
+                auto& [touched, so_far] = distance(next);
+
+                if (map.get_unchecked(next.x, next.y).isPassable() && (touched != search || onward < so_far)) {
+                    touched = search;
+                    so_far = onward;
+                    open.push({onward + estimate(next), onward, next});
+                }
+            }
+        }
+
+        if (!nearest) {
+            return std::nullopt;
+        }
+
+        return std::pair{*nearest, best};
     }
 };
 
