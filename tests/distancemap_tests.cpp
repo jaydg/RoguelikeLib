@@ -176,7 +176,8 @@ void TestDistanceMap()
 
     // Mended after tiles change, the distances and steps are exactly those
     // of the changed map measured anew: trees felled and planted, paths worn
-    // in, water bridged, with and without costs, in eight and four directions
+    // in, water bridged, with and without costs, in eight and four
+    // directions, over the whole map or only so far
     const std::array kinds{"grass", "corridor", "tree", "water", "bridge", "plant"};
     const std::array varied{RL::SStepCost{"grass", 3}, RL::SStepCost{"plant", 5}, RL::SStepCost{"water", 4}};
     std::mt19937 dice(4);
@@ -198,7 +199,8 @@ void TestDistanceMap()
         const std::span<const RL::SStepCost> paid = round % 2 == 0 ? std::span<const RL::SStepCost>(varied) :
                                                     std::span<const RL::SStepCost> {};
         const RL::Neighbors directions = round % 4 < 2 ? RL::Neighbors::All8 : RL::Neighbors::Cardinal4;
-        RL::CDistanceMap repaired(map, goals, paid, directions);
+        const int reach = round % 3 == 0 ? 9 : RL::CDistanceMap::unreachable;
+        RL::CDistanceMap repaired(map, goals, paid, directions, reach);
 
         for (int change = 0; change < 25; ++change) {
             std::vector<RL::Position> changed;
@@ -214,7 +216,7 @@ void TestDistanceMap()
 
             as_new = as_new && repaired.Mend(map, changed);
             ++mended;
-            const RL::CDistanceMap fresh(map, goals, paid, directions);
+            const RL::CDistanceMap fresh(map, goals, paid, directions, reach);
 
             for (std::size_t y = 0; y < map.getHeight(); ++y) {
                 for (std::size_t x = 0; x < map.getWidth(); ++x) {
@@ -240,7 +242,14 @@ void TestDistanceMap()
     changing.SetCell(2, 0, "tree");
     const std::array felled{RL::Position(2, 0)};
     const std::array off_map{RL::Position(9, 9)};
-    Check(!limited.Mend(changing, felled) && !stopped.Mend(changing, felled), "a map measured only partly is not mended");
+    const RL::CDistanceMap limited_anew(changing, corner_goal, {}, RL::Neighbors::All8, 2);
+    bool limited_alike = limited.Mend(changing, felled);
+
+    for (std::size_t x = 0; x < changing.getWidth(); ++x) {
+        limited_alike = limited_alike && limited.Distance(RL::Position(x, 1)) == limited_anew.Distance(RL::Position(x, 1));
+    }
+
+    Check(limited_alike && !stopped.Mend(changing, felled), "a map measured only so far is mended, but not one measured until some are known");
     Check(!whole_map.Mend(changing, corner_goal) && !whole_map.Mend(changing, off_map) &&
           whole_map.Distance(RL::Position(4, 0)) == 4, "nor at a goal or off the map, and it stays as it was");
 
@@ -303,4 +312,58 @@ void TestDistanceMap()
     }
 
     Check(nearest_alike && searched == 400 && found > 200, "the nearest goal is the one a map from the start finds nearest");
+
+    // Measured towards a position and the cells around it, the map has
+    // their distances, and the step from it, exactly as the whole map does,
+    // with costs and without, and within a distance limit
+    bool towards_alike = true;
+    int measured_towards = 0;
+
+    for (int round = 0; round < 400; ++round) {
+        RL::CMap map = RL::tests::MakeMap({
+            "..........T.......",
+            "....TT....T..~~...",
+            "::::::::::T..~~...",
+            "..&&......=..~~...",
+            "..&&...TTTT..~~...",
+            "..........:.......",
+            "TTTT......:...&&..",
+            "..........:.......",
+        });
+
+        for (int tiles = 0; tiles < 12; ++tiles) {
+            map.SetCell(chance() % map.getWidth(), chance() % map.getHeight(), kinds[chance() % kinds.size()]);
+        }
+
+        const std::span<const RL::SStepCost> paid = round % 2 == 0 ? std::span<const RL::SStepCost>(varied) :
+                                                    std::span<const RL::SStepCost> {};
+        const RL::Neighbors directions = round % 4 < 2 ? RL::Neighbors::All8 : RL::Neighbors::Cardinal4;
+        const int limit = round % 3 == 0 ? 12 : RL::CDistanceMap::unreachable;
+        const RL::Position goal(chance() % map.getWidth(), chance() % map.getHeight());
+        const RL::Position from(chance() % map.getWidth(), chance() % map.getHeight());
+        std::vector<RL::Position> around;
+
+        for (int dy = -1; dy <= 1; ++dy) {
+            for (int dx = -1; dx <= 1; ++dx) {
+                const int x = static_cast<int>(from.x) + dx;
+                const int y = static_cast<int>(from.y) + dy;
+
+                if (x >= 0 && y >= 0) {
+                    around.emplace_back(static_cast<std::size_t>(x), static_cast<std::size_t>(y));
+                }
+            }
+        }
+
+        const RL::CDistanceMap whole(map, std::span(&goal, 1), paid, directions, limit);
+        const RL::CDistanceMap towards(map, std::span(&goal, 1), paid, directions, limit, around);
+
+        for (const auto pos : around) {
+            towards_alike = towards_alike && towards.Distance(pos) == whole.Distance(pos);
+        }
+
+        towards_alike = towards_alike && towards.NextStep(from) == whole.NextStep(from);
+        ++measured_towards;
+    }
+
+    Check(towards_alike && measured_towards == 400, "measured towards a position, its surroundings are as the whole map has them");
 }

@@ -70,9 +70,11 @@ private:
     /// The step costs by the address of the type's name in @ref CTileData, the first given for a type.
     std::vector<std::pair<const char*, int>> by_name;
 
-    /// Whether the whole map was measured, without a distance limit or positions to stop at, so that
-    /// @ref Mend can repair it.
+    /// Whether the map was measured without positions to stop at, so that @ref Mend can repair it.
     bool complete = true;
+
+    /// The largest distance measured, as the constructor was given it.
+    int farthest = unreachable;
 
     /**
      * @brief The cost of stepping onto a passable tile: its type's listed cost, or 1.
@@ -166,17 +168,18 @@ public:
      *              more than once, its first entry applies. Each cell's cost is resolved once.
      * @param a_neighbors Connectivity mode (All8 allows diagonal movement, Cardinal4 restricts to cardinal directions).
      * @param max_distance Maximum cumulative distance to explore. Cells beyond this limit are marked as unreachable.
-     * @param until Optional positions whose distances are all that is needed. The search stops as soon as
-     *              each of them has its final distance, which is exactly what the complete search would give;
-     *              cells farther away may then be left unreachable or with a larger distance. Positions off the
-     *              map are ignored; one that cannot be reached lets the search run to its end.
+     * @param until Optional positions whose distances are all that is needed. The search heads for them
+     *              from the goals (an A* search) and stops as soon as each of them has its final distance,
+     *              which is exactly what the complete search would give; other cells may then be left
+     *              unreachable or with a larger distance. Positions off the map are ignored; one that cannot
+     *              be reached lets the search run to its end.
      * @throws std::invalid_argument If any entry in @p costs has a cost strictly less than 1.
      */
     CDistanceMap(const CMap& map, std::span<const Position> goals, std::span<const SStepCost> costs = {},
                  Neighbors a_neighbors = Neighbors::All8, int max_distance = unreachable,
                  std::span<const Position> until = {})
         : grid(map.getSize(), SCell{unreachable, 0}), neighbors(a_neighbors),
-          complete(max_distance == unreachable && until.empty())
+          complete(until.empty()), farthest(max_distance)
     {
         for (const SStepCost& cost : costs) {
             if (cost.cost < 1) {
@@ -211,7 +214,12 @@ public:
         // Fast-path check: are all edge costs uniform (cost = 1)?
         const bool has_variable_costs = !costs.empty() && std::ranges::any_of(costs, [](const auto& c) { return c.cost > 1; });
 
-        if (!has_variable_costs) {
+        // The positions asked for, all of them: what the search heads for,
+        // when it needs only those
+        const std::vector<Position> wanted = waiting;
+        const bool diagonal = neighbors == Neighbors::All8;
+
+        if (!has_variable_costs && !limited) {
             // UNIFORM BFS FAST-PATH (weights are all 1)
             std::vector<Position> queue;
             queue.reserve(std::min(width * height, std::size_t(4096)));
@@ -257,17 +265,34 @@ public:
                 }
             }
         } else {
-            // DIJKSTRA FOR VARIABLE COSTS
+            // DIJKSTRA FOR VARIABLE COSTS, or towards the positions asked
+            // for: an A* search, by the fewest steps from a cell to the
+            // nearest of them - never more than the way there costs, as each
+            // step costs at least 1, and never falling by more than a step
+            // costs, so that a cell taken from the queue still has its
+            // final distance, while the search keeps to the way towards them
             by_name = CostsByName(costs);
 
             const auto cost_of = [this](const CTile& tile) {
                 return CostOf(tile);
             };
+            const auto estimate = [&wanted, diagonal](std::size_t x, std::size_t y) {
+                int least = wanted.empty() ? 0 : unreachable;
+
+                for (const Position& pos : wanted) {
+                    const int dx = std::abs(static_cast<int>(x) - static_cast<int>(pos.x));
+                    const int dy = std::abs(static_cast<int>(y) - static_cast<int>(pos.y));
+                    least = std::min(least, diagonal ? std::max(dx, dy) : dx + dy);
+                }
+
+                return least;
+            };
 
             struct SQueued {
+                int key;
                 int dist;
                 Position pos;
-                bool operator>(const SQueued& other) const noexcept { return dist > other.dist; }
+                bool operator>(const SQueued& other) const noexcept { return key > other.key; }
             };
             std::priority_queue<SQueued, std::vector<SQueued>, std::greater<SQueued>> queue;
 
@@ -276,12 +301,12 @@ public:
                     const auto& tile = map.get_unchecked(goal.x, goal.y);
                     const int step = tile.isPassable() ? cost_of(tile) : 1;
                     grid.get_unchecked(goal.x, goal.y) = {0, step};
-                    queue.push({0, goal});
+                    queue.push({estimate(goal.x, goal.y), 0, goal});
                 }
             }
 
             while (!queue.empty()) {
-                const auto [so_far, at] = queue.top();
+                const auto [key, so_far, at] = queue.top();
                 queue.pop();
 
                 auto& at_cell = grid.get_unchecked(at.x, at.y);
@@ -325,7 +350,7 @@ public:
                                     from_cell.step_cost = cost_of(from_tile);
                                 }
 
-                                queue.push({new_dist, Position(unx, uny)});
+                                queue.push({new_dist + estimate(unx, uny), new_dist, Position(unx, uny)});
                             }
                         }
                     }
@@ -412,14 +437,14 @@ public:
      *   order of their distances, and measures them again from the cells around them.
      *
      * The distances and steps come out exactly as measuring the changed map anew, with the same goals,
-     * costs and connectivity, would give them. Positions whose tiles did not really change, or that are
-     * listed more than once, do no harm.
+     * costs, connectivity and distance limit, would give them. Positions whose tiles did not really
+     * change, or that are listed more than once, do no harm.
      *
      * @param map The map the distances were measured on, as it is now; of the same size.
      * @param changed Every position whose tile changed since the distances were measured or last mended.
      * @return False, leaving the distances as they were, when they cannot be repaired, and have to be
-     *         measured anew: when they were measured only up to a distance or until some positions were
-     *         known, when the map is of another size, or when a changed position is a goal or off the map.
+     *         measured anew: when they were measured only until some positions were known, when the map
+     *         is of another size, or when a changed position is a goal or off the map.
      */
     bool Mend(const CMap& map, std::span<const Position> changed)
     {
@@ -555,7 +580,7 @@ public:
                 }
             });
 
-            if (best != unreachable) {
+            if (best <= farthest && best != unreachable) {
                 grid.get_unchecked(pos.x, pos.y) = SCell{best, cost};
                 queue.push({best, pos});
             }
@@ -586,7 +611,7 @@ public:
             around(at, [&](const Position& next) {
                 SCell& cell = grid.get_unchecked(next.x, next.y);
 
-                if (new_dist < cell.distance && map.get_unchecked(next.x, next.y).isPassable()) {
+                if (new_dist <= farthest && new_dist < cell.distance && map.get_unchecked(next.x, next.y).isPassable()) {
                     cell.distance = new_dist;
 
                     if (cell.step_cost == 0) {
