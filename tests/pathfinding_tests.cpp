@@ -132,6 +132,31 @@ void TestPathfinding()
         Check(visited.size() == 3, "ForEachBresenham stops early when callback returns false");
         Check(visited[0] == line[0] && visited[1] == line[1] && visited[2] == line[2],
               "ForEachBresenham points match line prefix");
+
+        // The error accumulator uses the major axis in every octant.
+        // Steep lines previously stepped along x on every row, overshooting
+        // their destination and breaking winding roads built from them.
+        const RL::Position center(4, 4);
+        const std::array signs{-1, 1};
+        const std::array slopes{false, true};
+        const std::array offsets{std::pair{0, 0}, std::pair{1, 1}, std::pair{1, 2},
+                                 std::pair{2, 3}, std::pair{2, 4}};
+
+        for (const int sx : signs) {
+            for (const int sy : signs) {
+                for (const bool steep : slopes) {
+                    std::vector<RL::Position> expected;
+
+                    for (const auto [minor, major] : offsets) {
+                        expected.emplace_back(4 + sx * (steep ? minor : major),
+                                              4 + sy * (steep ? major : minor));
+                    }
+
+                    Check(center.BuildBresenhamLine(expected.back()) == expected,
+                          "Bresenham follows the expected raster line in every octant");
+                }
+            }
+        }
     }
 
     // 8. Position constexpr and noexcept guarantees

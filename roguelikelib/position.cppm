@@ -250,8 +250,8 @@ struct Position {
                 yc += ystep;
                 acc += 2 * std::abs(x2 - x1);
 
-                if (acc >= 2 * std::abs(x2 - x1)) {
-                    acc -= 2 * std::abs(x2 - x1);
+                if (acc >= 2 * std::abs(y2 - y1)) {
+                    acc -= 2 * std::abs(y2 - y1);
                     xc += xstep;
                 }
 
