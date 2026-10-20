@@ -7,6 +7,7 @@ module;
 
 export module rl.position;
 
+import rl.directions;
 import rl.distance;
 import std;
 
@@ -166,6 +167,28 @@ struct Position {
     [[nodiscard]] constexpr std::size_t ChebyshevDistance(const Position &other) const noexcept
     {
         return RL::ChebyshevDistance(x, y, other.x, other.y);
+    }
+
+    /**
+     * @brief The direction to step in from this position to an adjacent one.
+     *
+     * The step's change of x and y is that of @ref DirectionDelta for the direction returned.
+     *
+     * @param to The position to step onto.
+     * @return The direction, or nothing if @p to is this position or not adjacent to it.
+     */
+    [[nodiscard]] std::optional<EDirection> DirectionTo(const Position &to) const
+    {
+        const int dx = static_cast<int>(to.x) - static_cast<int>(x);
+        const int dy = static_cast<int>(to.y) - static_cast<int>(y);
+
+        for (int direction = EDirectionMin; direction <= EDirectionMax; ++direction) {
+            if (DirectionDelta(static_cast<EDirection>(direction)) == std::pair{dx, dy}) {
+                return static_cast<EDirection>(direction);
+            }
+        }
+
+        return std::nullopt;
     }
 
     /**
