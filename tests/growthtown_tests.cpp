@@ -69,9 +69,11 @@ void CheckTown(const RL::CMap& map, const std::vector<RL::SBuilding>& buildings)
     }
     Check(enclosed, "exterior walls are intact except at the entrance");
     bool compact_open = true;
+    bool furnishable = true;
     for (const auto& b : buildings) {
         const int width = b.corner2.x - b.corner1.x - 1;
         const int height = b.corner2.y - b.corner1.y - 1;
+        furnishable &= width * height >= 3;
         if (width * height <= 9) {
             for (auto y = b.corner1.y + 1; y < b.corner2.y; ++y) {
                 for (auto x = b.corner1.x + 1; x < b.corner2.x; ++x) {
@@ -80,6 +82,7 @@ void CheckTown(const RL::CMap& map, const std::vector<RL::SBuilding>& buildings)
             }
         }
     }
+    Check(furnishable, "every building has space for a hearth, a bed and a clear tile");
     Check(compact_open, "small cottages retain every interior tile as floor without internal doors");
 }
 
@@ -228,7 +231,10 @@ void TestGrowthTown()
             }
             Check(lanes.size() == 2, "each gate has exactly two lanes through the ramparts");
         }
-        Check(buildings.size() >= 30 && buildings.size() <= 1000, "fills a standard town with at least thirty buildings");
+        // Keep a density guard with room for varied packing. The former
+        // minimum of thirty included 3x3 sheds with only one interior tile;
+        // these are excluded so every building can be furnished as a home.
+        Check(buildings.size() >= 25 && buildings.size() <= 1000, "fills a standard town with at least twenty-five usable buildings");
         CheckUrbanForm(map, buildings);
         std::string wells;
         for (std::size_t y = 0; y < map.getHeight(); ++y) {

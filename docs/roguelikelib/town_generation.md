@@ -17,7 +17,7 @@ This generator generates a fortified medieval town complete with an uneven curta
 4. **Cottages, Plots & Gardens**  
    Cottages front onto the streets and fill back plots, separated by shared one-tile passages. Unbuilt courtyards are paved; greenery within the walls is limited to occasional two-tile gardens. Countryside outside the ramparts remains wild green terrain.
 5. **Building Dimensions**  
-   Most cottages measure 5–7 tiles along each axis (including exterior walls); smaller workshops and sheds fill narrow remnant plots. Building entrances can face any of the four cardinal directions.
+   Most cottages measure 5–7 tiles along each axis (including exterior walls); smaller workshops and sheds fill narrow remnant plots. Every building has at least three interior tiles, leaving room for a hearth, a bed, and a clear tile; 3×3 footprints with only one interior tile are excluded. The requested building count is an upper limit, and the number that fits varies with the layout. Building entrances can face any of the four cardinal directions.
 
 ---
 
