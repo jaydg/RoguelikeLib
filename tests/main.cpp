@@ -11,6 +11,7 @@ void TestScheduler();
 void TestClock();
 void TestCalendar();
 void TestDistanceMap();
+void TestDirections();
 void TestNames();
 void TestGrowthTown();
 void TestVoronoiScale();
@@ -56,6 +57,7 @@ int main(int argc, char* argv[])
         {"Mouse", TestMouse},
         {"Scheduler", TestScheduler},
         {"Clock", TestClock},
+        {"Directions", TestDirections},
         {"Calendar", TestCalendar},
         {"DistanceMap", TestDistanceMap},
         {"Names", TestNames},
