@@ -67,6 +67,33 @@ private:
     CMatrix<SCell> grid;   ///< 2D grid storing cell distances and step costs.
     Neighbors neighbors;   ///< Neighbor connectivity mode (Cardinal4 or All8).
 
+    /// The step costs by the address of the type's name in @ref CTileData, the first given for a type.
+    std::vector<std::pair<const char*, int>> by_name;
+
+    /// Whether the whole map was measured, without a distance limit or positions to stop at, so that
+    /// @ref Mend can repair it.
+    bool complete = true;
+
+    /**
+     * @brief The cost of stepping onto a passable tile: its type's listed cost, or 1.
+     *
+     * Every tile views its type's name in the registry, so a type is known by the address of that
+     * name, which is far cheaper to compare than its letters.
+     */
+    [[nodiscard]] int CostOf(const CTile& tile) const
+    {
+        const char* name = tile.getType().data();
+
+        for (const auto& [listed, cost] : by_name) {
+            if (listed == name) {
+                return cost;
+            }
+        }
+
+        return 1;
+    }
+
+
     /**
      * @brief Returns the coordinate offsets for neighbor exploration.
      *
@@ -114,7 +141,8 @@ public:
     CDistanceMap(const CMap& map, std::span<const Position> goals, std::span<const SStepCost> costs = {},
                  Neighbors a_neighbors = Neighbors::All8, int max_distance = unreachable,
                  std::span<const Position> until = {})
-        : grid(map.getSize(), SCell{unreachable, 0}), neighbors(a_neighbors)
+        : grid(map.getSize(), SCell{unreachable, 0}), neighbors(a_neighbors),
+          complete(max_distance == unreachable && until.empty())
     {
         for (const SStepCost& cost : costs) {
             if (cost.cost < 1) {
@@ -196,11 +224,8 @@ public:
             }
         } else {
             // DIJKSTRA FOR VARIABLE COSTS
-            // Every tile views its type's name in the registry, so a type is
-            // known by the address of that name, which is far cheaper to
-            // compare than its letters. A type nobody registered cannot be on
-            // the map; the first cost given for a type is the one that counts.
-            std::vector<std::pair<const char*, int>> by_name;
+            // A type nobody registered cannot be on the map; the first cost
+            // given for a type is the one that counts.
             by_name.reserve(costs.size());
 
             for (const SStepCost& listed : costs) {
@@ -215,15 +240,8 @@ public:
                 }
             }
 
-            const auto cost_of = [&by_name](const CTile& tile) {
-                const char* name = tile.getType().data();
-
-                for (const auto& [listed, cost] : by_name) {
-                    if (listed == name) {
-                        return cost;
-                    }
-                }
-                return 1;
+            const auto cost_of = [this](const CTile& tile) {
+                return CostOf(tile);
             };
 
             struct SQueued {
@@ -359,6 +377,208 @@ public:
         }
 
         return best;
+    }
+
+    /**
+     * @brief Repairs the distances after some tiles of the map have changed, instead of measuring it anew.
+     *
+     * Most changes to a map are small - a tree felled, a path worn into the grass, a wall raised - and
+     * change the distances of only the cells whose shortest ways lead over them. Given the map as it is now
+     * and every position changed since the distances were measured or last mended, this repairs just
+     * those cells:
+     * - a tile turned passable or cheaper to step onto lowers the distances beyond it, spreading out from
+     *   it only as far as they improve;
+     * - a tile turned impassable or dearer clears the cells whose every shortest way led over it, in the
+     *   order of their distances, and measures them again from the cells around them.
+     *
+     * The distances and steps come out exactly as measuring the changed map anew, with the same goals,
+     * costs and connectivity, would give them. Positions whose tiles did not really change, or that are
+     * listed more than once, do no harm.
+     *
+     * @param map The map the distances were measured on, as it is now; of the same size.
+     * @param changed Every position whose tile changed since the distances were measured or last mended.
+     * @return False, leaving the distances as they were, when they cannot be repaired, and have to be
+     *         measured anew: when they were measured only up to a distance or until some positions were
+     *         known, when the map is of another size, or when a changed position is a goal or off the map.
+     */
+    bool Mend(const CMap& map, std::span<const Position> changed)
+    {
+        const std::size_t width = grid.getWidth();
+        const std::size_t height = grid.getHeight();
+
+        if (!complete || map.getWidth() != width || map.getHeight() != height) {
+            return false;
+        }
+
+        for (const Position& pos : changed) {
+            if (!grid.inside(pos) || grid.get_unchecked(pos.x, pos.y).distance == 0) {
+                return false;
+            }
+        }
+
+        const auto steps = Steps(neighbors);
+        const auto index = [width](const Position& pos) {
+            return pos.y * width + pos.x;
+        };
+        const auto around = [&](const Position& pos, auto&& visit) {
+            const int ix = static_cast<int>(pos.x);
+            const int iy = static_cast<int>(pos.y);
+
+            for (const auto& [dx, dy] : steps) {
+                const int nx = ix + dx;
+                const int ny = iy + dy;
+
+                if (nx >= 0 && ny >= 0 && nx < static_cast<int>(width) && ny < static_cast<int>(height)) {
+                    visit(Position(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny)));
+                }
+            }
+        };
+        // What stepping onto a cell costs on the map as it is now; 0 if it cannot be stepped onto
+        const auto cost_now = [&](const Position& pos) {
+            const CTile& tile = map.get_unchecked(pos.x, pos.y);
+            return tile.isPassable() ? CostOf(tile) : 0;
+        };
+
+        struct SQueued {
+            int dist;
+            Position pos;
+            bool operator>(const SQueued& other) const noexcept { return dist > other.dist; }
+        };
+
+        // The cells cleared: the tiles turned dearer, and every cell whose
+        // shortest ways all led over cleared ones. Deciding in the order of
+        // the distances, every way a cell has is decided before it is.
+        std::unordered_set<std::size_t> cleared;
+        std::unordered_set<std::size_t> decided;
+        std::vector<Position> cleared_cells;
+        std::priority_queue<SQueued, std::vector<SQueued>, std::greater<SQueued>> deciding;
+
+        const auto clear = [&](const Position& pos) {
+            if (!cleared.insert(index(pos)).second) {
+                return;
+            }
+
+            cleared_cells.push_back(pos);
+            around(pos, [&](const Position& next) {
+                const SCell& cell = grid.get_unchecked(next.x, next.y);
+
+                if (cell.distance != unreachable && cell.distance != 0 && !decided.contains(index(next))) {
+                    deciding.push({cell.distance, next});
+                }
+            });
+        };
+
+        for (const Position& pos : changed) {
+            const SCell& cell = grid.get_unchecked(pos.x, pos.y);
+            const int now = cost_now(pos);
+
+            if (cell.distance != unreachable && (now == 0 || now > cell.step_cost)) {
+                decided.insert(index(pos));
+                clear(pos);
+            }
+        }
+
+        while (!deciding.empty()) {
+            const Position at = deciding.top().pos;
+            deciding.pop();
+
+            if (!decided.insert(index(at)).second) {
+                continue;
+            }
+
+            const int distance = grid.get_unchecked(at.x, at.y).distance;
+            bool kept = false;
+
+            around(at, [&](const Position& next) {
+                const SCell& cell = grid.get_unchecked(next.x, next.y);
+                kept = kept || (!cleared.contains(index(next)) && cell.distance != unreachable && cell.step_cost > 0 &&
+                                cell.distance + cell.step_cost == distance);
+            });
+
+            if (!kept) {
+                clear(at);
+            }
+        }
+
+        // The tiles turned cheaper or passable that were reached take their
+        // new cost; those reached anew take it when they are
+        std::priority_queue<SQueued, std::vector<SQueued>, std::greater<SQueued>> queue;
+
+        for (const Position& pos : changed) {
+            SCell& cell = grid.get_unchecked(pos.x, pos.y);
+
+            if (cell.distance != unreachable && !cleared.contains(index(pos))) {
+                cell.step_cost = cost_now(pos);
+                queue.push({cell.distance, pos});
+            }
+        }
+
+        for (const Position& pos : cleared_cells) {
+            grid.get_unchecked(pos.x, pos.y) = SCell{unreachable, 0};
+        }
+
+        // Cleared cells, and passable ones reached by nothing so far, are
+        // measured from the cells around them that keep their distances
+        const auto measure = [&](const Position& pos) {
+            const int cost = cost_now(pos);
+            int best = unreachable;
+
+            if (cost == 0) {
+                return;
+            }
+
+            around(pos, [&](const Position& next) {
+                const SCell& cell = grid.get_unchecked(next.x, next.y);
+
+                if (cell.distance != unreachable && cell.step_cost > 0) {
+                    best = std::min(best, cell.distance + cell.step_cost);
+                }
+            });
+
+            if (best != unreachable) {
+                grid.get_unchecked(pos.x, pos.y) = SCell{best, cost};
+                queue.push({best, pos});
+            }
+        };
+
+        for (const Position& pos : cleared_cells) {
+            measure(pos);
+        }
+
+        for (const Position& pos : changed) {
+            if (grid.get_unchecked(pos.x, pos.y).distance == unreachable) {
+                measure(pos);
+            }
+        }
+
+        // And from there on, every cell a shorter way reaches
+        while (!queue.empty()) {
+            const auto[so_far, at] = queue.top();
+            queue.pop();
+            const SCell& at_cell = grid.get_unchecked(at.x, at.y);
+
+            if (so_far > at_cell.distance) {
+                continue;
+            }
+
+            const int new_dist = so_far + at_cell.step_cost;
+
+            around(at, [&](const Position& next) {
+                SCell& cell = grid.get_unchecked(next.x, next.y);
+
+                if (new_dist < cell.distance && map.get_unchecked(next.x, next.y).isPassable()) {
+                    cell.distance = new_dist;
+
+                    if (cell.step_cost == 0) {
+                        cell.step_cost = cost_now(next);
+                    }
+
+                    queue.push({new_dist, next});
+                }
+            });
+        }
+
+        return true;
     }
 };
 
