@@ -191,6 +191,7 @@ void TestVoronoiChasms()
 void TestVoronoiFields()
 {
     std::size_t checked = 0;
+    std::size_t meadow_cells = 0;
     for (unsigned seed = 0; seed < 64; ++seed) {
         RL::InitRandomness(seed);
         RL::CMap map(seed % 2 == 0 ? RL::Size(79, 50) : RL::Size(120, 80));
@@ -206,6 +207,20 @@ void TestVoronoiFields()
         for (std::size_t y = 0; y < map.getHeight(); ++y) for (std::size_t x = 0; x < map.getWidth(); ++x)
             cultivable += map.get(x, y).getType() == "field";
         Check(plots && recorded.size() == cultivable, "field metadata records every cultivable cell exactly once, without hedges or lanes");
+        // The meadows: walkable grassland, no road, each cell once, none
+        // of it a field's
+        bool grazing = true;
+        std::set<std::pair<std::size_t, std::size_t>> grazed;
+        for (const auto& meadow : info.meadows) {
+            grazing &= !meadow.empty();
+            for (const auto pos : meadow) {
+                const auto type = map.get(pos).getType();
+                grazing &= map.get(pos).isPassable() && type != "corridor" && type != "bridge" && type != "field" &&
+                           grazed.emplace(pos.x, pos.y).second;
+            }
+        }
+        meadow_cells += grazed.size();
+        Check(grazing, "meadow metadata records walkable grassland, without roads or fields, each cell once");
         if (seed % 3 == 0) Check(info.fields.empty(), "unsettled regions expose no agricultural plots");
         if (info.field_gates.empty() || info.locations.empty()) { continue; }
         RL::Position root;
@@ -250,4 +265,5 @@ void TestVoronoiFields()
         CheckBuildings(map, info);
     }
     Check(checked > 0, "generated fields exercise their village connections");
+    Check(meadow_cells > 0, "some of the generated maps have meadows");
 }

@@ -67,6 +67,11 @@ struct SMultiRegionInfo {
     // Cultivable cells of each field region, excluding hedges, gates and roads.
     std::vector<std::vector<Position>> fields;
 
+    // The open grassland of each grass region: its walkable cells, as they
+    // are once the map is opened up and the roads laid, excluding the roads -
+    // a meadow, irregular as its region, for grazing, say.
+    std::vector<std::vector<Position>> meadows;
+
     // The difficulty of every cell: 0 in the town, 9 in the hardest
     // region. Opening the map up afterwards (see WildernessOpenings)
     // does not change it.
@@ -319,6 +324,7 @@ public:
     void ConnectTownDoors(CMap& level) const;
     void ConnectFieldRoads(CMap& level) const;
     [[nodiscard]] std::vector<std::vector<Position>> Fields(const CMap& level) const;
+    [[nodiscard]] std::vector<std::vector<Position>> Meadows(const CMap& level) const;
 
 private:
     int width_;
@@ -1421,6 +1427,23 @@ std::vector<std::vector<Position>> CWilderness::Fields(const CMap& level) const
     return fields;
 }
 
+// Collected last, as Fields() is: the roads and the openings made through
+// the map take cells of the grass regions.
+std::vector<std::vector<Position>> CWilderness::Meadows(const CMap& level) const
+{
+    std::vector<std::vector<Position>> meadows(regions_.size());
+    for (std::size_t cell = 0; cell < region_id_.size(); ++cell) {
+        const Position pos{cell % width_, cell / width_};
+        const auto type = level.get(pos).getType();
+        if (regions_[region_id_[cell]].terrain == Ter::Grass && level.get(pos).isPassable() &&
+                type != "corridor" && type != "bridge") {
+            meadows[region_id_[cell]].push_back(pos);
+        }
+    }
+    std::erase_if(meadows, [](const auto& cells) { return cells.empty(); });
+    return meadows;
+}
+
 SWildernessInfo CWilderness::Apply(CMap & level) const
 {
     SWildernessInfo info;
@@ -1614,6 +1637,7 @@ SMultiRegionInfo CreateMultiRegion(CMap & level, const SMultiRegionConfig& confi
     wilderness.ConnectTownDoors(level);
     wilderness.ConnectFieldRoads(level);
     info.fields = wilderness.Fields(level);
+    info.meadows = wilderness.Meadows(level);
 
     return info;
 }
