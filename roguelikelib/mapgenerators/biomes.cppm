@@ -23,14 +23,35 @@ namespace RL
 // Deterministic Hash Noise & Fractal Brownian Motion
 // =============================================================================
 
+/**
+ * A value in [0, 1) for a position and a seed, the same each time, as if
+ * drawn at random: the noise the biomes are filled with.
+ *
+ * Position and seed are combined, then mixed with MurmurHash3's 64-bit
+ * finalizer, so that every bit of them reaches every bit of the value.
+ * Without the finalizer, seeds a few apart - as callers derive one value
+ * from `seed + 137` and another from `seed + 149` for the same tile - gave
+ * values bound to each other: a sparse forest, whose few tiles of
+ * vegetation fell in a narrow band of the first, never drew a tree from
+ * the second.
+ *
+ * @param x    the position's column
+ * @param y    the position's row
+ * @param seed the seed of the noise
+ * @return     a value in [0, 1)
+ */
 export double HashNoise(const int x, const int y, const std::uint64_t seed)
 {
     std::uint64_t hash = seed;
     hash ^= static_cast<std::uint64_t>(x) * 0x9E3779B97F4A7C15ULL;
     hash = std::rotl(hash, 31);
     hash ^= static_cast<std::uint64_t>(y) * 0xC2B2AE3D27D4EB4FULL;
+
+    hash ^= hash >> 33;
     hash *= 0xFF51AFD7ED558CCDULL;
-    hash = std::rotl(hash, 29);
+    hash ^= hash >> 33;
+    hash *= 0xC4CEB9FE1A85EC53ULL;
+    hash ^= hash >> 33;
 
     return static_cast<double>(hash >> 11) * (1.0 / 9007199254740992.0);
 }

@@ -116,6 +116,28 @@ void TestBiomes()
         Check(trees > plants, "FillForest respects tree_density ratio");
     }
 
+    // 2b. A sparse forest - little vegetation, few of it trees, as around a
+    // town - still has its share of trees: the noise that chooses tree or
+    // plant must not follow the noise that chose vegetation
+    {
+        RL::CMap map(RL::Size(280, 120));
+        RL::CMatrix<bool> mask(map.getSize(), true);
+        RL::FillForest(map, mask, RL::SForestBiome{
+            .tree_density = 0.08f,
+            .rock_density = 0.005f,
+            .vegetation_density = 0.15f
+        }, 328352183);
+        std::size_t trees = 0, plants = 0;
+        for (std::size_t y = 0; y < map.getHeight(); ++y) {
+            for (std::size_t x = 0; x < map.getWidth(); ++x) {
+                trees += map.get(x, y).getType() == "tree";
+                plants += map.get(x, y).getType() == "plant";
+            }
+        }
+        const double share = static_cast<double>(trees) / static_cast<double>(trees + plants);
+        Check(share > 0.06 && share < 0.10, "a sparse forest has about its tree_density's share of trees among its vegetation");
+    }
+
     // 3. Masked Bog fill
     {
         RL::CMap map(RL::Size(40, 40));
