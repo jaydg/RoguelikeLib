@@ -1,8 +1,13 @@
+/**
+ * @file maputils.cppm
+ * @brief Procedural map generation utilities, room connection, door placement, road tracing, and stamping algorithms.
+ */
+
+module;
+
 //////////////////////////////////////////////////////////////////////////
 // Map generation helpers
 //////////////////////////////////////////////////////////////////////////
-
-module;
 
 export module rl.maputils;
 
@@ -20,11 +25,21 @@ namespace RL
 // Internal Math and Path Helpers
 namespace detail
 {
+
+/**
+ * @brief Computes the square of an integer.
+ * @param x Input integer.
+ * @return @f$ x^2 @f$.
+ */
 int Sqr(int x)
 {
     return x * x;
 }
 
+/**
+ * @brief Trims single-cell 90-degree raster steps across consecutive positions.
+ * @param seq Sequence of positions to simplify in-place.
+ */
 void CutCorners(std::vector<Position>& seq)
 {
     if (seq.size() < 3) {
@@ -48,6 +63,13 @@ void CutCorners(std::vector<Position>& seq)
     seq.resize(j);
 }
 
+/**
+ * @brief Computes a scaled signed cosine squared measure of the turn angle formed by three waypoints.
+ * @param p0 Previous waypoint.
+ * @param p1 Current waypoint (vertex of the angle).
+ * @param p2 Next waypoint.
+ * @return Scaled value indicating angle sharpness (negative for turns > 90 degrees).
+ */
 int SignCos2(const Position& p0, const Position& p1, const Position& p2)
 {
     int sqlen01 = Sqr(static_cast<int>(p1.x - p0.x)) + Sqr(static_cast<int>(p1.y - p0.y));
@@ -68,6 +90,14 @@ int SignCos2(const Position& p0, const Position& p1, const Position& p2)
     return static_cast<int>(val);
 }
 
+/**
+ * @brief Perturbs intermediate path waypoints within distance and angle constraints.
+ * @param way Sequence of waypoints to perturb in-place.
+ * @param level Map supplying dimensions and boundary limits.
+ * @param mindist Minimum allowed distance between consecutive waypoints.
+ * @param maxdist Maximum allowed distance between consecutive waypoints.
+ * @param pertamt Perturbation intensity factor.
+ */
 void PerturbPath(std::vector<Position>& way, const CMap& level, int mindist, int maxdist, int pertamt)
 {
     if (way.size() < 3) {
@@ -122,6 +152,11 @@ void PerturbPath(std::vector<Position>& way, const CMap& level, int mindist, int
     }
 }
 
+/**
+ * @brief Connects consecutive waypoints using Bresenham line segments without duplicate endpoints.
+ * @param[out] result Output vector populated with the continuous raster line.
+ * @param waypts Input sequence of waypoints to connect.
+ */
 void ConnectWaypoints(std::vector<Position>& result, const std::vector<Position>& waypts)
 {
     result.clear();
@@ -148,6 +183,13 @@ void ConnectWaypoints(std::vector<Position>& result, const std::vector<Position>
 export namespace RL
 {
 
+/**
+ * @brief Scans the map to locate all contiguous rectangular areas of a given tile type and dimensions.
+ * @param level Map to scan.
+ * @param type Tile type name to match (e.g., `"wall"`, `"floor"`).
+ * @param size Dimensions (width and height) of the target rectangular region.
+ * @param[out] positions Output vector appended with the top-left coordinate of each matching rectangle found.
+ */
 void FindOnMapAllRectanglesOfType(CMap &level, const std::string_view type, const Size &size, std::vector <Position>& positions)
 {
     auto good_points = CMatrix<bool>(level.getSize(), false);
@@ -190,6 +232,14 @@ void FindOnMapAllRectanglesOfType(CMap &level, const std::string_view type, cons
 
 //////////////////////////////////////////////////////////////////////////
 
+/**
+ * @brief Selects a random contiguous rectangular area of a given tile type and dimensions on the map.
+ * @param level Map to scan.
+ * @param type Tile type name to match.
+ * @param[out] pos Output parameter receiving the top-left position of the chosen rectangle.
+ * @param size Dimensions (width and height) of the target rectangular region.
+ * @return True if at least one matching rectangle was found, false otherwise.
+ */
 bool FindOnMapRandomRectangleOfType(CMap &level, std::string_view type, Position& pos, const Size &size)
 {
     std::vector<Position> positions;
@@ -207,6 +257,16 @@ bool FindOnMapRandomRectangleOfType(CMap &level, std::string_view type, Position
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 
+/**
+ * @brief Places doors at valid corridor-to-room threshold junctions based on probability.
+ *
+ * Examines corridor cells bordering room cells that are flanked by solid walls.
+ * If conditions are met, creates closed doors (`"door_closed"`) or open doors (`"door_open"`).
+ *
+ * @param level Map where doors will be placed.
+ * @param door_probability Probability [0.0, 1.0] of placing a door at any eligible threshold.
+ * @param open_probability Probability [0.0, 1.0] that a placed door starts in an opened state.
+ */
 void AddDoors(CMap &level, float door_probability, float open_probability)
 {
     auto is_solid = [&](int nx, int ny) -> bool {
@@ -368,6 +428,12 @@ char32_t GetOpenDoorGlyph(const CMap &level, std::size_t x, std::size_t y)
 }
 
 [[nodiscard]]
+/**
+ * @brief Returns the appropriate glyph for an opened door at a given position.
+ * @param level Map containing the door.
+ * @param pos Coordinates of the door.
+ * @return 32-bit Unicode code point (U'/' or U'\\').
+ */
 inline char32_t GetOpenDoorGlyph(const CMap &level, const Position &pos)
 {
     return GetOpenDoorGlyph(level, pos.x, pos.y);
@@ -461,6 +527,12 @@ bool OpenDoor(CMap &level, std::size_t x, std::size_t y)
     return true;
 }
 
+/**
+ * @brief Opens a door at the specified position.
+ * @param level Map containing the door.
+ * @param pos Coordinates of the door.
+ * @return True if a closed door was opened, false otherwise.
+ */
 inline bool OpenDoor(CMap &level, const Position &pos)
 {
     return OpenDoor(level, pos.x, pos.y);
@@ -483,6 +555,12 @@ bool CloseDoor(CMap &level, std::size_t x, std::size_t y)
     return true;
 }
 
+/**
+ * @brief Closes a door at the specified position.
+ * @param level Map containing the door.
+ * @param pos Coordinates of the door.
+ * @return True if an open door was closed, false otherwise.
+ */
 inline bool CloseDoor(CMap &level, const Position &pos)
 {
     return CloseDoor(level, pos.x, pos.y);
@@ -490,6 +568,16 @@ inline bool CloseDoor(CMap &level, const Position &pos)
 
 //////////////////////////////////////////////////////////////////////////
 
+/**
+ * @brief Carves an L-shaped or meandering corridor between two coordinates on the map.
+ * @param level Map to carve the corridor into.
+ * @param start_x1 Starting horizontal column.
+ * @param start_y1 Starting vertical row.
+ * @param start_x2 Ending horizontal column.
+ * @param start_y2 Ending vertical row.
+ * @param straight If true, carves fixed dog-leg straight corridors; if false, corridors meander randomly.
+ * @return True if the corridor was carved, false if either endpoint is outside the map boundaries.
+ */
 bool AddCorridor(CMap &level, const std::size_t& start_x1, const std::size_t& start_y1, const std::size_t& start_x2, const std::size_t& start_y2, bool straight = false)
 {
     if (!level.inside(start_x1, start_y1) || !level.inside(start_x2, start_y2)) {
@@ -589,6 +677,11 @@ bool AddCorridor(CMap &level, const std::size_t& start_x1, const std::size_t& st
 
 //////////////////////////////////////////////////////////////////////////
 
+/**
+ * @brief Flood-fills and partitions disconnected room regions, assigning each a unique integer identifier.
+ * @param level Map containing room tiles to label.
+ * @return Matrix of integer IDs where each distinct room region has a unique positive value (1-indexed) and non-room tiles are 0.
+ */
 CMatrix<int> FillDisconnectedRoomsWithDifferentValues(const CMap &level)
 {
     constexpr int any_room = -1;
@@ -618,7 +711,16 @@ CMatrix<int> FillDisconnectedRoomsWithDifferentValues(const CMap &level)
 
 //////////////////////////////////////////////////////////////////////////
 
-// TODO: with_doors is not implemented, as doors are not implemented
+/**
+ * @brief Interconnects isolated room chambers on the map by carving corridors between closest border points.
+ *
+ * Uses Warshall's algorithm for transitive closure to guarantee that all disconnected rooms
+ * become fully reachable from each other.
+ *
+ * @param level Map whose rooms are to be connected.
+ * @param with_doors Reserved parameter for doorway creation (currently unused).
+ * @param straight_connections If true, corridors use straight L-turns; if false, corridors meander randomly.
+ */
 void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool straight_connections = false)
 {
     // fill each room on the map with an individual number
@@ -812,6 +914,15 @@ void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool str
 
 //////////////////////////////////////////////////////////////////////////
 
+/**
+ * @brief Recursively splits a rectangular room into smaller compartments using binary space partitioning (BSP).
+ * @param level Map to modify.
+ * @param type Tile type name to draw for dividing partition walls (e.g., `"wall"`).
+ * @param min_size_x Minimum width constraint for partitioned sub-rooms.
+ * @param min_size_y Minimum height constraint for partitioned sub-rooms.
+ * @param room Rectangular room bounds to subdivide.
+ * @param with_doors If true, carves closed doors (`"door_closed"`) along partition walls.
+ */
 void AddRecursiveRooms(CMap &level, std::string_view type, std::size_t min_size_x, std::size_t min_size_y, const SRoom& room, bool with_doors = true)
 {
     std::size_t size_x = room.corner2.x - room.corner1.x;
@@ -888,6 +999,13 @@ void AddRecursiveRooms(CMap &level, std::string_view type, std::size_t min_size_
 
 //////////////////////////////////////////////////////////////////////////
 
+/**
+ * @brief Fills a rectangular region on the map with a designated tile type.
+ * @param level Map to modify.
+ * @param p1 Top-left corner position (inclusive).
+ * @param p2 Bottom-right corner position (exclusive).
+ * @param value Tile type name to assign to every cell within the rectangle.
+ */
 void DrawRectangleOnMap(CMap &level, const Position& p1, const Position& p2, std::string_view value)
 {
     for (std::size_t y = p1.y; y < p2.y; ++y) {
@@ -1145,6 +1263,11 @@ void CreateBuildingInterior(CMap& map, const SBuilding& building, int room_count
     UpdateDoorAndWindowGlyphs(map);
 }
 
+/**
+ * @brief Convenience alias for @ref CreateBuildingInterior.
+ * @param map Map where the building is situated.
+ * @param building Building specification with outer perimeter corners and entrance door.
+ */
 inline void TownInterior(CMap& map, const SBuilding& building)
 {
     CreateBuildingInterior(map, building);
@@ -1163,13 +1286,20 @@ inline void TownInterior(CMap& map, const SBuilding& building)
  *
  */
 
-/** Build a gently winding path using spaced, perturbed waypoints.
+/**
+ * @brief Constructs a gently winding path using spaced, perturbed waypoints.
  *
  * Unlike a zigzag/sigsag path, it can wind even when its endpoints share
  * a row or column. Waypoint turns are limited to 45 degrees. The returned
  * tiles are eight-neighbour connected; raster stair steps still occur.
  * The map supplies bounds only: callers must check terrain collisions.
- * pertamt is a nonnegative perturbation amount (typically 5–50).
+ *
+ * @param[out] road Vector populated with the resulting sequence of @ref Position coordinates.
+ * @param level Map supplying boundary bounds.
+ * @param start Starting coordinate.
+ * @param end Destination coordinate.
+ * @param pertamt Nonnegative perturbation amount (typically 5–50).
+ * @return True if a winding path was successfully built, false if out of bounds or pertamt < 0.
  */
 bool BuildWindingPath(std::vector<Position>& road, const CMap& level,
                       const Position& start, const Position& end, int pertamt)
@@ -1196,9 +1326,19 @@ bool BuildWindingPath(std::vector<Position>& road, const CMap& level,
     return true;
 }
 
-/** Route near a winding guide while respecting caller-supplied terrain costs.
+/**
+ * @brief Routes near a winding guide while respecting caller-supplied terrain costs.
+ *
  * A cost <= 0 blocks a tile. Positive costs prefer cheaper terrain.
  * Both endpoints are retained; no map tiles are changed. Failure clears road.
+ *
+ * @param[out] road Vector populated with the resulting path coordinates from start to end.
+ * @param level Map supplying bounds and coordinates.
+ * @param start Starting position.
+ * @param end Destination position.
+ * @param pertamt Perturbation amount for the winding guide (typically 5–50).
+ * @param terrain_cost Cost evaluation callback returning movement cost for a @ref Position (<= 0 blocks).
+ * @return True if a passable route was found, false otherwise.
  */
 bool BuildWindingRoute(std::vector<Position>& road, const CMap& level,
                        const Position& start, const Position& end, int pertamt,
@@ -1267,10 +1407,18 @@ bool BuildWindingRoute(std::vector<Position>& road, const CMap& level,
     return true;
 }
 
-/** Draw a winding road without large sharp turns.
+/**
+ * @brief Draws a winding road onto the map without large sharp turns.
  *
- * Uses BuildWindingPath; pertamt typically ranges from 5 to 50. This
- * drawing helper overwrites terrain and leaves the outer map edge alone.
+ * Uses @ref BuildWindingPath; pertamt typically ranges from 5 to 50.
+ * Overwrites terrain while preserving outer map borders.
+ *
+ * @param level Map to draw the road on.
+ * @param start Starting position.
+ * @param end Destination position.
+ * @param pertamt Nonnegative perturbation amount (typically 5–50).
+ * @param tile_type Tile type name to stamp for road cells (defaults to `"corridor"`).
+ * @return True if the road was successfully generated and stamped, false otherwise.
  */
 bool AddWindingRoad(CMap& level, const Position& start, const Position& end,
                     int pertamt, std::string_view tile_type = "corridor")
@@ -1290,18 +1438,18 @@ bool AddWindingRoad(CMap& level, const Position& start, const Position& end,
 
 //////////////////////////////////////////////////////////////////////////
 
-/** Build a zigzag path between two points.
+/**
+ * @brief Builds a randomized zigzag path between two points.
  *
- * This method is not aware of the map and usually only used as internal
- * helper for the highlevel-functions @ref AddZigzagRoad and @ref AddSigsagRoad
- * but may be useful for other uses.
+ * This method is not aware of the map and usually only used as an internal
+ * helper for the highlevel functions @ref AddZigzagRoad and @ref AddSigsagRoad,
+ * but may be useful for other path generation tasks.
  *
- * @param[out] ret All @ref Positions that form the road.
+ * @param[out] ret Vector of @ref Position coordinates that form the road.
  * @param p1 The starting position.
  * @param p2 The final position.
- * @param turnpct The chance of a non-forced turn in percent (so, 100/turnpct
- *                is approximately the length of a straight segment.
- * @param diagpct The chance that a diagonal turn is allowed.
+ * @param turnpct The chance of a non-forced turn in percent (100/turnpct is approximately segment length).
+ * @param diagpct The chance that a diagonal turn is allowed in percent.
  */
 void BuildZigzagPath(
     std::vector<Position>& ret,
@@ -1361,9 +1509,17 @@ void BuildZigzagPath(
     }
 }
 
-/** Build a zigzag route with individual grid corners cut diagonally.
- * This trims one-cell corners; it does not smooth the larger zigzag bends.
- * Use BuildWindingPath for gently winding routes with limited turn angles.
+/**
+ * @brief Builds a zigzag route with individual grid corners cut diagonally.
+ *
+ * Trims single-cell corners without smoothing larger zigzag bends.
+ * Use @ref BuildWindingPath for gently winding routes with limited turn angles.
+ *
+ * @param[out] ret Vector of @ref Position coordinates that form the road.
+ * @param p1 The starting position.
+ * @param p2 The final position.
+ * @param turnpct The chance of a non-forced turn in percent.
+ * @param diagpct The chance that a diagonal turn is allowed in percent.
  */
 void BuildSigsagPath(
     std::vector<Position>& ret,
@@ -1377,15 +1533,19 @@ void BuildSigsagPath(
     detail::CutCorners(ret);
 }
 
-/** Generates a randomly zigzagging road.
+/**
+ * @brief Generates and draws a randomly zigzagging road onto the map.
  *
- *  The road zigzags only if the endpoints differ in both coordinates,
- *  Otherwise it is a straight line.
+ * The road zigzags only if the endpoints differ in both coordinates;
+ * otherwise it is a straight line.
  *
- * @param turnpct The chance of a non-forced turn in percent (so, 100/turnpct
- *                is approximately the length of a straight segment.
- * @param diagpct The chance that a diagonal turn is allowed.
- * @return Whether the path generation was successful.
+ * @param level Map to draw the road on.
+ * @param start Starting position.
+ * @param end Final destination position.
+ * @param turnpct The chance of a non-forced turn in percent (100/turnpct is approximately segment length).
+ * @param diagpct The chance that a diagonal turn is allowed in percent.
+ * @param tile_type Tile type name to stamp (defaults to `"corridor"`).
+ * @return True if the road was successfully generated and stamped, false if out of bounds.
  */
 bool AddZigzagRoad(
     CMap &level,
@@ -1415,8 +1575,18 @@ bool AddZigzagRoad(
 
 //////////////////////////////////////////////////////////////////////////
 
-/** Draw a zigzag route with individual grid corners cut diagonally.
- * Large bends remain angular; use AddWindingRoad for gentle winding.
+/**
+ * @brief Draws a zigzag route with individual grid corners cut diagonally onto the map.
+ *
+ * Large bends remain angular; use @ref AddWindingRoad for gentle winding.
+ *
+ * @param level Map to draw the road on.
+ * @param start Starting position.
+ * @param end Final destination position.
+ * @param turnpct The chance of a non-forced turn in percent.
+ * @param diagpct The chance that a diagonal turn is allowed in percent.
+ * @param tile_type Tile type name to stamp (defaults to `"corridor"`).
+ * @return True if the road was successfully generated and stamped, false if out of bounds.
  */
 bool AddSigsagRoad(
     CMap &level,
@@ -1451,9 +1621,20 @@ bool AddSigsagRoad(
 
 } // end of export namespace RL
 
-// Stamp a town (grass leaves the landscape intact), then join its local
-// gate positions to surviving corridor/bridge tiles in the landscape.
-// Returns the number of gates connected. No road network means no links.
+/**
+ * @brief Stamps a town onto a landscape and connects its gates to surrounding road and bridge networks.
+ *
+ * Stamping preserves existing landscape tiles where the town map has `"grass"`.
+ * Connects the town's perimeter gates to surviving corridor and bridge networks
+ * in the surrounding landscape using Dijkstra shortest path traversal, bridging water
+ * with `"bridge"` tiles when necessary and paving land with `"corridor"`.
+ *
+ * @param landscape Destination landscape map to be stamped.
+ * @param town Source town map to stamp into the landscape.
+ * @param origin Top-left coordinate in the landscape where the town will be placed.
+ * @param gates Local gate positions within the town to connect to the outer road network.
+ * @return Number of town gates successfully connected to the road network.
+ */
 export namespace RL
 {
 std::size_t StampTownWithRoads(CMap& landscape, const CMap& town, Position origin,
