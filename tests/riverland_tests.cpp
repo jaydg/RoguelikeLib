@@ -51,6 +51,34 @@ void TestForestRoads()
         }
         Check(connected, "clearing entrances stay reachable, including rivers and scattered rocks");
         Check(reproducible, "forest road networks reproduce from their seed");
+
+        // Verify bridges run strictly straight and connect solid land on both banks (.===.)
+        bool bridges_valid = true;
+        for (std::size_t y = 0; y < size.y; ++y) {
+            for (std::size_t x = 0; x < size.x; ++x) {
+                if (map.get(x, y).getType() != "bridge") continue;
+                bool part_of_straight_bridge = false;
+                const int dirs[4][2] = {{1, 0}, {0, 1}, {1, 1}, {1, -1}};
+                for (const auto& [dx, dy] : dirs) {
+                    int fx = static_cast<int>(x), fy = static_cast<int>(y);
+                    while (map.inside(fx, fy) && map.get(fx, fy).getType() == "bridge") {
+                        fx += dx; fy += dy;
+                    }
+                    int bx = static_cast<int>(x), by = static_cast<int>(y);
+                    while (map.inside(bx, by) && map.get(bx, by).getType() == "bridge") {
+                        bx -= dx; by -= dy;
+                    }
+                    if (map.inside(fx, fy) && map.inside(bx, by) &&
+                        map.get(fx, fy).getType() != "water" &&
+                        map.get(bx, by).getType() != "water") {
+                        part_of_straight_bridge = true;
+                        break;
+                    }
+                }
+                bridges_valid &= part_of_straight_bridge;
+            }
+        }
+        Check(bridges_valid, "all bridges run strictly straight and connect solid land on both banks");
     }
     Check(paved_centres * 10 < centres, "forest roads leave clearing centres predominantly unpaved");
     Check(extra_roads < base_roads * 2, "additional routes share substantial portions of the existing road network");

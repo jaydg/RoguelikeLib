@@ -641,6 +641,9 @@ std::vector<SLocation> CreateRiverland(
 
         for (std::size_t attempt = 0; attempt < max_attempts; ++attempt) {
             const Position candidate(Random(map.getWidth()), Random(map.getHeight()));
+            if (map.get(candidate).getType() == "water") {
+                continue;
+            }
             std::size_t nearest = std::numeric_limits<std::size_t>::max();
 
             for (const auto& existing : clearing_centers) {
@@ -766,39 +769,134 @@ std::vector<SLocation> CreateRiverland(
                 if (cost != costs[cell]) continue;
                 if (cell == index(end)) break;
                 const Position here(cell % map.getWidth(), cell / map.getWidth());
+                const auto here_type = map.get(here).getType();
+                const bool here_is_solid = (here_type != "water" && here_type != "bridge");
+
                 for (int dy = -1; dy <= 1; ++dy) {
                     for (int dx = -1; dx <= 1; ++dx) {
                         if (dx == 0 && dy == 0) continue;
                         const Position next(here.x + dx, here.y + dy);
                         if (!map.inside(next)) continue;
-                        // Actual road tiles are cheap; running beside a road
-                        // is expensive, so routes share tiles before forking.
-                        int step = path_tiles.get(next.x, next.y) ? 2 :
-                            10 + (near_guide.get(next.x, next.y) ? 0 : 8) +
-                            (near_road.get(next.x, next.y) ? 24 : 0);
-                        if (map.get(next).getType() == "water") step += 30;
-                        if (dx != 0 && dy != 0) step = step * 14 / 10;
-                        const auto target = index(next);
-                        if (cost + step < costs[target]) {
-                            costs[target] = cost + step;
-                            parent[target] = cell;
-                            pending.emplace(cost + step, target);
+
+                        const bool next_on_road = path_tiles.get(next.x, next.y);
+                        const auto next_type = map.get(next).getType();
+                        const bool next_is_water = (next_type == "water");
+                        const bool is_diagonal = (dx != 0 && dy != 0);
+
+                        // 1. Reusing existing road or bridge tiles is very cheap (cost 2 or 3)
+                        if (next_on_road) {
+                            const int step = is_diagonal ? 3 : 2;
+                            const auto target = index(next);
+                            if (cost + step < costs[target]) {
+                                costs[target] = cost + step;
+                                parent[target] = cell;
+                                pending.emplace(cost + step, target);
+                            }
+                            continue;
+                        }
+
+                        // 2. Stepping onto water to build a new bridge:
+                        // Bridges must cross in a strictly straight line (horizontal, vertical,
+                        // or straight diagonal) across the water until reaching solid ground
+                        // on the opposite bank (or an existing road on solid ground).
+                        // Must start from solid ground (not from water, and not from an existing bridge).
+                        if (here_is_solid && next_is_water) {
+                            constexpr int max_bridge_span = 20;
+                            Position p = next;
+                            int span_length = 0;
+                            bool reached_bank = false;
+
+                            while (map.inside(p) && span_length < max_bridge_span) {
+                                const auto p_type = map.get(p).getType();
+                                if (p_type != "water") {
+                                    if (p_type != "bridge") {
+                                        reached_bank = true;
+                                    }
+                                    break;
+                                }
+                                p.x += dx;
+                                p.y += dy;
+                                ++span_length;
+                            }
+
+                            if (!reached_bank || span_length == 0 || !map.inside(p)) {
+                                // Bridge cannot cross (river too wide, out of bounds, or hit bridge)
+                                continue;
+                            }
+
+                            // High cost for building bridges across water:
+                            // Initial abutment setup cost (100) + per-tile span cost (60 per tile).
+                            // Diagonal crossings are penalized extra to strongly favor perpendicular bridges.
+                            int bridge_cost = 100 + span_length * 60 + (is_diagonal ? span_length * 50 : 0) + 10;
+                            if (is_diagonal) {
+                                bridge_cost = bridge_cost * 14 / 10;
+                            }
+
+                            const auto target = index(p);
+                            if (cost + bridge_cost < costs[target]) {
+                                costs[target] = cost + bridge_cost;
+                                parent[target] = cell;
+                                pending.emplace(cost + bridge_cost, target);
+                            }
+                            continue;
+                        }
+
+                        // 3. Solid land to solid land movement (normal wilderness path)
+                        if (!next_is_water && next_type != "bridge") {
+                            int step = 10 + (near_guide.get(next.x, next.y) ? 0 : 8) +
+                                       (near_road.get(next.x, next.y) ? 24 : 0);
+                            if (is_diagonal) {
+                                step = step * 14 / 10;
+                            }
+                            const auto target = index(next);
+                            if (cost + step < costs[target]) {
+                                costs[target] = cost + step;
+                                parent[target] = cell;
+                                pending.emplace(cost + step, target);
+                            }
+                            continue;
                         }
                     }
                 }
             }
+            if (costs[index(end)] == std::numeric_limits<int>::max()) return;
+
+            auto paint_tile = [&](Position pt) {
+                const auto type = map.get(pt).getType();
+                if (type == "water" || type == "bridge") {
+                    map.SetCell(pt.x, pt.y, "bridge");
+                } else if (in_clearing.get(pt.x, pt.y)) {
+                    map.SetCell(pt.x, pt.y, "trail");
+                } else {
+                    map.SetCell(pt.x, pt.y, "corridor");
+                }
+                path_tiles.set(pt.x, pt.y, true);
+                clearing_access.set(pt.x, pt.y, true);
+            };
+
             for (auto cell = index(end); cell != count; cell = parent[cell]) {
                 const Position p(cell % map.getWidth(), cell / map.getWidth());
-                const auto type = map.get(p).getType();
-                if (type == "water" || type == "bridge") {
-                    map.SetCell(p.x, p.y, "bridge");
-                } else if (in_clearing.get(p.x, p.y)) {
-                    map.SetCell(p.x, p.y, "trail");
-                } else {
-                    map.SetCell(p.x, p.y, "corridor");
+                paint_tile(p);
+                const auto p_cell = parent[cell];
+                if (p_cell != count) {
+                    const Position prev(p_cell % map.getWidth(), p_cell / map.getWidth());
+                    const int max_diff = std::max(
+                        std::abs(static_cast<int>(p.x) - static_cast<int>(prev.x)),
+                        std::abs(static_cast<int>(p.y) - static_cast<int>(prev.y))
+                    );
+                    if (max_diff > 1) {
+                        const int step_x = (static_cast<int>(p.x) > static_cast<int>(prev.x)) -
+                                           (static_cast<int>(p.x) < static_cast<int>(prev.x));
+                        const int step_y = (static_cast<int>(p.y) > static_cast<int>(prev.y)) -
+                                           (static_cast<int>(p.y) < static_cast<int>(prev.y));
+                        Position cur(static_cast<int>(prev.x) + step_x, static_cast<int>(prev.y) + step_y);
+                        while (cur.x != p.x || cur.y != p.y) {
+                            paint_tile(cur);
+                            cur.x += step_x;
+                            cur.y += step_y;
+                        }
+                    }
                 }
-                path_tiles.set(p.x, p.y, true);
-                clearing_access.set(p.x, p.y, true);
             }
         };
 
