@@ -62,6 +62,7 @@ export {
                 { "void",        { U' ', 0x000000, true,  false } },
                 { "wall",        { U'#', 0x888888, false, false } },
                 { "corridor",    { U'.', 0xCCCCCC, true,  true } },
+                { "trail",       { U'.', 0x929B70, true,  true } },
                 { "grass",       { U'"', 0xA7CC7C, true,  true } },
                 { "plant",       { U'&', 0x8DAD68, false, true } },
                 { "tree",        { U'T', 0x4D9157, false, false } },

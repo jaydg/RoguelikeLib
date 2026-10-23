@@ -111,6 +111,7 @@ export void RegisterBiomeTiles()
     add("slope", {CTileData::get("grass").second.glyph, 0xA7CC7C, true, true}); // elevation-tinted grass
     add("scrub", {U'&', 0x84945A, false, true});                 // hillside bushes
     add("heather", {U'*', 0xB889B4, true, true});                // sparse flowering ground cover
+    add("trail", {U'.', 0x929B70, true, true});                  // faint worn trail
     add("animal_trail", {U'.', 0x929B70, true, true});           // faint worn trail
     add("fallen_log", {U'=', 0x8B6B43, true, true});             // passable horizontal log
     add("fallen_log_vertical", {U'|', 0x8B6B43, true, true});    // passable vertical log

@@ -12,7 +12,7 @@ using RL::tests::Check;
 
 void TestForestRoads()
 {
-    std::size_t centres = 0, paved_centres = 0, base_roads = 0, extra_roads = 0;
+    std::size_t centres = 0, paved_centres = 0, base_roads = 0, extra_roads = 0, trail_cells = 0;
     for (unsigned seed = 0; seed < 24; ++seed) {
         const RL::Size size(seed % 2 ? 120 : 79, seed % 2 ? 80 : 50);
         RL::CMap map(size), base(size), replay(size);
@@ -46,6 +46,7 @@ void TestForestRoads()
                 reproducible &= map.get(x, y).getType() == replay.get(x, y).getType();
                 base_roads += base.get(x, y).getType() == "corridor" || base.get(x, y).getType() == "bridge";
                 extra_roads += map.get(x, y).getType() == "corridor" || map.get(x, y).getType() == "bridge";
+                trail_cells += map.get(x, y).getType() == "trail";
             }
         }
         Check(connected, "clearing entrances stay reachable, including rivers and scattered rocks");
@@ -53,6 +54,7 @@ void TestForestRoads()
     }
     Check(paved_centres * 10 < centres, "forest roads leave clearing centres predominantly unpaved");
     Check(extra_roads < base_roads * 2, "additional routes share substantial portions of the existing road network");
+    Check(trail_cells > 0, "forest clearings contain visible worn trail pathways connecting entrances");
 }
 
 void TestBiomes()

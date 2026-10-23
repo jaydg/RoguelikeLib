@@ -474,6 +474,10 @@ constexpr std::array<SOpening, 3> ForestOpenings = {{
 /**
  * @brief Generates an organic wilderness landscape featuring meandering rivers, tributaries, clearings, and connecting roads.
  *
+ * Roads link clearings across the wilderness, sharing trunks before branching.
+ * Entrances at clearing borders connect to the clearing center with visible worn trails,
+ * preserving natural open meadow grass while providing clear navigation between paths.
+ *
  * @param map Map to populate.
  * @param biome Terrain pattern defining trees, foliage, and vegetation parameters (defaults to @ref SForestBiome).
  * @param num_clearings Target number of open forest clearings (defaults to 5).
@@ -491,6 +495,8 @@ std::vector<SLocation> CreateRiverland(
     std::size_t num_streams = 8
 )
 {
+    RegisterBiomeTiles();
+
     // 1. Fill map with grass
     map.Clear("grass");
 
@@ -714,59 +720,18 @@ std::vector<SLocation> CreateRiverland(
     }
 
     CMatrix<bool> clearing_access(map.getSize(), false);
+    CMatrix<bool> in_clearing(map.getSize(), false);
+    for (const auto& pos : all_clearing_tiles) {
+        if (map.inside(pos)) in_clearing.set(pos.x, pos.y, true);
+    }
+    for (const auto& c : clearing_centers) {
+        if (map.inside(c)) in_clearing.set(c.x, c.y, true);
+    }
 
     // 5. Generate ways connecting clearings (with collision avoidance and bridges)
     if (!clearing_centers.empty()) {
         CMatrix<bool> path_tiles(map.getSize(), false);
-        std::vector<std::vector<Position>> entrances(clearing_centers.size());
         const auto index = [&](Position p) { return p.y * map.getWidth() + p.x; };
-
-        // Reuse an entrance for destinations in the same general direction.
-        // Opposite destinations can still have separate clearing entrances.
-        const auto entrance = [&](std::size_t clearing, Position destination) {
-            const Position center = clearing_centers[clearing];
-            const double dx = static_cast<double>(destination.x) - center.x;
-            const double dy = static_cast<double>(destination.y) - center.y;
-            const double length = std::hypot(dx, dy);
-            for (Position existing : entrances[clearing]) {
-                const double ex = static_cast<double>(existing.x) - center.x;
-                const double ey = static_cast<double>(existing.y) - center.y;
-                if (ex * dx + ey * dy >= 0.5 * std::hypot(ex, ey) * length) {
-                    return existing;
-                }
-            }
-            // Stay just inside the irregular edge, rather than running a
-            // road through the middle of the open clearing.
-            const double distance = std::min(length * 0.4, clearing_radii[clearing] * 0.8);
-            Position result(
-                std::clamp<int>(std::lround(center.x + (length > 0 ? dx / length * distance : 0)), 0, map.getWidth() - 1),
-                std::clamp<int>(std::lround(center.y + (length > 0 ? dy / length * distance : 0)), 0, map.getHeight() - 1));
-            entrances[clearing].push_back(result);
-            // Keep access through the clearing walkable without painting a
-            // road across its centre. Water still needs a bridge.
-            const int steps = std::max(std::abs(static_cast<int>(result.x) - static_cast<int>(center.x)),
-                                       std::abs(static_cast<int>(result.y) - static_cast<int>(center.y)));
-            for (int step = 0; step <= steps; ++step) {
-                const double t = steps > 0 ? static_cast<double>(step) / steps : 0;
-                const Position p(std::lround(center.x + (static_cast<double>(result.x) - center.x) * t),
-                                 std::lround(center.y + (static_cast<double>(result.y) - center.y) * t));
-                clearing_access.set(p.x, p.y, true);
-                const auto type = map.get(p).getType();
-                if (type == "tree" || type == "plant" || type == "rock") map.SetCell(p.x, p.y, "grass");
-                else if (type == "water") map.SetCell(p.x, p.y, "bridge");
-            }
-            return result;
-        };
-
-        CMatrix<bool> clearing_core(map.getSize(), false);
-        for (std::size_t y = 0; y < map.getHeight(); ++y) {
-            for (std::size_t x = 0; x < map.getWidth(); ++x) {
-                for (std::size_t i = 0; i < clearing_centers.size(); ++i) {
-                    if (Distance(x, y, clearing_centers[i].x, clearing_centers[i].y) < clearing_radii[i] * 0.5)
-                        clearing_core.set(x, y, true);
-                }
-            }
-        }
 
         const auto connect = [&](Position start, Position end) {
             // A winding guide gives new roads a natural shape. Routing can
@@ -786,7 +751,7 @@ std::vector<SLocation> CreateRiverland(
             for (Position p : guide) mark_near(near_guide, p, 2);
             for (std::size_t y = 0; y < map.getHeight(); ++y) {
                 for (std::size_t x = 0; x < map.getWidth(); ++x) {
-                    if (path_tiles.get(x, y)) mark_near(near_road, Position(x, y), 3);
+                    if (path_tiles.get(x, y)) mark_near(near_road, Position(x, y), 1);
                 }
             }
             const auto count = map.getWidth() * map.getHeight();
@@ -810,8 +775,7 @@ std::vector<SLocation> CreateRiverland(
                         // is expensive, so routes share tiles before forking.
                         int step = path_tiles.get(next.x, next.y) ? 2 :
                             10 + (near_guide.get(next.x, next.y) ? 0 : 8) +
-                            (near_road.get(next.x, next.y) ? 24 : 0) +
-                            (clearing_core.get(next.x, next.y) ? 80 : 0);
+                            (near_road.get(next.x, next.y) ? 24 : 0);
                         if (map.get(next).getType() == "water") step += 30;
                         if (dx != 0 && dy != 0) step = step * 14 / 10;
                         const auto target = index(next);
@@ -825,29 +789,33 @@ std::vector<SLocation> CreateRiverland(
             }
             for (auto cell = index(end); cell != count; cell = parent[cell]) {
                 const Position p(cell % map.getWidth(), cell / map.getWidth());
-                map.SetCell(p.x, p.y, map.get(p).getType() == "water" || map.get(p).getType() == "bridge" ? "bridge" : "corridor");
+                const auto type = map.get(p).getType();
+                if (type == "water" || type == "bridge") {
+                    map.SetCell(p.x, p.y, "bridge");
+                } else if (in_clearing.get(p.x, p.y)) {
+                    map.SetCell(p.x, p.y, "trail");
+                } else {
+                    map.SetCell(p.x, p.y, "corridor");
+                }
                 path_tiles.set(p.x, p.y, true);
+                clearing_access.set(p.x, p.y, true);
             }
         };
 
         // First connect every clearing to the closest earlier clearing.
-        // Subsequent routes reuse existing entrances and road segments.
+        // Subsequent routes reuse existing road segments and share trunks before branching.
         for (std::size_t i = 1; i < clearing_centers.size(); ++i) {
             std::size_t nearest = 0;
             for (std::size_t j = 1; j < i; ++j) {
                 if (Distance(clearing_centers[i].x, clearing_centers[i].y, clearing_centers[j].x, clearing_centers[j].y) <
                     Distance(clearing_centers[i].x, clearing_centers[i].y, clearing_centers[nearest].x, clearing_centers[nearest].y)) nearest = j;
             }
-            const Position start = entrance(i, clearing_centers[nearest]);
-            const Position end = entrance(nearest, clearing_centers[i]);
-            connect(start, end);
+            connect(clearing_centers[i], clearing_centers[nearest]);
         }
         for (std::size_t extra = 0; extra < num_paths && clearing_centers.size() > 1; ++extra) {
             const std::size_t a = Random(clearing_centers.size()), b = Random(clearing_centers.size());
             if (a == b) continue;
-            const Position start = entrance(a, clearing_centers[b]);
-            const Position end = entrance(b, clearing_centers[a]);
-            connect(start, end);
+            connect(clearing_centers[a], clearing_centers[b]);
         }
     } else {
         // Fallback: generate random paths if no clearings were created
@@ -859,18 +827,11 @@ std::vector<SLocation> CreateRiverland(
     }
 
     // 6. Fill the wilderness background outside clearings, access ways, rivers and roads
-    CMatrix<bool> clearing_mask(map.getSize(), false);
-    for (const auto& pos : all_clearing_tiles) {
-        if (map.inside(pos)) {
-            clearing_mask.set(pos.x, pos.y, true);
-        }
-    }
-
     CMatrix<bool> mask(map.getSize(), false);
     for (std::size_t y = 0; y < map.getHeight(); ++y) {
         for (std::size_t x = 0; x < map.getWidth(); ++x) {
             const auto type = map.get(x, y).getType();
-            if (type == "grass" && !clearing_mask.get(x, y) && !clearing_access.get(x, y)) {
+            if (type == "grass" && !in_clearing.get(x, y) && !clearing_access.get(x, y)) {
                 mask.set(x, y, true);
             }
         }
