@@ -174,7 +174,7 @@ void CreateSymmetricStructure(CMap &level, const int& max_number_of_rooms = 15,
             continue;
         }
 
-        ConnectClosestRooms(level, true, true);
+        ConnectClosestRooms(level, true);
         break;
     }
 

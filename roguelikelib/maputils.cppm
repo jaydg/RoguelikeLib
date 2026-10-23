@@ -718,10 +718,9 @@ CMatrix<int> FillDisconnectedRoomsWithDifferentValues(const CMap &level)
  * become fully reachable from each other.
  *
  * @param level Map whose rooms are to be connected.
- * @param with_doors Reserved parameter for doorway creation (currently unused).
  * @param straight_connections If true, corridors use straight L-turns; if false, corridors meander randomly.
  */
-void ConnectClosestRooms(CMap &level, [[maybe_unused]] bool with_doors, bool straight_connections = false)
+void ConnectClosestRooms(CMap &level, bool straight_connections = false)
 {
     // fill each room on the map with an individual number
     auto floodmap = FillDisconnectedRoomsWithDifferentValues(level);

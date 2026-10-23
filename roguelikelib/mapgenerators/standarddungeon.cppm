@@ -37,7 +37,7 @@ void CreateStandardDungeon(CMap &level, int max_number_of_rooms, bool with_doors
         }
     }
 
-    ConnectClosestRooms(level, true, true);
+    ConnectClosestRooms(level, true);
 
     if (with_doors) {
         AddDoors(level, 1, 0.5);
