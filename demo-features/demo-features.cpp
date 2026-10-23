@@ -1346,13 +1346,8 @@ public:
             }
 
             list.setItems(std::move(labels));
-            list.setOnActivate([this](std::size_t index) {
-                const auto& name = generators[index].name;
-                if ((name == "Cave and Glade" || name == "Riverland" || name == "Castle") && open_config_cb) {
-                    open_config_cb(name);
-                } else {
-                    Generate();
-                }
+            list.setOnActivate([this](std::size_t) {
+                Generate();
             });
         }
 
@@ -1762,14 +1757,7 @@ int main(int argc, char* argv[])
             }
             std::string target(target_generator);
             if (target.empty() && !tabs.empty() && tabs[0]) {
-                const auto selected = tabs[0]->getSelectedGeneratorName();
-                if (selected == "Riverland") {
-                    target = "Riverland";
-                } else if (selected == "Castle") {
-                    target = "Castle";
-                } else {
-                    target = "Cave and Glade";
-                }
+                target = tabs[0]->getSelectedGeneratorName();
             }
             if (target == "Riverland") {
                 tabs[0]->SelectGenerator("Riverland");
@@ -1803,7 +1791,7 @@ int main(int argc, char* argv[])
                 });
                 windows.Open(castle_config_window);
                 windows.Focus(castle_config_window);
-            } else {
+            } else if (target == "Cave and Glade") {
                 tabs[0]->SelectGenerator("Cave and Glade");
                 configuring_cave = true;
                 for (auto& tab : tabs) tab->Hover(std::nullopt);
