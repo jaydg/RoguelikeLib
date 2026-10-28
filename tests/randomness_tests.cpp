@@ -160,4 +160,30 @@ void TestRandomness()
     const std::uint32_t color = 0x1080FF;
     const std::uint32_t jittered_color = RL::GetJitteredColor(color);
     Check(jittered_color != 0, "color jittering produces non-zero color");
+
+    // A seed gives the same numbers with every compiler and standard library: these
+    // are what libstdc++'s distributions made of seed 2026, as the library's own
+    // mapping does now
+    RL::InitRandomness(2026);
+    std::vector<unsigned> below_hundred;
+    for (int i = 0; i < 8; ++i) {
+        below_hundred.push_back(RL::Random(100));
+    }
+    Check(below_hundred == std::vector<unsigned>{42, 61, 72, 86, 3, 91, 80, 89}, "Random() draws as pinned");
+
+    std::vector<unsigned> between;
+    for (int i = 0; i < 4; ++i) {
+        between.push_back(RL::RandomBetween(10, 20));
+    }
+    Check(between == std::vector<unsigned>{18, 14, 19, 15}, "RandomBetween() draws as pinned");
+
+    std::vector<float> floats;
+    for (int i = 0; i < 4; ++i) {
+        floats.push_back(RL::RandomFloat(-1.0f, 3.0f));
+    }
+    Check(floats == std::vector<float>{1.60401177f, -0.0206456184f, -0.939545393f, 1.07542133f}, "RandomFloat() draws as pinned");
+
+    std::array<int, 8> order{0, 1, 2, 3, 4, 5, 6, 7};
+    RL::Shuffle(order.begin(), order.end());
+    Check(order == std::array<int, 8>{2, 4, 6, 7, 1, 0, 3, 5}, "Shuffle() orders as pinned");
 }

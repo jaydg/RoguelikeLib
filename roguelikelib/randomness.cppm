@@ -20,6 +20,60 @@ namespace RL
 // Internal module state (not exported, has module linkage)
 Xoshiro256PlusPlus rng;
 
+// The engine's draws are mapped onto a range here, not by the standard library's
+// distributions: the standard prescribes what an engine yields, but not how a
+// distribution uses it, so libc++ and libstdc++ make different numbers of one seed.
+// These follow libstdc++'s algorithms for an engine of full 64 bits, so that a seed
+// gives what it gave before, with either library.
+
+// The 128-bit product of two 64-bit numbers, as its high and its low half
+std::pair<std::uint64_t, std::uint64_t> Product(const std::uint64_t a, const std::uint64_t b)
+{
+    const std::uint64_t a_low = a & 0xffffffffU;
+    const std::uint64_t a_high = a >> 32;
+    const std::uint64_t b_low = b & 0xffffffffU;
+    const std::uint64_t b_high = b >> 32;
+    const std::uint64_t low_low = a_low * b_low;
+    const std::uint64_t high_low = a_high * b_low;
+    const std::uint64_t low_high = a_low * b_high;
+    const std::uint64_t cross = (low_low >> 32) + (high_low & 0xffffffffU) + low_high;
+    return {a_high * b_high + (high_low >> 32) + (cross >> 32), (cross << 32) | (low_low & 0xffffffffU)};
+}
+
+// A number in [0, count), by Lemire's nearly divisionless method (as libstdc++'s
+// uniform_int_distribution); a count of 0 stands for all 2^64 numbers
+std::uint64_t Below(const std::uint64_t count)
+{
+    if (count == 0) {
+        return rng();
+    }
+
+    auto [high, low] = Product(rng(), count);
+
+    if (low < count) {
+        const std::uint64_t threshold = (0 - count) % count;
+
+        while (low < threshold) {
+            std::tie(high, low) = Product(rng(), count);
+        }
+    }
+
+    return high;
+}
+
+// A number in [0, 1), of the low 32 bits of a draw (as libstdc++'s
+// generate_canonical<float>), drawn again should it round up to 1
+float Canonical()
+{
+    while (true) {
+        const float value = static_cast<float>(static_cast<std::uint32_t>(rng())) / 4294967296.0f;
+
+        if (value < 1.0f) {
+            return value;
+        }
+    }
+}
+
 // Public API (exported)
 export {
 
@@ -102,8 +156,7 @@ export {
             return 0;
         }
 
-        std::uniform_int_distribution<std::size_t> dist(0, limit - 1);
-        return static_cast<unsigned>(dist(rng));
+        return static_cast<unsigned>(Below(limit));
     }
 
     /**
@@ -119,8 +172,7 @@ export {
             return min;
         }
 
-        std::uniform_int_distribution<std::size_t> dist(min, max - 1);
-        return static_cast<unsigned>(dist(rng));
+        return static_cast<unsigned>(min + Below(max - min));
     }
 
     /**
@@ -132,8 +184,7 @@ export {
      */
     float RandomFloat(float min = 0.0, float max = 1.0)
     {
-        std::uniform_real_distribution<float> dist(min, max);
-        return dist(rng);
+        return Canonical() * (max - min) + min;
     }
 
     /**
@@ -177,8 +228,7 @@ export {
     void Shuffle(RandomAccessIterator first, RandomAccessIterator last)
     {
         for (auto i = (last - first) - 1; i > 0; --i) {
-            std::uniform_int_distribution<decltype(i)> d(0, i);
-            std::swap(first[i], first[d(rng)]);
+            std::swap(first[i], first[static_cast<decltype(i)>(Below(static_cast<std::uint64_t>(i) + 1))]);
         }
     }
 
