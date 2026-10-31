@@ -230,6 +230,16 @@ void TestGrowthTown()
                 }
             }
             Check(lanes.size() == 2, "each gate has exactly two lanes through the ramparts");
+            // Side by side, in one straight line of rampart, a wall at
+            // either end: a pair of doors closes the gate
+            const RL::Position step = i < 2 ? RL::Position(0, 1) : RL::Position(1, 0);
+            const RL::Position next(gate.x + step.x, gate.y + step.y), last(gate.x - step.x, gate.y - step.y);
+            const bool forward = map.get(next).getType() == "corridor";
+            const RL::Position partner = forward ? next : last;
+            const RL::Position beyond = forward ? RL::Position(next.x + step.x, next.y + step.y) : RL::Position(last.x - step.x, last.y - step.y);
+            const RL::Position behind = forward ? last : next;
+            Check(map.get(partner).getType() == "corridor" && map.get(beyond).getType() == "wall" && map.get(behind).getType() == "wall",
+                  "each gate's two lanes pass through the ramparts side by side, between walls");
         }
         // Keep a density guard with room for varied packing. The former
         // minimum of thirty included 3x3 sheds with only one interior tile;

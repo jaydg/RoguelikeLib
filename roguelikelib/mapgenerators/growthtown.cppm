@@ -162,6 +162,79 @@ export std::vector<SBuilding> CreateGrowthTown(CMap& map, const TerrainBiome& su
             }
         }
     }
+    // A gate's two lanes pass through the ramparts side by side, between
+    // straight walls, so that a pair of doors may close it: where the
+    // outline steps at a gate, push it out across the two lanes and the
+    // cell to either side of them, to the outermost of those four rows (or
+    // columns). Pushing outward adds rampart on open ground only.
+    for (std::size_t i = 0; i < gates.size(); ++i) {
+        const auto p = gate_centres[i];
+        if (p.x == Position::invalid || p.y == Position::invalid) {
+            continue;
+        }
+        const bool rows = i < 2;
+        const std::size_t along = rows ? p.y : p.x;
+        const std::size_t length = rows ? height : width;
+        const std::size_t across = rows ? width : height;
+        if (along < 2 || along + 3 >= length) {
+            continue;
+        }
+        auto is_inside = [&](std::size_t line, std::size_t step) {
+            return rows ? inside[line * width + step] : inside[step * width + line];
+        };
+        auto set_inside = [&](std::size_t line, std::size_t step) {
+            if (rows) {
+                inside[line * width + step] = true;
+            } else {
+                inside[step * width + line] = true;
+            }
+        };
+        // The first inside cell of each line from the gate's side - west or
+        // north from the low end, east or south from the high end - and the
+        // outermost of them
+        const bool low = i == 0 || i == 2;
+        std::array<std::size_t, 4> edges{};
+        std::size_t outermost = low ? across : 0;
+        for (std::size_t k = 0; k < 4; ++k) {
+            const std::size_t line = along - 1 + k;
+            std::size_t edge = low ? across : 0;
+            if (low) {
+                for (std::size_t step = 0; step < across; ++step) {
+                    if (is_inside(line, step)) {
+                        edge = step;
+                        break;
+                    }
+                }
+                outermost = std::min(outermost, edge);
+            } else {
+                for (std::size_t step = across; step-- > 0;) {
+                    if (is_inside(line, step)) {
+                        edge = step;
+                        break;
+                    }
+                }
+                outermost = std::max(outermost, edge);
+            }
+            edges[k] = edge;
+        }
+        if (outermost == 0 || outermost + 1 >= across) {
+            continue;
+        }
+        for (std::size_t k = 0; k < 4; ++k) {
+            const std::size_t line = along - 1 + k;
+            if (low) {
+                for (std::size_t step = outermost; step < edges[k] && step < across; ++step) {
+                    set_inside(line, step);
+                }
+            } else {
+                for (std::size_t step = edges[k] + 1; step <= outermost; ++step) {
+                    set_inside(line, step);
+                }
+            }
+        }
+    }
+    // The cells of the gates' lanes through the ramparts
+    std::vector<bool> lane(width * height);
     for (std::size_t y = 1; y + 1 < height; ++y) {
         for (std::size_t x = 1; x + 1 < width; ++x) {
             if (!boundary_cell(x, y)) {
@@ -177,10 +250,13 @@ export std::vector<SBuilding> CreateGrowthTown(CMap& map, const TerrainBiome& su
                 }
             }
             map.SetCell(x, y, opening ? "corridor" : "wall");
+            lane[y * width + x] = opening;
         }
     }
     // Carving a bent gate road can clip a rampart corner. Restore overlap
-    // at those junctions too, without bridging the broad gate openings.
+    // at those junctions too, without bridging the broad gate openings,
+    // and never across a gate's lane: beside a gate's straight frame, a
+    // stepped rampart may touch it only at a corner.
     bool repaired;
     do {
         repaired = false;
@@ -197,7 +273,14 @@ export std::vector<SBuilding> CreateGrowthTown(CMap& map, const TerrainBiome& su
                         const double dx = (p.x - cx) / rx, dy = (p.y - cy) / ry;
                         return dx * dx + dy * dy;
                     };
-                    map.SetCell(distance(first) > distance(second) ? first : second, "wall");
+                    const bool first_lane = lane[first.y * width + first.x];
+                    const bool second_lane = lane[second.y * width + second.x];
+                    if (first_lane && second_lane) {
+                        continue;
+                    }
+                    const Position walled = first_lane ? second : second_lane ? first :
+                                            distance(first) > distance(second) ? first : second;
+                    map.SetCell(walled, "wall");
                     repaired = true;
                 }
             }
