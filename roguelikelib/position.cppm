@@ -305,6 +305,8 @@ using Size = Position;
 
 } // namespace RL
 
+namespace std {
+
 /**
  * @brief Hash specialization for @ref RL::Position.
  *
@@ -313,7 +315,7 @@ using Size = Position;
  * to minimize hash collisions.
  */
 template <>
-struct std::hash<RL::Position> {
+struct hash<RL::Position> {
     /**
      * @brief Computes a 64-bit hash of an @ref RL::Position.
      * @param p Position to hash.
@@ -326,3 +328,5 @@ struct std::hash<RL::Position> {
         return static_cast<std::size_t>(h);
     }
 };
+
+} // namespace std
