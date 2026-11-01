@@ -95,3 +95,36 @@ names.Learn("Arthur", "Lancelot", "Gawain", "Percival", "Galahad");
 
 std::string hero_name = names.GenerateName();
 ```
+
+---
+
+## In-Game Calendar & Date System (`rl.calendar`)
+
+The calendar module provides `RL::CCalendar` for custom in-game year structures, translating sequential elapsed day counters into structured calendar dates:
+
+- **Custom Year Structure**: Build a year from any number of parts (`RL::SCalendarPart`) with arbitrary names and durations (months, seasons, moon cycles, festivals).
+- **Epoch / Day-of-Year Offset**: Configure which day of the year the timeline begins counting from.
+- **Structured Dates**: `RL::CCalendar::DateOf()` returns an `RL::SDate` containing 1-based year, 0-based part index, and 1-based day of month.
+- **Ordinal Formatting**: `RL::Ordinal()` generates English ordinal strings (e.g., `"1st"`, `"2nd"`, `"3rd"`, `"11th"`, `"22nd"`).
+
+```cpp
+import rl.calendar;
+import std;
+
+// 1. Define a 4-season calendar starting on day 10 of the year
+RL::CCalendar calendar({
+    {"Thawmoon", 30},
+    {"Seedmoon", 30},
+    {"Sunmoon", 30},
+    {"Frostmoon", 30}
+}, 10);
+
+// 2. Query date from elapsed days (e.g. from RL::CClock::Day())
+RL::SDate date = calendar.DateOf(35); // 35 days after start
+// date.year == 1, date.part == 1 ("Seedmoon"), date.day == 16
+
+// 3. Format as a display string with ordinal suffix
+std::string formatted = std::format("Year {}, {} of {}",
+    date.year, RL::Ordinal(date.day), calendar.PartName(date.part));
+// "Year 1, 16th of Seedmoon"
+```

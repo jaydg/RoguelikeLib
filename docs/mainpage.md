@@ -21,7 +21,7 @@ Algorithms and procedural generation tools with zero graphical dependencies:
 - **\ref roguelikelib_getting_started "Getting Started with RoguelikeLib"**: Library architecture, Xmake target integration, and importing C++20 modules.
 - **\ref roguelikelib_town_generation "Procedural Town Generation"**: GrowthTown generator, town walls, gates, market squares, and procedural room growth based on Lopes et al. (GAMEON 2010).
 - **\ref roguelikelib_map_stamping "Map Stamping & Wilderness"**: Map stamping API, automated road networks, Voronoi wilderness biomes, hill trails, and chasms.
-- **\ref roguelikelib_algorithms "Core Algorithms & Randomness"**: Field-of-view, pathfinding, distance maps, and high-performance PRNG with Xoshiro256++.
+- **\ref roguelikelib_algorithms "Core Algorithms & Randomness"**: Field-of-view, pathfinding, distance maps, calendar systems, and high-performance PRNG with Xoshiro256++.
 
 ### RTUI (Terminal UI) Guides
 
