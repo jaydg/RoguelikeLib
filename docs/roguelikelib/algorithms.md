@@ -163,3 +163,41 @@ clock.Hour();       // 13
 clock.Day();        // 0 (first day)
 day.At(clock);      // "afternoon"
 ```
+
+---
+
+## Discrete Timeline Scheduler (`rl.scheduler`)
+
+The scheduler module provides `RL::CScheduler<Id>` to drive turn order in turn-based games using speed or action-cost systems:
+
+- **Speed / Energy Systems**: Faster actors can act with shorter tick delays (`cost * 100 / speed`), taking turns more frequently.
+- **Deterministic Turn Order**: Actors scheduled for the exact same tick act strictly in the order they were scheduled (FIFO tie-breaking).
+- **Identifier Decoupling**: Stores copyable actor handles (`Id`) such as pointers, integer entity IDs, or strings without taking ownership.
+- **Dynamic Updates & Removal**: Re-scheduling an actor adjusts their scheduled time; `Remove()` cancels turns in @f$O(\log N)@f$.
+- **Complete Serialization**: Inspect upcoming turns with `Scheduled()` and restore timeline state with `Restore()`.
+
+```cpp
+import rl.scheduler;
+
+struct Actor {
+    int speed = 100; // base speed
+};
+
+Actor player{.speed = 100};
+Actor fast_goblin{.speed = 200};
+
+RL::CScheduler<Actor*> timeline;
+timeline.Schedule(&player, 0);
+timeline.Schedule(&fast_goblin, 0);
+
+// Main turn loop:
+while (auto actor = timeline.Next()) {
+    // Current simulation tick: timeline.Now()
+    const RL::Ticks base_cost = 100;
+    const RL::Ticks delay = base_cost * 100 / (*actor)->speed;
+
+    // Reschedule actor for their next turn:
+    timeline.Schedule(*actor, delay);
+    break;
+}
+```
