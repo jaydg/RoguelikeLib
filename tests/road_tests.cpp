@@ -1,4 +1,5 @@
 import rl.maputils;
+import rl.matrix;
 import rl.randomness;
 import rltests.check;
 import std;
@@ -65,5 +66,103 @@ void TestWindingRoad()
           "a blocked terrain-aware route fails cleanly rather than bridging a lake");
     Check(!RL::BuildWindingRoute(route, lake, RL::Position(12, 8), end, 12, cost),
           "terrain-aware winding routes reject a blocked endpoint");
+}
 
+void TestRoadsWithBridges()
+{
+    // 1. FindStraightBridgeSpan unit tests
+    {
+        RL::CMap map(RL::Size(30, 20));
+        map.Clear("grass");
+        // Vertical river from x=10 to x=12 across all y
+        for (std::size_t y = 0; y < 20; ++y) {
+            for (std::size_t x = 10; x <= 12; ++x) {
+                map.SetCell(x, y, "water");
+            }
+        }
+
+        // Test valid horizontal crossing
+        auto span = RL::FindStraightBridgeSpan(map, RL::Position(9, 5), 1, 0, 10);
+        Check(span.valid, "valid horizontal bridge span detected across river");
+        Check(span.span_length == 3, "span length is 3 water cells");
+        Check(span.landing == RL::Position(13, 5), "landing position is on opposite bank");
+
+        // Test valid diagonal crossing
+        auto diag_span = RL::FindStraightBridgeSpan(map, RL::Position(9, 5), 1, 1, 10);
+        Check(diag_span.valid, "valid diagonal bridge span detected across river");
+        Check(diag_span.span_length == 3, "diagonal span length is 3 water cells");
+        Check(diag_span.landing == RL::Position(13, 9), "diagonal landing is opposite bank");
+
+        // Test starting from water fails
+        auto from_water = RL::FindStraightBridgeSpan(map, RL::Position(10, 5), 1, 0, 10);
+        Check(!from_water.valid, "cannot start bridge from water");
+
+        // Test max_span cutoff
+        auto too_long = RL::FindStraightBridgeSpan(map, RL::Position(9, 5), 1, 0, 2);
+        Check(!too_long.valid, "bridge exceeding max_span is invalid");
+
+        // Test out of bounds / running off map
+        RL::CMap water_edge(RL::Size(20, 20));
+        water_edge.Clear("grass");
+        for (std::size_t x = 15; x < 20; ++x) {
+            for (std::size_t y = 0; y < 20; ++y) water_edge.SetCell(x, y, "water");
+        }
+        auto off_map = RL::FindStraightBridgeSpan(water_edge, RL::Position(14, 5), 1, 0, 10);
+        Check(!off_map.valid, "bridge running off map without opposite bank is invalid");
+    }
+
+    // 2. BuildRouteWithBridges & AddRoadWithBridges
+    {
+        RL::CMap map(RL::Size(40, 20));
+        map.Clear("grass");
+        // Vertical river at x=18..20
+        for (std::size_t y = 0; y < 20; ++y) {
+            for (std::size_t x = 18; x <= 20; ++x) {
+                map.SetCell(x, y, "water");
+            }
+        }
+
+        std::vector<RL::Position> route;
+        RL::Position start(5, 10), end(35, 10);
+        bool found = RL::BuildRouteWithBridges(route, map, start, end);
+        Check(found, "route across river found with straight bridge");
+        Check(!route.empty() && route.front() == start && route.back() == end, "endpoints preserved");
+
+        // Check continuity of the route
+        bool continuous = true;
+        for (std::size_t i = 1; i < route.size(); ++i) {
+            const int dx = std::abs(static_cast<int>(route[i].x) - static_cast<int>(route[i - 1].x));
+            const int dy = std::abs(static_cast<int>(route[i].y) - static_cast<int>(route[i - 1].y));
+            if (std::max(dx, dy) > 1) {
+                continuous = false;
+                break;
+            }
+        }
+        Check(continuous, "bridge-aware route is continuous 8-connected path");
+
+        // Test AddRoadWithBridges
+        RL::CMatrix<bool> road_mask(map.getSize(), false);
+        bool painted = RL::AddRoadWithBridges(map, start, end, "corridor", "bridge", &road_mask);
+        Check(painted, "AddRoadWithBridges painted path and bridge");
+        Check(map.get(5, 10).getType() == "corridor", "start is paved corridor");
+        Check(map.get(35, 10).getType() == "corridor", "end is paved corridor");
+        Check(map.get(18, 10).getType() == "bridge", "river tile 18 is paved bridge");
+        Check(map.get(19, 10).getType() == "bridge", "river tile 19 is paved bridge");
+        Check(map.get(20, 10).getType() == "bridge", "river tile 20 is paved bridge");
+        Check(road_mask.get(19, 10), "road_mask reflects bridge tile");
+
+        // Test road reuse with existing_roads
+        RL::Position start2(5, 15), end2(35, 10);
+        std::vector<RL::Position> route2;
+        RL::SRouteWithBridgesConfig config{ .existing_roads = &road_mask };
+        Check(RL::BuildRouteWithBridges(route2, map, start2, end2, config), "second route connects");
+        bool joined_existing = false;
+        for (const auto& p : route2) {
+            if (p != end2 && road_mask.get(p.x, p.y)) {
+                joined_existing = true;
+                break;
+            }
+        }
+        Check(joined_existing, "second route reuses existing road network");
+    }
 }

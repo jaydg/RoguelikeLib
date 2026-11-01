@@ -36,7 +36,7 @@ All RoguelikeLib components are exported as C++20 modules under the `rl.*` names
 | `rl.fov` | Field of View computation | `RL::CalculateFov()` |
 | `rl.pathfinding` | A* and Dijkstra pathfinding | `RL::FindPath()`, `RL::BuildDistanceMap()` |
 | `rl.mapgenerators` | Procedural map generators umbrella module | `rl.mapgenerators.*` |
-| `rl.maputils` | Road construction, carving, and stitching | `RL::BuildWindingPath()`, `RL::StampTownWithRoads()` |
+| `rl.maputils` | Road construction, carving, and stitching | `RL::BuildWindingPath()`, `RL::StampTownWithRoads()`, `RL::AddRoadWithBridges()` |
 | `rl.scheduler` | Turn-based scheduling and event queues | `RL::CScheduler` |
 | `rl.clock` | Day/night cycle, turn clocks, and daily schedules | `RL::CClock`, `RL::CDailySchedule` |
 | `rl.calendar` | Custom in-game calendars, annual parts, and dates | `RL::CCalendar`, `RL::SDate`, `RL::Ordinal()` |

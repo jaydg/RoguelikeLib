@@ -1436,6 +1436,340 @@ bool AddWindingRoad(CMap& level, const Position& start, const Position& end,
 }
 
 //////////////////////////////////////////////////////////////////////////
+// River-crossing roads and straight bridges
+//////////////////////////////////////////////////////////////////////////
+
+/**
+ * @brief Result of a straight bridge span query across water.
+ */
+struct SBridgeSpan {
+    bool valid = false;          ///< Whether a valid straight bridge can be built.
+    Position landing{};         ///< Landing position on the opposite solid bank.
+    int span_length = 0;        ///< Number of water cells spanned.
+    int cost = 0;               ///< Bridge construction pathfinding cost.
+};
+
+/**
+ * @brief Evaluates whether a strictly straight bridge span can cross water in direction (dx, dy).
+ *
+ * Verifies that:
+ * - Origin @p from is on solid dry land (neither water nor an existing bridge).
+ * - The bridge runs in a strictly straight line (horizontal, vertical, or diagonal) across
+ *   consecutive water cells up to @p max_span.
+ * - The bridge terminates on solid dry land on the opposite bank (or an existing road on solid land).
+ * - The bridge does not end in water, run out of bounds, or merge mid-river into another bridge.
+ *
+ * @param map Map to query.
+ * @param from Starting position on solid land.
+ * @param dx Horizontal step direction (-1, 0, 1).
+ * @param dy Vertical step direction (-1, 0, 1).
+ * @param max_span Maximum bridge length in water cells (defaults to 20).
+ * @param setup_cost Upfront abutment setup cost (defaults to 100).
+ * @param per_tile_cost Cost per water cell spanned (defaults to 60).
+ * @param diagonal_cost Extra penalty cost per cell for diagonal spans (defaults to 50).
+ * @return @ref SBridgeSpan describing the span validity, landing position, length, and cost.
+ */
+[[nodiscard]] SBridgeSpan FindStraightBridgeSpan(
+    const CMap& map,
+    Position from,
+    int dx,
+    int dy,
+    int max_span = 20,
+    int setup_cost = 100,
+    int per_tile_cost = 60,
+    int diagonal_cost = 50
+)
+{
+    SBridgeSpan span;
+    if (dx == 0 && dy == 0) return span;
+    if (!map.inside(from)) return span;
+
+    const auto from_type = map.get(from).getType();
+    if (from_type == "water" || from_type == "bridge") return span;
+
+    Position next(from.x + dx, from.y + dy);
+    if (!map.inside(next) || map.get(next).getType() != "water") return span;
+
+    Position p = next;
+    int span_length = 0;
+    bool reached_bank = false;
+
+    while (map.inside(p) && span_length < max_span) {
+        const auto p_type = map.get(p).getType();
+        if (p_type != "water") {
+            if (p_type != "bridge") {
+                reached_bank = true;
+            }
+            break;
+        }
+        p.x += dx;
+        p.y += dy;
+        ++span_length;
+    }
+
+    if (!reached_bank || span_length == 0 || !map.inside(p)) {
+        return span;
+    }
+
+    const bool is_diagonal = (dx != 0 && dy != 0);
+    int bridge_cost = setup_cost + span_length * per_tile_cost + (is_diagonal ? span_length * diagonal_cost : 0) + 10;
+    if (is_diagonal) {
+        bridge_cost = bridge_cost * 14 / 10;
+    }
+
+    span.valid = true;
+    span.landing = p;
+    span.span_length = span_length;
+    span.cost = bridge_cost;
+    return span;
+}
+
+/**
+ * @brief Configuration parameters for bridge-aware route finding.
+ */
+struct SRouteWithBridgesConfig {
+    int pertamt = 8;                              ///< Perturbation amount for the winding guide path (0 disables guide).
+    int max_bridge_span = 20;                     ///< Maximum allowed bridge length across water.
+    int bridge_setup_cost = 100;                  ///< Upfront abutment setup cost for building a bridge.
+    int bridge_per_tile_cost = 60;                ///< Cost per water tile crossed.
+    int bridge_diagonal_cost = 50;                ///< Extra cost per tile for diagonal bridge spans.
+    int land_base_cost = 10;                      ///< Base movement cost through open wilderness.
+    int existing_road_cost = 2;                   ///< Cost to traverse existing roads (orthogonal).
+    const CMatrix<bool>* existing_roads = nullptr; ///< Optional mask of existing road/bridge network.
+};
+
+/**
+ * @brief Builds a route connecting two positions, taking into account river crossings and bridges.
+ *
+ * Prefers natural routing over solid land. When water must be crossed, only permits strictly straight
+ * bridges (horizontal, vertical, or diagonal) with solid collinear banks on both sides (.===.).
+ *
+ * Reuses existing road and bridge segments at low cost when @p config.existing_roads is provided,
+ * allowing subsequent routes to share trunks before cleanly branching.
+ *
+ * @param[out] route Vector populated with resulting continuous path coordinates (including intermediate bridge tiles).
+ * @param map Map supplying terrain types.
+ * @param start Starting position.
+ * @param end Destination position.
+ * @param config Optional routing and bridge configuration.
+ * @return True if a route was found, false otherwise.
+ */
+bool BuildRouteWithBridges(
+    std::vector<Position>& route,
+    const CMap& map,
+    const Position& start,
+    const Position& end,
+    const SRouteWithBridgesConfig& config = {}
+)
+{
+    route.clear();
+    if (!map.inside(start) || !map.inside(end)) {
+        return false;
+    }
+    if (start == end) {
+        route.push_back(start);
+        return true;
+    }
+
+    const auto width = map.getWidth(), height = map.getHeight();
+    const auto count = width * height;
+    const auto index = [width](Position p) { return p.y * width + p.x; };
+
+    // A winding guide gives new roads a natural shape.
+    CMatrix<bool> near_guide(map.getSize(), false);
+    if (config.pertamt > 0) {
+        std::vector<Position> guide;
+        BuildWindingPath(guide, map, start, end, config.pertamt);
+        for (const Position p : guide) {
+            for (int dy = -2; dy <= 2; ++dy) {
+                for (int dx = -2; dx <= 2; ++dx) {
+                    const Position at(p.x + dx, p.y + dy);
+                    if (map.inside(at)) near_guide.set(at.x, at.y, true);
+                }
+            }
+        }
+    }
+
+    CMatrix<bool> near_road(map.getSize(), false);
+    if (config.existing_roads) {
+        for (std::size_t y = 0; y < height; ++y) {
+            for (std::size_t x = 0; x < width; ++x) {
+                if (config.existing_roads->get(x, y)) {
+                    for (int dy = -1; dy <= 1; ++dy) {
+                        for (int dx = -1; dx <= 1; ++dx) {
+                            const Position at(x + dx, y + dy);
+                            if (map.inside(at)) near_road.set(at.x, at.y, true);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    std::vector<int> costs(count, std::numeric_limits<int>::max());
+    std::vector<std::size_t> parent(count, count);
+    using Entry = std::pair<int, std::size_t>;
+    std::priority_queue<Entry, std::vector<Entry>, std::greater<Entry>> pending;
+
+    costs[index(start)] = 0;
+    pending.emplace(0, index(start));
+
+    while (!pending.empty()) {
+        const auto [cost, cell] = pending.top();
+        pending.pop();
+
+        if (cost != costs[cell]) continue;
+        if (cell == index(end)) break;
+
+        const Position here(cell % width, cell / width);
+        const auto here_type = map.get(here).getType();
+        const bool here_is_solid = (here_type != "water" && here_type != "bridge");
+
+        for (int dy = -1; dy <= 1; ++dy) {
+            for (int dx = -1; dx <= 1; ++dx) {
+                if (dx == 0 && dy == 0) continue;
+                const Position next(here.x + dx, here.y + dy);
+                if (!map.inside(next)) continue;
+
+                const bool next_on_road = config.existing_roads && config.existing_roads->get(next.x, next.y);
+                const auto next_type = map.get(next).getType();
+                const bool next_is_water = (next_type == "water");
+                const bool is_diagonal = (dx != 0 && dy != 0);
+
+                // 1. Reusing existing road or bridge tiles is cheap
+                if (next_on_road) {
+                    const int step = is_diagonal ? (config.existing_road_cost * 3 / 2) : config.existing_road_cost;
+                    const auto target = index(next);
+                    if (cost + step < costs[target]) {
+                        costs[target] = cost + step;
+                        parent[target] = cell;
+                        pending.emplace(cost + step, target);
+                    }
+                    continue;
+                }
+
+                // 2. Stepping onto water to build a new bridge
+                if (here_is_solid && next_is_water) {
+                    const auto span = FindStraightBridgeSpan(
+                        map, here, dx, dy, config.max_bridge_span,
+                        config.bridge_setup_cost, config.bridge_per_tile_cost, config.bridge_diagonal_cost
+                    );
+                    if (!span.valid) continue;
+
+                    const auto target = index(span.landing);
+                    if (cost + span.cost < costs[target]) {
+                        costs[target] = cost + span.cost;
+                        parent[target] = cell;
+                        pending.emplace(cost + span.cost, target);
+                    }
+                    continue;
+                }
+
+                // 3. Solid land to solid land movement
+                if (!next_is_water && next_type != "bridge") {
+                    const bool on_guide = (config.pertamt <= 0) || near_guide.get(next.x, next.y);
+                    const bool beside_road = config.existing_roads && near_road.get(next.x, next.y);
+                    int step = config.land_base_cost + (on_guide ? 0 : 8) + (beside_road ? 24 : 0);
+                    if (is_diagonal) {
+                        step = step * 14 / 10;
+                    }
+                    const auto target = index(next);
+                    if (cost + step < costs[target]) {
+                        costs[target] = cost + step;
+                        parent[target] = cell;
+                        pending.emplace(cost + step, target);
+                    }
+                    continue;
+                }
+            }
+        }
+    }
+
+    if (costs[index(end)] == std::numeric_limits<int>::max()) {
+        return false;
+    }
+
+    std::vector<Position> key_nodes;
+    for (auto cell = index(end); cell != count; cell = parent[cell]) {
+        key_nodes.emplace_back(cell % width, cell / width);
+    }
+    std::ranges::reverse(key_nodes);
+
+    for (std::size_t i = 0; i + 1 < key_nodes.size(); ++i) {
+        const Position u = key_nodes[i];
+        const Position v = key_nodes[i + 1];
+        route.push_back(u);
+
+        const int max_diff = std::max(
+            std::abs(static_cast<int>(v.x) - static_cast<int>(u.x)),
+            std::abs(static_cast<int>(v.y) - static_cast<int>(u.y))
+        );
+        if (max_diff > 1) {
+            const int step_x = (static_cast<int>(v.x) > static_cast<int>(u.x)) -
+                               (static_cast<int>(v.x) < static_cast<int>(u.x));
+            const int step_y = (static_cast<int>(v.y) > static_cast<int>(u.y)) -
+                               (static_cast<int>(v.y) < static_cast<int>(u.y));
+            Position cur(static_cast<int>(u.x) + step_x, static_cast<int>(u.y) + step_y);
+            while (cur != v) {
+                route.push_back(cur);
+                cur.x += step_x;
+                cur.y += step_y;
+            }
+        }
+    }
+    route.push_back(key_nodes.back());
+    return true;
+}
+
+/**
+ * @brief Stamps a road with bridges between two points onto a map.
+ *
+ * Computes a route using @ref BuildRouteWithBridges and paints it onto the map:
+ * - Water tiles (and existing bridges) are painted with @p bridge_type.
+ * - Land tiles are painted with @p road_type.
+ * - If @p road_mask is provided, newly paved tiles are set to true.
+ *
+ * @param map Map to draw on.
+ * @param start Starting position.
+ * @param end Destination position.
+ * @param path_type Tile type for terrestrial road cells (defaults to "corridor").
+ * @param bridge_type Tile type for aquatic bridge crossings (defaults to "bridge").
+ * @param road_mask Optional mask updated with road/bridge cells.
+ * @param config Routing configuration.
+ * @return True if the road was successfully built and stamped, false if unreachable.
+ */
+bool AddRoadWithBridges(
+    CMap& map,
+    const Position& start,
+    const Position& end,
+    std::string_view path_type = "corridor",
+    std::string_view bridge_type = "bridge",
+    CMatrix<bool>* road_mask = nullptr,
+    SRouteWithBridgesConfig config = {}
+)
+{
+    if (road_mask && !config.existing_roads) {
+        config.existing_roads = road_mask;
+    }
+    std::vector<Position> route;
+    if (!BuildRouteWithBridges(route, map, start, end, config)) {
+        return false;
+    }
+    for (const auto& pt : route) {
+        const auto type = map.get(pt).getType();
+        if (type == "water" || type == "bridge") {
+            map.SetCell(pt.x, pt.y, bridge_type);
+        } else {
+            map.SetCell(pt.x, pt.y, path_type);
+        }
+        if (road_mask) {
+            road_mask->set(pt.x, pt.y, true);
+        }
+    }
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
 
 /**
  * @brief Builds a randomized zigzag path between two points.

@@ -125,3 +125,4 @@ landscapes using Voronoi diagrams, based on Andrew Doull's algorithm
 | `BuildSigsagPath` / `AddSigsagRoad` | Chamfered corners | Cuts 1-cell corners while retaining large turns. |
 | `BuildWindingPath` / `AddWindingRoad` | Smooth natural curves | Perturbs spaced waypoints with turn-angle limits. |
 | `BuildWindingRoute` | Cost-aware curves | Accepts a tile-cost callback to avoid lakes or prefer paths. |
+| `BuildRouteWithBridges` / `AddRoadWithBridges` | River-crossing roads | Dijkstra-based routing with strictly straight bridges across water and road network reuse. |

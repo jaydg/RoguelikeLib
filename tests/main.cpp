@@ -19,6 +19,7 @@ void TestVoronoiBogs();
 void TestVoronoiChasms();
 void TestVoronoiFields();
 void TestWindingRoad();
+void TestRoadsWithBridges();
 void TestForestRoads();
 void TestMapStamp();
 void TestTownRoads();
@@ -71,6 +72,7 @@ int main(int argc, char* argv[])
         {"MultiRegionChasms", TestVoronoiChasms},
         {"MultiRegionFields", TestVoronoiFields},
         {"WindingRoad", TestWindingRoad},
+        {"RoadsWithBridges", TestRoadsWithBridges},
         {"ForestRoads", TestForestRoads},
         {"RiverlandRoads", TestForestRoads},
         {"MapStamp", TestMapStamp},
