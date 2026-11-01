@@ -128,3 +128,38 @@ std::string formatted = std::format("Year {}, {} of {}",
     date.year, RL::Ordinal(date.day), calendar.PartName(date.part));
 // "Year 1, 16th of Seedmoon"
 ```
+
+---
+
+## Turn-Based Clock & Daily Schedules (`rl.clock`)
+
+The clock module provides `RL::CClock` for tracking time of day in turn-based worlds and `RL::CDailySchedule` for recurring daily phases and character routines:
+
+- **Turn-to-Time Progression**: Advance by a configurable number of minutes per turn (`RL::CClock::Advance()`).
+- **Time Queries**: Query hour (0-23), minute (0-59), minute of the day (0-1439), and elapsed days (0 on day 1).
+- **Serialization**: Simple state saving and restoring via `RL::CClock::Minutes()` and `RL::CClock::FromMinutes()`.
+- **Timestamp Formatting**: `RL::CClock::ToString()` produces standard `"HH:MM"` 24-hour time strings.
+- **Daily Schedules**: `RL::CDailySchedule<T>` maps times of day to states (e.g. dawn, day, dusk, night) with automatic wrap-around past midnight.
+
+```cpp
+import rl.clock;
+import std;
+
+// 1. Create a clock with 1 minute per turn, starting at 08:00
+RL::CClock clock(1, 8, 0);
+
+// 2. Set up recurring daily phases
+RL::CDailySchedule<std::string_view> day;
+day.Set(6, 0, "morning");
+day.Set(12, 0, "afternoon");
+day.Set(18, 0, "evening");
+day.Set(22, 0, "night");
+
+// 3. Advance turns (e.g. 5 hours = 300 turns)
+clock.Advance(300);
+
+clock.ToString();   // "13:00"
+clock.Hour();       // 13
+clock.Day();        // 0 (first day)
+day.At(clock);      // "afternoon"
+```
