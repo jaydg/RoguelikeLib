@@ -545,11 +545,159 @@ struct CCastleConfig {
     }
 };
 
+struct CMultiRegionConfig {
+    struct BiomeEntry {
+        std::string label;
+        std::function<TerrainBiome()> create;
+    };
+
+    struct SettlementEntry {
+        std::string label;
+        bool with_buildings;
+    };
+
+    struct RegionCountEntry {
+        std::string label;
+        int count;
+    };
+
+    struct PresetEntry {
+        std::string label;
+        std::size_t settlement;
+        std::size_t region_count;
+        std::size_t forest;
+        std::size_t hills;
+        std::size_t grass;
+    };
+
+    std::vector<SettlementEntry> settlements = {
+        {"Buildings & Fields", true},
+        {"No Buildings (Bogs)", false}
+    };
+
+    std::vector<RegionCountEntry> regions = {
+        {"Auto (~1/200 cells)", 0},
+        {"12 Regions", 12},
+        {"25 Regions", 25},
+        {"40 Regions", 40},
+        {"60 Regions", 60}
+    };
+
+    std::vector<BiomeEntry> forests = {
+        {"Forest Pine (Unicode)", []() -> TerrainBiome {
+            return SForestBiome{.vegetation_density = 0.65f, .tree_tile = "pine"};
+        }},
+        {"Forest (ASCII)", []() -> TerrainBiome {
+            return SForestBiome{.vegetation_density = 0.65f};
+        }},
+        {"Dense Pine Wildwood", []() -> TerrainBiome {
+            return SForestBiome{.tree_density = 0.85f, .vegetation_density = 0.85f, .patchiness = 0.4f, .tree_tile = "pine"};
+        }},
+        {"Bogland", []() -> TerrainBiome {
+            return SBogBiome{};
+        }},
+        {"Rolling Hills", []() -> TerrainBiome {
+            return SHillsBiome{};
+        }}
+    };
+
+    std::vector<BiomeEntry> hills = {
+        {"Rolling Hills", []() -> TerrainBiome {
+            return SHillsBiome{};
+        }},
+        {"Bogland", []() -> TerrainBiome {
+            return SBogBiome{};
+        }},
+        {"Plain Grass", []() -> TerrainBiome {
+            return SSolidBiome{"grass"};
+        }}
+    };
+
+    std::vector<BiomeEntry> grasses = {
+        {"Grassland Pine (Unicode)", []() -> TerrainBiome {
+            return SGrasslandBiome{.tree_tile = "pine"};
+        }},
+        {"Grassland (ASCII)", []() -> TerrainBiome {
+            return SGrasslandBiome{};
+        }},
+        {"Rolling Hills", []() -> TerrainBiome {
+            return SHillsBiome{};
+        }}
+    };
+
+    std::vector<PresetEntry> presets = {
+        {"Standard (Unicode)", 0, 0, 0, 0, 0},
+        {"Classic ASCII", 0, 0, 1, 0, 1},
+        {"Dense Pine Wildwood", 0, 2, 2, 0, 0},
+        {"Bog & Fenland (Wild)", 1, 0, 3, 1, 1},
+        {"Highland Valleys", 0, 1, 4, 0, 0},
+        {"Sparse Settlements", 0, 1, 0, 0, 0}
+    };
+
+    std::size_t settlement_idx = 0;
+    std::size_t region_idx = 0;
+    std::size_t forest_idx = 0;
+    std::size_t hills_idx = 0;
+    std::size_t grass_idx = 0;
+    std::optional<std::size_t> preset_idx = 0;
+
+    void CheckPresetMatch()
+    {
+        preset_idx.reset();
+        for (std::size_t i = 0; i < presets.size(); ++i) {
+            if (presets[i].settlement == settlement_idx &&
+                presets[i].region_count == region_idx &&
+                presets[i].forest == forest_idx &&
+                presets[i].hills == hills_idx &&
+                presets[i].grass == grass_idx) {
+                preset_idx = i;
+                break;
+            }
+        }
+    }
+
+    void ApplyPreset(std::size_t idx)
+    {
+        if (idx < presets.size()) {
+            preset_idx = idx;
+            settlement_idx = presets[idx].settlement;
+            region_idx = presets[idx].region_count;
+            forest_idx = presets[idx].forest;
+            hills_idx = presets[idx].hills;
+            grass_idx = presets[idx].grass;
+        }
+    }
+
+    void Generate(CMap& map) const
+    {
+        RegisterBiomeTiles();
+        const SMultiRegionConfig config{
+            .num_regions = regions[region_idx].count,
+            .with_buildings = settlements[settlement_idx].with_buildings,
+            .forest_biome = forests[forest_idx].create(),
+            .bog_biome = SBogBiome{},
+            .hills_biome = hills[hills_idx].create(),
+            .grass_biome = grasses[grass_idx].create()
+        };
+        CreateMultiRegion(map, config);
+    }
+
+    [[nodiscard]] std::string Summary() const
+    {
+        if (preset_idx) {
+            return std::format("{} | C: configure", presets[*preset_idx].label);
+        }
+        return std::format("{} / {} | C: configure",
+                           settlements[settlement_idx].label,
+                           forests[forest_idx].label);
+    }
+};
+
 std::vector<SGenerator> Generators(std::shared_ptr<CCaveGladeConfig> cave_glade_config = nullptr,
                                    std::shared_ptr<CRiverlandConfig> riverland_config = nullptr,
-                                   std::shared_ptr<CCastleConfig> castle_config = nullptr)
+                                   std::shared_ptr<CCastleConfig> castle_config = nullptr,
+                                   std::shared_ptr<CMultiRegionConfig> multiregion_config = nullptr)
 {
-    const auto voronoi_buildings = std::make_shared<bool>(false);
     std::vector<SGenerator> result = {
         {
             "Standard Dungeon", [](CMap & map)
@@ -636,14 +784,17 @@ std::vector<SGenerator> Generators(std::shared_ptr<CCaveGladeConfig> cave_glade_
             }
         },
         {
-            "Multi-Region Wilderness", [voronoi_buildings](CMap & map)
+            "Multi-Region Wilderness", [multiregion_config](CMap & map)
             {
-                *voronoi_buildings = Random(2) != 0;
-                CreateMultiRegion(map, 0, *voronoi_buildings);
+                if (multiregion_config) {
+                    multiregion_config->Generate(map);
+                } else {
+                    CreateMultiRegion(map, 0, false);
+                }
             },
-            [voronoi_buildings]()
+            [multiregion_config]()
             {
-                return *voronoi_buildings ? "buildings and fields" : "no buildings; bogs";
+                return multiregion_config ? multiregion_config->Summary() : "C: configure";
             }
         },
         {
@@ -1152,6 +1303,151 @@ public:
     }
 };
 
+// Configuration dialog for Multi-Region Wilderness
+class CMultiRegionConfigWindow : public CWindow
+{
+    std::shared_ptr<CMultiRegionConfig> config;
+    std::function<void()> on_change;
+    std::size_t selected_row = 0;
+    bool done = false;
+
+public:
+    CMultiRegionConfigWindow(std::shared_ptr<CMultiRegionConfig> a_config, std::function<void()> a_on_change)
+        : CWindow("Multi-Region Wilderness Studio", {Position(4, 3), Size(50, 11)},
+                  EWindowOptions::NoResize | EWindowOptions::NoMove | EWindowOptions::NoClose),
+          config(std::move(a_config)), on_change(std::move(a_on_change))
+    {
+    }
+
+    [[nodiscard]] bool TakeDone()
+    {
+        const bool res = done;
+        done = false;
+        return res;
+    }
+
+    void CycleRow(int dir)
+    {
+        if (!config) return;
+        if (selected_row == 0) {
+            const int count = static_cast<int>(config->presets.size());
+            const int cur = config->preset_idx ? static_cast<int>(*config->preset_idx) : 0;
+            const int next = (cur + dir + count) % count;
+            config->ApplyPreset(static_cast<std::size_t>(next));
+        } else if (selected_row == 1) {
+            const int count = static_cast<int>(config->settlements.size());
+            config->settlement_idx = (static_cast<int>(config->settlement_idx) + dir + count) % count;
+            config->CheckPresetMatch();
+        } else if (selected_row == 2) {
+            const int count = static_cast<int>(config->regions.size());
+            config->region_idx = (static_cast<int>(config->region_idx) + dir + count) % count;
+            config->CheckPresetMatch();
+        } else if (selected_row == 3) {
+            const int count = static_cast<int>(config->forests.size());
+            config->forest_idx = (static_cast<int>(config->forest_idx) + dir + count) % count;
+            config->CheckPresetMatch();
+        } else if (selected_row == 4) {
+            const int count = static_cast<int>(config->hills.size());
+            config->hills_idx = (static_cast<int>(config->hills_idx) + dir + count) % count;
+            config->CheckPresetMatch();
+        } else if (selected_row == 5) {
+            const int count = static_cast<int>(config->grasses.size());
+            config->grass_idx = (static_cast<int>(config->grass_idx) + dir + count) % count;
+            config->CheckPresetMatch();
+        }
+        if (on_change) {
+            on_change();
+        }
+    }
+
+    void Draw(CScreen& screen, const SRect& inside) override
+    {
+        if (inside.Empty() || !config) return;
+
+        const std::string preset_str = config->preset_idx ? config->presets[*config->preset_idx].label : "(Custom)";
+
+        struct RowDisplay {
+            std::string label;
+            std::string value;
+        };
+
+        const std::array<RowDisplay, 6> rows = {{
+            {"Preset:", preset_str},
+            {"Town/Bogs:", config->settlements[config->settlement_idx].label},
+            {"Regions:", config->regions[config->region_idx].label},
+            {"Forests:", config->forests[config->forest_idx].label},
+            {"Hills:", config->hills[config->hills_idx].label},
+            {"Grasslands:", config->grasses[config->grass_idx].label}
+        }};
+
+        for (std::size_t i = 0; i < rows.size(); ++i) {
+            if (i >= inside.size.y) break;
+            const bool is_selected = (i == selected_row);
+            const std::string prefix = is_selected ? "> " : "  ";
+            const std::uint32_t colour = is_selected ? 0xFFFF70 : 0xC0C0C0;
+
+            const std::string text = std::format("{}{:13} ◄ {:^24} ►",
+                                                 prefix, rows[i].label, rows[i].value);
+            screen.Print(inside.corner.x + 1, inside.corner.y + i, text, colour, is_selected);
+        }
+
+        if (inside.size.y > 7) {
+            screen.Print(inside.corner.x + 1, inside.corner.y + 7,
+                         "↑/↓: row | ←/→: cycle | R: re-roll | Enter: done",
+                         0x808080);
+        }
+    }
+
+    bool HandleKey(const SKey& key) override
+    {
+        if (key.type == EKey::Closed || key.type == EKey::Escape ||
+            (key.type == EKey::Char && (key.ch == U'q' || key.ch == U'Q' || key.ch == 3))) {
+            done = true;
+            return true;
+        }
+        if (key.type == EKey::Enter || (key.type == EKey::Char && (key.ch == U'c' || key.ch == U'C'))) {
+            done = true;
+            return true;
+        }
+        if (key.type == EKey::Up || (key.type == EKey::Char && key.ch == U'k')) {
+            selected_row = (selected_row + 5) % 6;
+            return true;
+        }
+        if (key.type == EKey::Down || (key.type == EKey::Char && key.ch == U'j')) {
+            selected_row = (selected_row + 1) % 6;
+            return true;
+        }
+        if (key.type == EKey::Left || (key.type == EKey::Char && key.ch == U'h')) {
+            CycleRow(-1);
+            return true;
+        }
+        if (key.type == EKey::Right || (key.type == EKey::Char && (key.ch == U'l' || key.ch == U' '))) {
+            CycleRow(1);
+            return true;
+        }
+        if (key.type == EKey::Char && (key.ch == U'r' || key.ch == U'R')) {
+            if (on_change) on_change();
+            return true;
+        }
+        return false;
+    }
+
+    void Click(Position at, EMouseButton button) override
+    {
+        if (button != EMouseButton::Left) return;
+        if (at.y < 6) {
+            selected_row = at.y;
+            if (at.x < 24) {
+                CycleRow(-1);
+            } else {
+                CycleRow(1);
+            }
+        } else if (at.y >= 7) {
+            done = true;
+        }
+    }
+};
+
 // Each tab owns its demonstration state. The generator tab embeds the
 // library list widget, forwarding input in its sidebar to that widget.
 class CFeatureWindow : public CWindow
@@ -1330,6 +1626,7 @@ public:
                    std::shared_ptr<CCaveGladeConfig> a_cave_glade_config = nullptr,
                    std::shared_ptr<CRiverlandConfig> a_riverland_config = nullptr,
                    std::shared_ptr<CCastleConfig> a_castle_config = nullptr,
+                   std::shared_ptr<CMultiRegionConfig> a_multiregion_config = nullptr,
                    std::function<void(std::string_view)> a_open_config = nullptr)
         : CWindow(std::move(title),
     {
@@ -1338,7 +1635,7 @@ public:
       open_config_cb(std::move(a_open_config))
     {
         if (mode == 0) {
-            generators = Generators(a_cave_glade_config, a_riverland_config, a_castle_config);
+            generators = Generators(a_cave_glade_config, a_riverland_config, a_castle_config, a_multiregion_config);
             std::vector<std::string> labels;
 
             for (const auto& generator : generators) {
@@ -1713,6 +2010,7 @@ int main(int argc, char* argv[])
         auto cave_glade_config = std::make_shared<CCaveGladeConfig>();
         auto riverland_config = std::make_shared<CRiverlandConfig>();
         auto castle_config = std::make_shared<CCastleConfig>();
+        auto multiregion_config = std::make_shared<CMultiRegionConfig>();
         std::vector<std::unique_ptr<CFeatureWindow>> tabs;
         const std::array titles = {"Map generators", "FOV", "Path finding", "Distance map", "Scheduler", "Calendar"};
 
@@ -1732,9 +2030,15 @@ int main(int argc, char* argv[])
                 tabs[0]->Generate();
             }
         });
+        CMultiRegionConfigWindow multiregion_config_window(multiregion_config, [&] {
+            if (!tabs.empty() && tabs[0]) {
+                tabs[0]->Generate();
+            }
+        });
         bool configuring_cave = false;
         bool configuring_riverland = false;
         bool configuring_castle = false;
+        bool configuring_multiregion = false;
         auto close_config = [&] {
             windows.Close(config_window);
             windows.Focus(*tabs[active]);
@@ -1749,6 +2053,11 @@ int main(int argc, char* argv[])
             windows.Close(castle_config_window);
             windows.Focus(*tabs[active]);
             configuring_castle = false;
+        };
+        auto close_multiregion_config = [&] {
+            windows.Close(multiregion_config_window);
+            windows.Focus(*tabs[active]);
+            configuring_multiregion = false;
         };
         auto open_config = [&](std::string_view target_generator = {}) {
             if (active != 0) {
@@ -1807,12 +2116,28 @@ int main(int argc, char* argv[])
                 });
                 windows.Open(config_window);
                 windows.Focus(config_window);
+            } else if (target == "Multi-Region Wilderness") {
+                tabs[0]->SelectGenerator("Multi-Region Wilderness");
+                configuring_multiregion = true;
+                for (auto& tab : tabs) tab->Hover(std::nullopt);
+                const Size scr_size = screen.getSize();
+                const std::size_t win_w = std::min<std::size_t>(50, scr_size.x > 4 ? scr_size.x - 2 : scr_size.x);
+                const std::size_t win_h = std::min<std::size_t>(11, scr_size.y > 4 ? scr_size.y - 2 : scr_size.y);
+                const Position pos(scr_size.x > win_w ? (scr_size.x - win_w) / 2 : 1,
+                                   scr_size.y > win_h ? (scr_size.y - win_h) / 2 : 1);
+                windows.setLayout(multiregion_config_window, SWindowLayout{
+                    .open = true,
+                    .dock = EDock::None,
+                    .floating = SRect(pos, Size(win_w, win_h))
+                });
+                windows.Open(multiregion_config_window);
+                windows.Focus(multiregion_config_window);
             }
         };
 
         for (std::size_t index = 0; index < titles.size(); ++index) {
             tabs.push_back(std::make_unique<CFeatureWindow>(titles[index], static_cast<int>(index), map_size,
-                                                            cave_glade_config, riverland_config, castle_config,
+                                                            cave_glade_config, riverland_config, castle_config, multiregion_config,
                                                             [&](std::string_view name) { open_config(name); }));
             tabs.back()->setFrameTitle("RoguelikeLib features demo");
             windows.Open(*tabs.back());
@@ -1889,7 +2214,7 @@ int main(int argc, char* argv[])
 
             if (key.type == EKey::Mouse) {
                 for (auto& tab : tabs) {
-                    tab->Hover((editing_size || configuring_cave || configuring_riverland || configuring_castle) ? std::nullopt : std::optional(key.mouse.position));
+                    tab->Hover((editing_size || configuring_cave || configuring_riverland || configuring_castle || configuring_multiregion) ? std::nullopt : std::optional(key.mouse.position));
                 }
             }
 
@@ -1923,11 +2248,18 @@ int main(int argc, char* argv[])
                 }
                 continue;
             }
-            if (!editing_size && !configuring_cave && !configuring_riverland && !configuring_castle && key.type == EKey::Char && (key.ch == U'c' || key.ch == U'C')) {
+            if (configuring_multiregion && key.type != EKey::Closed && !(key.type == EKey::Char && key.ch == 3)) {
+                multiregion_config_window.HandleKey(key);
+                if (multiregion_config_window.TakeDone()) {
+                    close_multiregion_config();
+                }
+                continue;
+            }
+            if (!editing_size && !configuring_cave && !configuring_riverland && !configuring_castle && !configuring_multiregion && key.type == EKey::Char && (key.ch == U'c' || key.ch == U'C')) {
                 open_config(tabs[0] ? tabs[0]->getSelectedGeneratorName() : "");
                 continue;
             }
-            if (!editing_size && !configuring_cave && !configuring_riverland && !configuring_castle && key.type == EKey::Char && (key.ch == U'm' || key.ch == U'M')) {
+            if (!editing_size && !configuring_cave && !configuring_riverland && !configuring_castle && !configuring_multiregion && key.type == EKey::Char && (key.ch == U'm' || key.ch == U'M')) {
                 const auto dimensions = tabs[active < 4 ? active : 0]->getMapSize();
                 size_entry.Begin(dimensions);
                 editing_size = true;
@@ -1952,6 +2284,9 @@ int main(int argc, char* argv[])
                 }
                 if (configuring_castle && castle_config_window.TakeDone()) {
                     close_castle_config();
+                }
+                if (configuring_multiregion && multiregion_config_window.TakeDone()) {
+                    close_multiregion_config();
                 }
 
                 for (std::size_t index = 0; index < tabs.size(); ++index) {
