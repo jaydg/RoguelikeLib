@@ -186,4 +186,58 @@ void TestRandomness()
     std::array<int, 8> order{0, 1, 2, 3, 4, 5, 6, 7};
     RL::Shuffle(order.begin(), order.end());
     Check(order == std::array<int, 8>{2, 4, 6, 7, 1, 0, 3, 5}, "Shuffle() orders as pinned");
+    // Owned bindings select an engine without advancing the coordinator.
+    {
+        const auto coordinator = RL::GetRandomState();
+        RL::Xoshiro256PlusPlus owned(2026);
+        RL::Xoshiro256PlusPlus nested(17);
+        {
+            const RL::CScopedRandomBinding binding(owned);
+            Check(RL::Random(100) == 42, "bound engine uses the pinned range mapping");
+            const auto outer = RL::GetRandomState();
+            try {
+                const RL::CScopedRandomBinding inner(nested);
+                RL::InitRandomness(2026);
+                Check(RL::Random(100) == 42, "seeding affects the selected owned engine");
+                throw std::runtime_error("binding unwind");
+            } catch (const std::runtime_error&) {}
+            Check(RL::GetRandomState() == outer, "unwind restores the outer engine without modifying it");
+        }
+        Check(RL::GetRandomState() == coordinator, "owned binding preserves coordinator continuation");
+    }
+    // Keep bindings active while the coordinator draws. Assertions run only
+    // after joining; workers write distinct result containers.
+    {
+        std::array<std::vector<unsigned>, 4> expected;
+        std::array<std::vector<unsigned>, 4> actual;
+        for (std::size_t i = 0; i < expected.size(); ++i) {
+            RL::Xoshiro256PlusPlus engine(100 + i);
+            const RL::CScopedRandomBinding binding(engine);
+            for (int draw = 0; draw < 1000; ++draw) { expected[i].push_back(RL::Random(1000003)); }
+        }
+        const auto before = RL::GetRandomState();
+        const auto coordinator_draw = RL::Random(1000003);
+        const auto after = RL::GetRandomState();
+        Check(RL::SetRandomState(before), "coordinator checkpoint restores before concurrency fixture");
+        std::barrier entered(5);
+        std::barrier resume(5);
+        std::vector<std::jthread> workers;
+        for (std::size_t i = 0; i < actual.size(); ++i) {
+            workers.emplace_back([&, i] {
+                RL::Xoshiro256PlusPlus engine(100 + i);
+                const RL::CScopedRandomBinding binding(engine);
+                entered.arrive_and_wait();
+                resume.arrive_and_wait();
+                for (int draw = 0; draw < 1000; ++draw) { actual[i].push_back(RL::Random(1000003)); }
+            });
+        }
+        entered.arrive_and_wait();
+        Check(RL::GetRandomState() == before, "worker bindings never replace coordinator selection");
+        Check(RL::Random(1000003) == coordinator_draw, "coordinator draw is independent of active workers");
+        resume.arrive_and_wait();
+        workers.clear();
+        Check(actual == expected, "concurrent owned streams match serial references");
+        Check(RL::GetRandomState() == after, "workers do not advance the coordinator engine");
+    }
+
 }

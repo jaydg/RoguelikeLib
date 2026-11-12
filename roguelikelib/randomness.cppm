@@ -20,6 +20,15 @@ namespace RL
 // Internal module state (not exported, has module linkage)
 Xoshiro256PlusPlus rng;
 
+// Unbound calls retain the original coordinator stream. A job may bind its
+// own engine on its executing thread; the bound engine must outlive the scope.
+thread_local Xoshiro256PlusPlus* bound_rng = nullptr;
+
+Xoshiro256PlusPlus& CurrentRandomEngine() noexcept
+{
+    return bound_rng ? *bound_rng : rng;
+}
+
 // The engine's draws are mapped onto a range here, not by the standard library's
 // distributions: the standard prescribes what an engine yields, but not how a
 // distribution uses it, so libc++ and libstdc++ make different numbers of one seed.
@@ -45,16 +54,16 @@ std::pair<std::uint64_t, std::uint64_t> Product(const std::uint64_t a, const std
 std::uint64_t Below(const std::uint64_t count)
 {
     if (count == 0) {
-        return rng();
+        return CurrentRandomEngine()();
     }
 
-    auto [high, low] = Product(rng(), count);
+    auto [high, low] = Product(CurrentRandomEngine()(), count);
 
     if (low < count) {
         const std::uint64_t threshold = (0 - count) % count;
 
         while (low < threshold) {
-            std::tie(high, low) = Product(rng(), count);
+            std::tie(high, low) = Product(CurrentRandomEngine()(), count);
         }
     }
 
@@ -66,7 +75,7 @@ std::uint64_t Below(const std::uint64_t count)
 float Canonical()
 {
     while (true) {
-        const float value = static_cast<float>(static_cast<std::uint32_t>(rng())) / 4294967296.0f;
+        const float value = static_cast<float>(static_cast<std::uint32_t>(CurrentRandomEngine()())) / 4294967296.0f;
 
         if (value < 1.0f) {
             return value;
@@ -76,6 +85,22 @@ float Canonical()
 
 // Public API (exported)
 export {
+
+    // Thread-affine, nestable binding over an explicitly owned engine. Existing
+    // Random/Shuffle/name-generation callers automatically use this engine.
+    // An engine can migrate between threads between scopes, never concurrently.
+    class CScopedRandomBinding
+    {
+        Xoshiro256PlusPlus* previous;
+    public:
+        explicit CScopedRandomBinding(Xoshiro256PlusPlus& engine) noexcept
+            : previous(std::exchange(bound_rng, &engine)) {}
+        ~CScopedRandomBinding() { bound_rng = previous; }
+        CScopedRandomBinding(const CScopedRandomBinding&) = delete;
+        CScopedRandomBinding& operator=(const CScopedRandomBinding&) = delete;
+        CScopedRandomBinding(CScopedRandomBinding&&) = delete;
+        CScopedRandomBinding& operator=(CScopedRandomBinding&&) = delete;
+    };
 
     /**
      * @brief Seeds the pseudo-random number generator with a deterministic 64-bit value.
@@ -88,7 +113,7 @@ export {
      */
     void InitRandomness(const std::uint64_t seed)
     {
-        rng.seed(seed);
+        CurrentRandomEngine().seed(seed);
     }
 
     /**
@@ -117,7 +142,7 @@ export {
     std::string GetRandomState()
     {
         std::ostringstream state;
-        state << rng;
+        state << CurrentRandomEngine();
         return state.str();
     }
 
@@ -140,7 +165,7 @@ export {
             return false;
         }
 
-        rng = restored;
+        CurrentRandomEngine() = restored;
         return true;
     }
 
