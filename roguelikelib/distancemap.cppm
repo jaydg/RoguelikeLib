@@ -264,6 +264,87 @@ public:
                     }
                 }
             }
+        } else if (!limited) {
+            // BUCKET QUEUE FOR VARIABLE COSTS over the whole map (Dial's
+            // algorithm): step costs are small whole numbers, so the cells
+            // waiting are kept by their distance, in as many buckets as one
+            // step can cost and one more, taken in turn. Every cell gets the
+            // same, shortest, distance as a priority queue would give it.
+            by_name = CostsByName(costs);
+            int widest = 1;
+
+            for (const auto& [name, cost] : by_name) {
+                widest = std::max(widest, cost);
+            }
+
+            std::vector<std::vector<Position>> buckets(static_cast<std::size_t>(widest) + 1);
+            std::size_t waiting_cells = 0;
+            const auto bucket_of = [&buckets](int dist) -> std::vector<Position>& {
+                return buckets[static_cast<std::size_t>(dist) % buckets.size()];
+            };
+
+            for (const Position& goal : goals) {
+                if (map.inside(goal)) {
+                    const auto& tile = map.get_unchecked(goal.x, goal.y);
+                    const int step = tile.isPassable() ? CostOf(tile) : 1;
+                    grid.get_unchecked(goal.x, goal.y) = {0, step};
+                    bucket_of(0).push_back(goal);
+                    ++waiting_cells;
+                }
+            }
+
+            for (int dist = 0; waiting_cells > 0; ++dist) {
+                // What is found from here costs at least one step more, and
+                // at most `widest`: it goes into another bucket than this
+                auto& bucket = bucket_of(dist);
+
+                for (const Position& at : bucket) {
+                    --waiting_cells;
+                    const auto& at_cell = grid.get_unchecked(at.x, at.y);
+
+                    // Found again at a shorter distance since
+                    if (at_cell.distance != dist) {
+                        continue;
+                    }
+
+                    const int new_dist = dist + at_cell.step_cost;
+
+                    if (new_dist > max_distance) {
+                        continue;
+                    }
+
+                    const int ix = static_cast<int>(at.x);
+                    const int iy = static_cast<int>(at.y);
+
+                    for (const auto& [dx, dy] : steps) {
+                        const int nx = ix + dx;
+                        const int ny = iy + dy;
+
+                        if (nx >= 0 && ny >= 0 && nx < static_cast<int>(width) && ny < static_cast<int>(height)) {
+                            const std::size_t unx = static_cast<std::size_t>(nx);
+                            const std::size_t uny = static_cast<std::size_t>(ny);
+                            const auto& from_tile = map.get_unchecked(unx, uny);
+
+                            if (from_tile.isPassable()) {
+                                auto& from_cell = grid.get_unchecked(unx, uny);
+
+                                if (new_dist < from_cell.distance) {
+                                    from_cell.distance = new_dist;
+
+                                    if (from_cell.step_cost == 0) {
+                                        from_cell.step_cost = CostOf(from_tile);
+                                    }
+
+                                    bucket_of(new_dist).push_back(Position(unx, uny));
+                                    ++waiting_cells;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                bucket.clear();
+            }
         } else {
             // DIJKSTRA FOR VARIABLE COSTS, or towards the positions asked
             // for: an A* search, by the fewest steps from a cell to the

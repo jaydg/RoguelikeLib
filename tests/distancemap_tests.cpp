@@ -174,6 +174,104 @@ void TestDistanceMap()
 
     Check(whole, "asked for one that cannot be reached, the whole map is measured");
 
+    // Over the whole map, with differing costs, every distance is the
+    // shortest there is: as plain relaxation, step after step until nothing
+    // changes, finds it - on maps of mixed ground and walls, with one goal
+    // or two, a wall among them, in eight and four directions, as far as
+    // the search may reach or only so far
+    {
+        const std::array ground{"grass", "grass", "corridor", "tree", "water", "plant", "bridge"};
+        const std::array mixed{RL::SStepCost{"grass", 3}, RL::SStepCost{"plant", 5}, RL::SStepCost{"water", 4}};
+        std::mt19937 rolls(7);
+        bool shortest = true;
+
+        for (int round = 0; round < 60; ++round) {
+            RL::CMap map(RL::Size(13, 9));
+
+            for (std::size_t y = 0; y < 9; ++y) {
+                for (std::size_t x = 0; x < 13; ++x) {
+                    map.SetCell(x, y, ground[rolls() % ground.size()]);
+                }
+            }
+
+            std::vector<RL::Position> goals{RL::Position(rolls() % 13, rolls() % 9)};
+
+            if (round % 2 == 1) {
+                goals.emplace_back(rolls() % 13, rolls() % 9);
+            }
+
+            const RL::Neighbors directions = round % 4 < 2 ? RL::Neighbors::All8 : RL::Neighbors::Cardinal4;
+            const int reach = round % 3 == 0 ? 11 : RL::CDistanceMap::unreachable;
+            const RL::CDistanceMap measured(map, goals, mixed, directions, reach);
+
+            // Stepping onto a tile costs its type's cost; onto a goal one
+            // cannot stand on, 1
+            const auto onto = [&](RL::Position pos) {
+                const auto& tile = map.get(pos);
+
+                if (!tile.isPassable()) {
+                    return 1;
+                }
+
+                for (const auto& listed : mixed) {
+                    if (tile.getType() == listed.type) {
+                        return listed.cost;
+                    }
+                }
+
+                return 1;
+            };
+            std::vector<int> best(13 * 9, RL::CDistanceMap::unreachable);
+
+            for (const auto& goal : goals) {
+                best[goal.y * 13 + goal.x] = 0;
+            }
+
+            for (bool changed = true; changed;) {
+                changed = false;
+
+                for (std::size_t y = 0; y < 9; ++y) {
+                    for (std::size_t x = 0; x < 13; ++x) {
+                        const int here = best[y * 13 + x];
+
+                        if (here == RL::CDistanceMap::unreachable) {
+                            continue;
+                        }
+
+                        const int next = here + onto(RL::Position(x, y));
+
+                        for (int dy = -1; dy <= 1; ++dy) {
+                            for (int dx = -1; dx <= 1; ++dx) {
+                                const auto nx = static_cast<int>(x) + dx;
+                                const auto ny = static_cast<int>(y) + dy;
+
+                                if ((dx == 0 && dy == 0) || (directions == RL::Neighbors::Cardinal4 && dx != 0 && dy != 0) ||
+                                        nx < 0 || ny < 0 || nx >= 13 || ny >= 9 || next > reach) {
+                                    continue;
+                                }
+
+                                const RL::Position pos(static_cast<std::size_t>(nx), static_cast<std::size_t>(ny));
+
+                                if (map.get(pos).isPassable() && next < best[pos.y * 13 + pos.x]) {
+                                    best[pos.y * 13 + pos.x] = next;
+                                    changed = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (std::size_t y = 0; y < 9; ++y) {
+                for (std::size_t x = 0; x < 13; ++x) {
+                    shortest = shortest && measured.Distance(RL::Position(x, y)) == best[y * 13 + x];
+                }
+            }
+        }
+
+        Check(shortest, "over the whole map, with costs, every distance is the shortest");
+    }
+
     // Mended after tiles change, the distances and steps are exactly those
     // of the changed map measured anew: trees felled and planted, paths worn
     // in, water bridged, with and without costs, in eight and four
